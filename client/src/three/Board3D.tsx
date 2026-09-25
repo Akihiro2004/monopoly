@@ -80,7 +80,7 @@ export const Board3D: React.FC = () => {
             <mesh receiveShadow castShadow>
               <boxGeometry args={coord.size} />
               <meshStandardMaterial
-                color={ownerColor ? '#ffffff' : '#f8fafc'}
+                color="#f8fafc"
                 roughness={0.4}
               />
             </mesh>
@@ -90,14 +90,6 @@ export const Board3D: React.FC = () => {
               <mesh position={[0, coord.size[1] / 2 + 0.01, bandZ]}>
                 <boxGeometry args={[coord.size[0] * 0.95, 0.02, coord.size[2] * 0.25]} />
                 <meshStandardMaterial color={groupColor} roughness={0.3} />
-              </mesh>
-            )}
-
-            {/* Owner Flag Ring on top if owned */}
-            {ownerColor && (
-              <mesh position={[0, coord.size[1] / 2 + 0.02, 0]}>
-                <boxGeometry args={[coord.size[0] * 0.85, 0.02, coord.size[2] * 0.85]} />
-                <meshStandardMaterial color={ownerColor} transparent opacity={0.35} />
               </mesh>
             )}
 
@@ -129,11 +121,12 @@ export const Board3D: React.FC = () => {
               </Text>
             )}
 
-            {/* 3D Buildings (House/Building/Hotel/Landmark) */}
-            {prop && prop.buildLevel > 0 && (
+            {/* 3D Buildings/House preview attached to the inner edge ("ujung land") */}
+            {prop && prop.ownerId && (
               <BuildingMesh
                 level={prop.buildLevel}
-                position={[0, coord.size[1] / 2, 0]}
+                position={[0, coord.size[1] / 2, -coord.size[2] * 0.32]}
+                color={ownerColor}
               />
             )}
           </group>

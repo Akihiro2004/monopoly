@@ -8,17 +8,37 @@ interface BuildingProps {
 }
 
 export const BuildingMesh: React.FC<BuildingProps> = ({ level, position, color = '#10b981' }) => {
-  if (level === 0) return null;
-
   const [x, y, z] = position;
 
-  // Level 1: House (small green pitched roof box)
+  // Level 0: Purchased Land Marker (mini house with owner's colored roof at tile edge)
+  if (level === 0) {
+    return (
+      <group position={[x, y + 0.1, z]}>
+        {/* House body */}
+        <mesh castShadow position={[0, 0.08, 0]}>
+          <boxGeometry args={[0.3, 0.16, 0.24]} />
+          <meshStandardMaterial color="#f8fafc" roughness={0.3} />
+        </mesh>
+        {/* Pitched Roof in owner's player color */}
+        <mesh castShadow position={[0, 0.22, 0]} rotation={[0, Math.PI / 4, 0]}>
+          <coneGeometry args={[0.22, 0.14, 4]} />
+          <meshStandardMaterial color={color} roughness={0.3} metalness={0.2} />
+        </mesh>
+      </group>
+    );
+  }
+
+  // Level 1: House (compact green cottage with owner color base)
   if (level === 1) {
     return (
-      <group position={[x, y + 0.35, z]}>
-        <mesh castShadow>
-          <boxGeometry args={[0.4, 0.3, 0.4]} />
+      <group position={[x, y + 0.14, z]}>
+        <mesh castShadow position={[0, 0.1, 0]}>
+          <boxGeometry args={[0.36, 0.2, 0.3]} />
           <meshStandardMaterial color="#10b981" roughness={0.3} />
+        </mesh>
+        <mesh castShadow position={[0, 0.26, 0]} rotation={[0, Math.PI / 4, 0]}>
+          <coneGeometry args={[0.26, 0.16, 4]} />
+          <meshStandardMaterial color="#059669" roughness={0.3} />
         </mesh>
       </group>
     );
