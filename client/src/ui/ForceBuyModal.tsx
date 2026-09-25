@@ -1,110 +1,101 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { socket } from '../net/socket.js';
 import { useGameStore } from '../store/gameStore.js';
-import { BOARD_TILES } from '@monopoly/shared';
-import { Zap, AlertTriangle, ArrowRight, ShieldAlert } from 'lucide-react';
+import { BOARD_TILES, FORCE_BUY_TIMER_MS } from '@monopoly/shared';
+import { ArrowRight, Lock, Zap } from 'lucide-react';
+import { audioManager } from '../sound/audioManager.js';
+import { Modal } from './common/Modal.js';
+import { PlayerAvatar } from './common/PlayerAvatar.js';
+import { useCountdown } from './game/useCountdown.js';
+import { GROUP_HEX, LEVEL_NAMES, money, rentLabel } from './theme.js';
 
+const RING = 2 * Math.PI * 20;
+
+// Only the landing player decides; the owner is warned in the action panel.
 export const ForceBuyModal: React.FC = () => {
-  const forceBuyOffer = useGameStore((s) => s.forceBuyOffer);
+  const offer = useGameStore((s) => s.forceBuyOffer);
   const gameState = useGameStore((s) => s.gameState);
   const myPlayerId = useGameStore((s) => s.myPlayerId);
   const isWalking = useGameStore((s) => s.isWalking);
+  const left = useCountdown(offer?.expiresAt);
 
-  const [timeLeft, setTimeLeft] = useState(15);
+  if (!offer || !gameState || isWalking || offer.buyerPlayerId !== myPlayerId) return null;
 
-  useEffect(() => {
-    if (!forceBuyOffer) return;
-    const interval = setInterval(() => {
-      const remaining = Math.max(0, Math.ceil((forceBuyOffer.expiresAt - Date.now()) / 1000));
-      setTimeLeft(remaining);
-      if (remaining <= 0) {
-        clearInterval(interval);
-      }
-    }, 200);
+  const tile = BOARD_TILES[offer.tileIndex];
+  const prop = gameState.properties[offer.tileIndex];
+  const buyer = gameState.players.find((p) => p.playerId === offer.buyerPlayerId);
+  const owner = gameState.players.find((p) => p.playerId === offer.targetPlayerId);
+  if (!tile || !buyer || !owner) return null;
+  const canAfford = buyer.money >= offer.price;
+  const progress = Math.min(1, (left * 1000) / FORCE_BUY_TIMER_MS);
 
-    return () => clearInterval(interval);
-  }, [forceBuyOffer]);
-
-  if (!forceBuyOffer || !gameState || isWalking) return null;
-
-  const isBuyer = forceBuyOffer.buyerPlayerId === myPlayerId;
-  const isVictim = forceBuyOffer.targetPlayerId === myPlayerId;
-  const tile = BOARD_TILES[forceBuyOffer.tileIndex];
-  const buyer = gameState.players.find((p) => p.playerId === forceBuyOffer.buyerPlayerId);
-  const victim = gameState.players.find((p) => p.playerId === forceBuyOffer.targetPlayerId);
-
-  const handleRespond = (accept: boolean) => {
+  const respond = (accept: boolean) => {
+    if (accept) audioManager.playBuy();
+    else audioManager.playClick();
     socket.emit('game:forceBuyResponse', { accept });
   };
 
-  const levelNames = ['Raw Land', 'House (Lv 1)', 'Building (Lv 2)', 'Hotel (Lv 3)', 'Landmark (Lv 4)'];
-  const levelName = levelNames[forceBuyOffer.currentBuildLevel];
-
   return (
-    <div className="force-buy-overlay">
-      <div className="force-buy-modal">
-        <div className="modal-header">
-          <Zap className="flash-icon" size={28} />
-          <h2>FORCE BUY OFFER</h2>
-          <div className="timer-badge">
-            <span>{timeLeft}s</span>
+    <Modal width={420} label="Force buy offer">
+      <div className="modal-pad force-buy">
+        <div className="fb-head">
+          <span className="fb-icon">
+            <Zap size={22} fill="currentColor" />
+          </span>
+          <div>
+            <h2>Force buy?</h2>
+            <p>Take this property at double its value. The owner can’t refuse.</p>
+          </div>
+          <svg className={`fb-timer ${left <= 5 ? 'urgent' : ''}`} viewBox="0 0 48 48" aria-label={`${left} seconds left`}>
+            <circle cx="24" cy="24" r="20" className="track" />
+            <circle cx="24" cy="24" r="20" className="bar" strokeDasharray={RING} strokeDashoffset={RING * (1 - progress)} />
+            <text x="24" y="29" textAnchor="middle">
+              {left}
+            </text>
+          </svg>
+        </div>
+
+        <div className="fb-property" style={{ '--g': GROUP_HEX[tile.group] } as React.CSSProperties}>
+          <span className="fb-band" />
+          <div>
+            <strong>{tile.name}</strong>
+            <span>
+              {LEVEL_NAMES[offer.currentBuildLevel]} · Rent {prop ? rentLabel(gameState, prop) : ''}
+            </span>
           </div>
         </div>
 
-        <div className="modal-content">
-          <div className="property-preview">
-            <span className="prop-name">{tile?.name}</span>
-            <span className="prop-level">{levelName}</span>
+        <div className="fb-transfer">
+          <div className="fb-party">
+            <PlayerAvatar token={owner.tokenType} color={owner.color} size={40} />
+            <span>{owner.name}</span>
+            <small>Owner</small>
           </div>
-
-          <div className="transfer-flow">
-            <div className="transfer-party">
-              <span className="party-role">Owner</span>
-              <span className="party-name">{victim?.name}</span>
-            </div>
-            <ArrowRight size={24} className="flow-arrow" />
-            <div className="transfer-party">
-              <span className="party-role">Buyer</span>
-              <span className="party-name">{buyer?.name}</span>
-            </div>
+          <div className="fb-arrow">
+            <span className="tnum">{money(offer.price)}</span>
+            <ArrowRight size={20} />
           </div>
-
-          <div className="price-tag">
-            <span className="price-label">2X FORCE-BUY PRICE</span>
-            <span className="price-value">${forceBuyOffer.price}</span>
+          <div className="fb-party">
+            <PlayerAvatar token={buyer.tokenType} color={buyer.color} size={40} />
+            <span>You</span>
+            <small className="tnum">{money(buyer.money)} cash</small>
           </div>
+        </div>
 
-          <div className="rules-note">
-            <ShieldAlert size={16} />
-            <span>Keeps {levelName}. Landmark lock applied (cannot upgrade to Landmark).</span>
-          </div>
+        <div className="callout">
+          <Lock size={15} />
+          <span>Keeps its {LEVEL_NAMES[offer.currentBuildLevel].toLowerCase()} level but can never become a Landmark.</span>
+        </div>
 
-          {isBuyer ? (
-            <div className="modal-actions">
-              <button
-                className="btn btn-force-buy"
-                onClick={() => handleRespond(true)}
-                disabled={(buyer?.money ?? 0) < forceBuyOffer.price}
-              >
-                <Zap size={18} />
-                <span>FORCE BUY FOR ${forceBuyOffer.price}</span>
-              </button>
-              <button className="btn btn-decline" onClick={() => handleRespond(false)}>
-                <span>DECLINE (PAY RENT)</span>
-              </button>
-            </div>
-          ) : isVictim ? (
-            <div className="waiting-message warning">
-              <AlertTriangle size={20} />
-              <span>{buyer?.name} can buy your property for ${forceBuyOffer.price}. The sale is mandatory if they accept.</span>
-            </div>
-          ) : (
-            <div className="waiting-message">
-              <span>{buyer?.name} is deciding whether to force-buy {tile?.name} from {victim?.name}...</span>
-            </div>
-          )}
+        <div className="modal-actions">
+          <button className="btn btn-secondary btn-lg btn-decline" onClick={() => respond(false)}>
+            Pay rent
+          </button>
+          <button className="btn btn-primary btn-lg btn-force-buy" onClick={() => respond(true)} disabled={!canAfford}>
+            <Zap size={17} fill="currentColor" /> Buy for <span className="tnum">{money(offer.price)}</span>
+          </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };

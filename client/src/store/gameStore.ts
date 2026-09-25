@@ -17,6 +17,13 @@ export interface ToastMessage {
   type: 'info' | 'success' | 'warning' | 'danger';
 }
 
+export interface ActivityEntry {
+  id: string;
+  text: string;
+  type: ToastMessage['type'];
+  timestamp: number;
+}
+
 interface GameStore {
   myPlayerId: string;
   roomState: RoomState | null;
@@ -29,6 +36,7 @@ interface GameStore {
   toasts: ToastMessage[];
   winner: { winnerId: string; victoryType: VictoryType } | null;
   cardDraw: CardDraw | null;
+  activity: ActivityEntry[];
 
   // Actions
   setRoomState: (room: RoomState) => void;
@@ -42,6 +50,7 @@ interface GameStore {
   addToast: (text: string, type?: 'info' | 'success' | 'warning' | 'danger') => void;
   removeToast: (id: string) => void;
   setWinner: (winner: { winnerId: string; victoryType: VictoryType } | null) => void;
+  pushActivity: (text: string, type?: ToastMessage['type']) => void;
   resetAll: () => void;
 }
 
@@ -57,6 +66,7 @@ export const useGameStore = create<GameStore>((set) => ({
   toasts: [],
   winner: null,
   cardDraw: null,
+  activity: [],
 
   setRoomState: (roomState) => set({ roomState }),
   setGameState: (gameState) =>
@@ -80,7 +90,8 @@ export const useGameStore = create<GameStore>((set) => ({
     set((s) => ({ chatMessages: [...s.chatMessages.slice(-50), msg] })),
   addToast: (text, type = 'info') => {
     const id = Math.random().toString(36).substring(2, 9);
-    set((s) => ({ toasts: [...s.toasts, { id, text, type }] }));
+    // Keep the stack short so it never covers the board.
+    set((s) => ({ toasts: [...s.toasts.slice(-2), { id, text, type }] }));
     setTimeout(() => {
       set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
     }, 4500);
@@ -88,6 +99,13 @@ export const useGameStore = create<GameStore>((set) => ({
   removeToast: (id) =>
     set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
   setWinner: (winner) => set({ winner }),
+  pushActivity: (text, type = 'info') =>
+    set((s) => {
+      // The server often sends the same line as a toast and as lastActionText.
+      if (!text || s.activity.slice(-4).some((a) => a.text === text)) return s;
+      const entry = { id: Math.random().toString(36).substring(2, 9), text, type, timestamp: Date.now() };
+      return { activity: [...s.activity.slice(-99), entry] };
+    }),
   resetAll: () =>
     set({
       roomState: null,
@@ -96,6 +114,7 @@ export const useGameStore = create<GameStore>((set) => ({
       forceBuyOffer: null,
       cardDraw: null,
       chatMessages: [],
+      activity: [],
       winner: null,
     }),
 }));
@@ -116,6 +135,9 @@ export function initSocketListeners() {
     const prevGame = prev.gameState;
     const myId = prev.myPlayerId;
     prev.setGameState(game);
+    if (game.lastActionText && game.lastActionText !== prevGame?.lastActionText) {
+      prev.pushActivity(game.lastActionText);
+    }
 
     // Transition sounds only for live updates, not the first sync after
     // (re)connect — otherwise a reload replays every sound at once.
@@ -170,6 +192,7 @@ export function initSocketListeners() {
 
   socket.on('game:toast', ({ text, type }) => {
     useGameStore.getState().addToast(text, type);
+    useGameStore.getState().pushActivity(text, type ?? 'info');
     // Debt entry already plays the debt alarm via the DEBT phase change,
     // and bankruptcy plays its own dirge via the state change — the toasts
     // for those arrive alongside, so skip them here to avoid stacking.

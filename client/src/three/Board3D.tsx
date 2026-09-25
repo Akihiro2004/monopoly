@@ -1,5 +1,6 @@
 import React from 'react';
 import { Text } from '@react-three/drei';
+import { TEXT_FONT } from './fonts.js';
 import { BOARD_TILES, TileDef } from '@monopoly/shared';
 import { BOARD_COORDINATES } from './boardCoords.js';
 import { useGameStore } from '../store/gameStore.js';
@@ -107,6 +108,7 @@ export const Board3D: React.FC = () => {
 
             {/* Tile Label */}
             <Text
+              font={TEXT_FONT}
               position={[0, coord.size[1] / 2 + 0.03, 0]}
               rotation={[-Math.PI / 2, 0, 0]}
               fontSize={0.24}
@@ -122,6 +124,7 @@ export const Board3D: React.FC = () => {
             {/* Price text on the outer edge */}
             {tile.price > 0 && (
               <Text
+                font={TEXT_FONT}
                 position={[0, coord.size[1] / 2 + 0.03, priceZ]}
                 rotation={[-Math.PI / 2, 0, 0]}
                 fontSize={0.2}

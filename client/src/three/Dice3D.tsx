@@ -2,6 +2,7 @@ import React, { useRef, useMemo, useEffect, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Text } from '@react-three/drei';
+import { BOLD_FONT } from './fonts.js';
 import { useGameStore } from '../store/gameStore.js';
 import { createDiceFaceTexture, ROTATION_FOR_TOP_FACE } from './diceTextures.js';
 import { audioManager } from '../sound/audioManager.js';
@@ -106,6 +107,7 @@ export const Dice3D: React.FC = () => {
 
       {/* Roll result label */}
       <Text
+        font={BOLD_FONT}
         position={[0, 0.26, 1.7]}
         rotation={[-Math.PI / 2, 0, 0]}
         fontSize={0.55}

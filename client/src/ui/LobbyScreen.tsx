@@ -2,7 +2,7 @@ import React from 'react';
 import { socket, clearSession } from '../net/socket.js';
 import { useGameStore } from '../store/gameStore.js';
 import { TokenType, PlayerColor } from '@monopoly/shared';
-import { Users, CheckCircle, Copy, Play, Trophy, LogOut } from 'lucide-react';
+import { Check, ChevronLeft, Copy, Play, Share2, Trophy, Users, Palette, Shapes } from 'lucide-react';
 import { TOKENS, COLORS } from './lobbyConstants.js';
 import { LobbySeats } from './LobbySeats.js';
 
@@ -15,10 +15,33 @@ export const LobbyScreen: React.FC = () => {
   if (!roomState) return null;
   const mySeat = roomState.seats.find((s) => s.playerId === myPlayerId);
   const isHost = mySeat?.isHost ?? false;
+  const others = roomState.seats.filter((s) => s.playerId !== myPlayerId);
+  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+
+  const notReady = roomState.seats.filter((s) => !s.isReady && !s.isHost).length;
+  const canStart = roomState.seats.length >= 2 && notReady === 0;
+  const startHint =
+    roomState.seats.length < 2
+      ? 'Invite at least one more player to start.'
+      : notReady > 0
+        ? `Waiting for ${notReady} player${notReady > 1 ? 's' : ''} to ready up.`
+        : 'Everyone is ready. Start when you like.';
 
   const handleCopyCode = () => {
-    navigator.clipboard.writeText(roomState.roomId);
-    addToast('Room code copied!', 'success');
+    navigator.clipboard?.writeText(roomState.roomId).then(
+      () => addToast('Room code copied', 'success'),
+      () => addToast(`Room code: ${roomState.roomId}`, 'info')
+    );
+  };
+
+  const handleShare = () => {
+    navigator
+      .share({
+        title: 'Monopoly 3D',
+        text: `Join my Monopoly 3D game. Room code: ${roomState.roomId}`,
+        url: window.location.origin
+      })
+      .catch(() => {});
   };
 
   const handleSelectToken = (token: TokenType) => {
@@ -36,9 +59,9 @@ export const LobbyScreen: React.FC = () => {
     socket.emit('room:ready', { ready: !mySeat.isReady });
   };
 
-  const handleToggleSpecialVictory = (enabled: boolean) => {
+  const handleToggleSpecialVictory = () => {
     if (!isHost) return;
-    socket.emit('room:toggleSpecialVictory', { enabled });
+    socket.emit('room:toggleSpecialVictory', { enabled: !roomState.settings.specialVictory });
   };
 
   const handleStartGame = () => {
@@ -53,93 +76,148 @@ export const LobbyScreen: React.FC = () => {
   };
 
   return (
-    <div className="lobby-container">
-      <div className="lobby-card">
-        <div className="lobby-header">
-          <div>
-            <div className="room-badge"><Users size={16} /><span>ROOM CODE</span></div>
-            <div className="code-display" onClick={handleCopyCode}>
-              <h2>{roomState.roomId}</h2>
-              <Copy size={20} className="copy-icon" />
-            </div>
-          </div>
+    <div className="menu-screen lobby-screen">
+      <div className="menu-bg" />
 
-          <div className="special-victory-toggle">
-            <div className="toggle-label">
-              <Trophy size={16} color="#fbbf24" />
-              <span>LINE Victories (Triple & Line):</span>
-            </div>
-            {isHost ? (
-              <button
-                className={`toggle-btn ${roomState.settings.specialVictory ? 'active' : ''}`}
-                onClick={() => handleToggleSpecialVictory(!roomState.settings.specialVictory)}
-              >
-                {roomState.settings.specialVictory ? 'ENABLED' : 'DISABLED'}
+      <header className="lobby-appbar">
+        <button className="btn btn-ghost btn-sm btn-leave" onClick={handleLeave}>
+          <ChevronLeft size={18} />
+          <span>Leave</span>
+        </button>
+        <div className="brand">
+          <span className="brand-mark" />
+          <span className="brand-name">Game lobby</span>
+        </div>
+        <span className="lobby-appbar-spacer" />
+      </header>
+
+      <div className="lobby-layout">
+        <div className="lobby-main">
+          <section className="card room-card">
+            <div className="room-code-block">
+              <span className="section-title">Room code</span>
+              <button className="code-display" onClick={handleCopyCode} title="Copy room code">
+                <h2>{roomState.roomId}</h2>
               </button>
-            ) : (
-              <span className="badge-status">{roomState.settings.specialVictory ? 'Enabled' : 'Disabled'}</span>
-            )}
-          </div>
+              <p className="room-hint">Friends join from the home screen with this code.</p>
+            </div>
+            <div className="room-actions">
+              <button className="btn btn-secondary" onClick={handleCopyCode}>
+                <Copy size={16} /> Copy
+              </button>
+              {canShare && (
+                <button className="btn btn-secondary" onClick={handleShare}>
+                  <Share2 size={16} /> Share
+                </button>
+              )}
+            </div>
+          </section>
+
+          <section className="card">
+            <div className="card-head">
+              <span className="section-title">
+                <Users size={14} /> Players
+              </span>
+              <span className="seat-count tnum">
+                {roomState.seats.length}
+                <span>/{roomState.settings.maxPlayers || 6}</span>
+              </span>
+            </div>
+            <LobbySeats seats={roomState.seats} myPlayerId={myPlayerId} maxPlayers={roomState.settings.maxPlayers || 6} />
+          </section>
         </div>
 
-        <LobbySeats seats={roomState.seats} myPlayerId={myPlayerId} />
-
-        {mySeat && (
-          <div className="customization-section">
-            <div className="pick-group">
-              <label>CHOOSE TOKEN</label>
-              <div className="token-picker">
-                {TOKENS.map((t) => (
-                  <button
-                    key={t.type}
-                    className={`token-btn ${mySeat.tokenType === t.type ? 'active' : ''}`}
-                    onClick={() => handleSelectToken(t.type)}
-                  >
-                    <t.icon size={20} />
-                  </button>
-                ))}
+        <div className="lobby-side">
+          {mySeat && (
+            <section className="card">
+              <div className="card-head">
+                <span className="section-title">
+                  <Shapes size={14} /> Your token
+                </span>
               </div>
-            </div>
-
-            <div className="pick-group">
-              <label>CHOOSE COLOR</label>
-              <div className="color-picker">
-                {COLORS.map((c) => (
-                  <button
-                    key={c.color}
-                    className={`color-btn ${mySeat.color === c.color ? 'active' : ''}`}
-                    style={{ backgroundColor: c.hex }}
-                    onClick={() => handleSelectColor(c.color)}
-                  />
-                ))}
+              <div className="token-grid">
+                {TOKENS.map((t) => {
+                  const takenBy = others.find((s) => s.tokenType === t.type);
+                  const active = mySeat.tokenType === t.type;
+                  return (
+                    <button
+                      key={t.type}
+                      className={`token-option ${active ? 'active' : ''}`}
+                      onClick={() => handleSelectToken(t.type)}
+                      disabled={!!takenBy}
+                      title={takenBy ? `Taken by ${takenBy.displayName}` : t.label}
+                    >
+                      <t.icon size={24} />
+                      <span>{t.label}</span>
+                      {takenBy && <span className="token-taken">{takenBy.displayName}</span>}
+                    </button>
+                  );
+                })}
               </div>
+
+              <div className="card-head" style={{ marginTop: 18 }}>
+                <span className="section-title">
+                  <Palette size={14} /> Color
+                </span>
+              </div>
+              <div className="color-row">
+                {COLORS.map((c) => {
+                  const takenBy = others.find((s) => s.color === c.color);
+                  const active = mySeat.color === c.color;
+                  return (
+                    <button
+                      key={c.color}
+                      className={`color-swatch ${active ? 'active' : ''}`}
+                      style={{ '--c': c.hex } as React.CSSProperties}
+                      onClick={() => handleSelectColor(c.color)}
+                      disabled={!!takenBy}
+                      aria-label={takenBy ? `${c.color}, taken by ${takenBy.displayName}` : c.color}
+                    >
+                      {active && <Check size={16} strokeWidth={3} />}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          <section className="card">
+            <div className="setting-row">
+              <span className="setting-icon">
+                <Trophy size={18} />
+              </span>
+              <div className="setting-copy">
+                <strong>Special victories</strong>
+                <span>Win instantly with 3 full color sets or every property on one side.</span>
+              </div>
+              <button
+                className={`switch ${roomState.settings.specialVictory ? 'on' : ''}`}
+                onClick={handleToggleSpecialVictory}
+                disabled={!isHost}
+                role="switch"
+                aria-checked={roomState.settings.specialVictory}
+                title={isHost ? 'Toggle special victories' : 'Only the host can change this'}
+              />
             </div>
+          </section>
+
+          <div className="lobby-actions">
+            {isHost ? (
+              <button className="btn btn-primary btn-xl btn-block btn-start" onClick={handleStartGame} disabled={!canStart}>
+                <Play size={20} fill="currentColor" />
+                <span>Start game</span>
+              </button>
+            ) : (
+              <button
+                className={`btn btn-xl btn-block btn-ready ${mySeat?.isReady ? 'btn-secondary is-ready' : 'btn-success'}`}
+                onClick={handleToggleReady}
+              >
+                <Check size={20} strokeWidth={3} />
+                <span>{mySeat?.isReady ? "I'm ready (tap to undo)" : 'Ready up'}</span>
+              </button>
+            )}
+            <p className="lobby-hint">{isHost ? startHint : mySeat?.isReady ? 'Waiting for the host to start.' : 'Pick your token, then ready up.'}</p>
           </div>
-        )}
-
-        <div className="lobby-actions">
-          {!isHost && (
-            <button className={`btn btn-ready ${mySeat?.isReady ? 'btn-active-ready' : ''}`} onClick={handleToggleReady}>
-              <CheckCircle size={18} />
-              <span>{mySeat?.isReady ? 'UNREADY' : 'READY'}</span>
-            </button>
-          )}
-
-          {isHost && (
-            <button
-              className="btn btn-primary btn-start"
-              onClick={handleStartGame}
-              disabled={roomState.seats.length < 2 || roomState.seats.some((s) => !s.isReady && !s.isHost)}
-            >
-              <Play size={18} />
-              <span>START GAME ({roomState.seats.length}/6)</span>
-            </button>
-          )}
-
-          <button className="btn btn-secondary btn-leave" onClick={handleLeave}>
-            <LogOut size={18} />
-            <span>LEAVE</span>
-          </button>
         </div>
       </div>
     </div>
