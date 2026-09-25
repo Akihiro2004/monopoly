@@ -4,9 +4,11 @@ import { useGameStore } from '../store/gameStore.js';
 import { BOARD_TILES } from '@monopoly/shared';
 import { Dices, Check, Hammer } from 'lucide-react';
 import { PlayersSidebar } from './PlayersSidebar.js';
+import { DICE_PIP_CHARS } from './diceIcons.js';
 
 export const GameHUD: React.FC = () => {
   const gameState = useGameStore((s) => s.gameState);
+  const diceRoll = useGameStore((s) => s.diceRoll);
   const myPlayerId = useGameStore((s) => s.myPlayerId);
 
   if (!gameState) return null;
@@ -14,6 +16,11 @@ export const GameHUD: React.FC = () => {
   const curPlayer = gameState.players[gameState.currentPlayerIndex];
   const isMyTurn = curPlayer.playerId === myPlayerId;
   const myPlayer = gameState.players.find((p) => p.playerId === myPlayerId);
+
+  const d1 = diceRoll?.d1 ?? gameState.dice?.[0] ?? 1;
+  const d2 = diceRoll?.d2 ?? gameState.dice?.[1] ?? 1;
+  const total = d1 + d2;
+  const isDoubles = d1 === d2;
 
   const handleRoll = () => socket.emit('game:roll');
   const handleEndTurn = () => socket.emit('game:endTurn');
@@ -31,6 +38,13 @@ export const GameHUD: React.FC = () => {
             {isMyTurn ? "👉 IT'S YOUR TURN!" : `${curPlayer.name}'s turn`}
           </span>
           <span className="phase-pill">{gameState.phase}</span>
+          {/* Live Dice Value Indicator with Pips */}
+          <div className="hud-dice-badge">
+            <span className="hud-die-pip">{DICE_PIP_CHARS[d1]}</span>
+            <span className="hud-die-pip">{DICE_PIP_CHARS[d2]}</span>
+            <span className="hud-dice-sum">={total}</span>
+            {isDoubles && <span className="hud-doubles-tag">DOUBLES!</span>}
+          </div>
         </div>
         <div className="action-ticker">{gameState.lastActionText}</div>
       </div>
@@ -115,3 +129,4 @@ export const GameHUD: React.FC = () => {
     </div>
   );
 };
+

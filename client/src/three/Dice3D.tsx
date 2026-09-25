@@ -1,64 +1,118 @@
-import React, { useRef } from 'react';
+import React, { useRef, useMemo, useEffect, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { Text } from '@react-three/drei';
 import { useGameStore } from '../store/gameStore.js';
+import { createDiceFaceTexture, ROTATION_FOR_TOP_FACE } from './diceTextures.js';
 
-export const Dice3D: React.FC = () => {
-  const diceRoll = useGameStore((s) => s.diceRoll);
-  const mesh1 = useRef<THREE.Mesh>(null);
-  const mesh2 = useRef<THREE.Mesh>(null);
-  const rollingRef = useRef(false);
+interface DieProps {
+  position: [number, number, number];
+  targetValue: number;
+  rollTrigger: number;
+}
+
+const SingleDie: React.FC<DieProps> = ({ position, targetValue, rollTrigger }) => {
+  const meshRef = useRef<THREE.Mesh>(null);
   const animTime = useRef(0);
+  const isRolling = useRef(false);
 
-  // Trigger spin animation when a new dice roll comes in
-  React.useEffect(() => {
-    if (diceRoll) {
-      rollingRef.current = true;
+  // Pre-generate materials for all 6 faces: [+X=3, -X=4, +Y=1, -Y=6, +Z=5, -Z=2]
+  const materials = useMemo(() => {
+    const faceNumbers = [3, 4, 1, 6, 5, 2];
+    return faceNumbers.map((num) => {
+      const tex = createDiceFaceTexture(num);
+      return new THREE.MeshStandardMaterial({
+        map: tex,
+        roughness: 0.25,
+        metalness: 0.05,
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (rollTrigger > 0) {
+      isRolling.current = true;
       animTime.current = 0;
     }
-  }, [diceRoll]);
+  }, [rollTrigger]);
 
   useFrame((_, delta) => {
-    if (!rollingRef.current) return;
-    animTime.current += delta;
+    if (!meshRef.current) return;
 
-    if (animTime.current < 0.8) {
-      if (mesh1.current) {
-        mesh1.current.rotation.x += delta * 15;
-        mesh1.current.rotation.y += delta * 12;
-        mesh1.current.position.y = 1.5 + Math.sin(animTime.current * 8) * 0.5;
-      }
-      if (mesh2.current) {
-        mesh2.current.rotation.x -= delta * 14;
-        mesh2.current.rotation.z += delta * 16;
-        mesh2.current.position.y = 1.5 + Math.sin(animTime.current * 7 + 0.3) * 0.5;
+    if (isRolling.current) {
+      animTime.current += delta;
+      const duration = 0.9;
+
+      if (animTime.current < duration) {
+        // Tumble and spin mid-air
+        meshRef.current.rotation.x += delta * 18;
+        meshRef.current.rotation.y += delta * 14;
+        meshRef.current.rotation.z += delta * 16;
+        meshRef.current.position.y = 0.7 + Math.sin((animTime.current / duration) * Math.PI) * 1.5;
+      } else {
+        // Finished rolling: land with the correct pips face on top!
+        isRolling.current = false;
+        meshRef.current.position.y = 0.55;
+        const targetRot = ROTATION_FOR_TOP_FACE[targetValue] || [0, 0, 0];
+        meshRef.current.rotation.set(targetRot[0], targetRot[1], targetRot[2]);
       }
     } else {
-      rollingRef.current = false;
-      if (mesh1.current) {
-        mesh1.current.position.y = 0.5;
-        mesh1.current.rotation.set(0, 0, 0);
-      }
-      if (mesh2.current) {
-        mesh2.current.position.y = 0.5;
-        mesh2.current.rotation.set(0, 0, 0);
-      }
+      meshRef.current.position.y = 0.55;
+      const targetRot = ROTATION_FOR_TOP_FACE[targetValue] || [0, 0, 0];
+      meshRef.current.rotation.set(targetRot[0], targetRot[1], targetRot[2]);
     }
   });
 
   return (
-    <group position={[0, 0, 0]}>
-      {/* Die 1 */}
-      <mesh ref={mesh1} position={[-1.2, 0.5, 0]} castShadow>
-        <boxGeometry args={[0.9, 0.9, 0.9]} />
-        <meshStandardMaterial color="#ffffff" roughness={0.2} metalness={0.1} />
-      </mesh>
-
-      {/* Die 2 */}
-      <mesh ref={mesh2} position={[1.2, 0.5, 0]} castShadow>
-        <boxGeometry args={[0.9, 0.9, 0.9]} />
-        <meshStandardMaterial color="#fef3c7" roughness={0.2} metalness={0.1} />
+    <group position={position}>
+      <mesh ref={meshRef} material={materials} castShadow receiveShadow>
+        <boxGeometry args={[1.0, 1.0, 1.0]} />
       </mesh>
     </group>
   );
 };
+
+export const Dice3D: React.FC = () => {
+  const diceRoll = useGameStore((s) => s.diceRoll);
+  const gameState = useGameStore((s) => s.gameState);
+  const [rollCount, setRollCount] = useState(0);
+
+  useEffect(() => {
+    if (diceRoll) {
+      setRollCount((c) => c + 1);
+    }
+  }, [diceRoll]);
+
+  const d1 = diceRoll?.d1 ?? gameState?.dice?.[0] ?? 1;
+  const d2 = diceRoll?.d2 ?? gameState?.dice?.[1] ?? 1;
+  const total = d1 + d2;
+  const isDoubles = d1 === d2;
+
+  return (
+    <group position={[0, 0, 0]}>
+      <SingleDie
+        position={[-1.1, 0, 0]}
+        targetValue={d1}
+        rollTrigger={rollCount}
+      />
+      <SingleDie
+        position={[1.1, 0, 0]}
+        targetValue={d2}
+        rollTrigger={rollCount}
+      />
+
+      {/* 3D Dice Banner */}
+      <Text
+        position={[0, 0.15, 1.6]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        fontSize={0.55}
+        color="#fbbf24"
+        anchorX="center"
+        anchorY="middle"
+      >
+        {isDoubles && rollCount > 0 ? `🎲 ${d1} + ${d2} = ${total} (DOUBLES!)` : `🎲 ${d1} + ${d2} = ${total}`}
+      </Text>
+    </group>
+  );
+};
+
