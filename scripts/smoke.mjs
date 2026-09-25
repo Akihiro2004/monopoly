@@ -138,6 +138,13 @@ async function main() {
   check('active player token left GO', !!rollerState && rollerState.position !== 0, rollerState ? `position ${rollerState.position}` : 'no state');
   check('game:state carries both players', moved.players.length === 2);
 
+  if (moved.phase === 'BUY_OFFER') {
+    const buyResolved = waitFor(roller, 'game:state', (s) => s.phase === 'TURN_ENDED');
+    roller.emit('game:buyResponse', { accept: true });
+    await buyResolved;
+    check('buy offer prompt accepted', true);
+  }
+
   const before = { turn: moved.turnNumber, index: moved.currentPlayerIndex };
   const endPromise = waitFor(
     bob,
