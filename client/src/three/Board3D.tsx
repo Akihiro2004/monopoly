@@ -63,11 +63,9 @@ export const Board3D: React.FC = () => {
         const isCorner = coord.index % 10 === 0;
         const groupColor = GROUP_COLORS[tile.group] || '#D1D5DB';
 
-        // Color band and price sit on opposite edges of the tile.
-        // Both must face the board center so all four sides read consistently.
-        const bandSign = coord.index >= 10 && coord.index <= 29 ? 1 : -1;
-        const bandZ = bandSign * coord.size[2] * 0.35;
-        const priceZ = -bandSign * coord.size[2] * 0.32;
+        // Color band on inner edge facing board center, price on outer edge
+        const bandZ = -coord.size[2] * 0.35;
+        const priceZ = coord.size[2] * 0.32;
 
         // Check if tile has an owner
         let ownerColor: string | undefined;
