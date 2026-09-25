@@ -54,6 +54,9 @@ export function registerLobbyHandlers(
     socket.join(result.room.roomId);
     callback({ ok: true });
     broadcastRoom(result.room.roomId);
+    if (result.room.status === 'playing' && result.room.engine) {
+      socket.emit('game:state', result.room.engine.state);
+    }
   });
 
   socket.on('room:selectToken', ({ tokenType, color }) => {

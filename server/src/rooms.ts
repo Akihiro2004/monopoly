@@ -70,16 +70,22 @@ export class RoomManager {
   ): { ok: boolean; room?: RoomSession; error?: string } {
     const room = this.rooms.get(roomId.toUpperCase());
     if (!room) return { ok: false, error: 'Room not found' };
-    if (room.status !== 'waiting') return { ok: false, error: 'Game already in progress' };
-    if (room.seats.length >= room.settings.maxPlayers) return { ok: false, error: 'Room is full (max 6)' };
-
     const existing = room.seats.find((s) => s.playerId === playerId);
     if (existing) {
       existing.isConnected = true;
       existing.displayName = name || existing.displayName;
       this.socketToPlayer.set(socketId, { roomId: room.roomId, playerId });
+      if (room.engine) {
+        const player = room.engine.state.players.find((p) => p.playerId === playerId);
+        if (player) {
+          player.isConnected = true;
+        }
+      }
       return { ok: true, room };
     }
+
+    if (room.status !== 'waiting') return { ok: false, error: 'Game already in progress' };
+    if (room.seats.length >= room.settings.maxPlayers) return { ok: false, error: 'Room is full (max 6)' };
 
     const seatIndex = room.seats.length;
     const usedColors = new Set(room.seats.map((s) => s.color));
