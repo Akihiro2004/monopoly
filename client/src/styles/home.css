@@ -38,6 +38,8 @@ body, html, #root {
   justify-content: center;
   background: radial-gradient(circle at center, #1e293b 0%, #090d16 100%);
   z-index: 50;
+  padding: 16px;
+  overflow-y: auto;
 }
 
 .home-card {
@@ -45,7 +47,7 @@ body, html, #root {
   backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 20px;
-  padding: 40px;
+  padding: 32px 28px;
   width: 100%;
   max-width: 480px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
@@ -66,12 +68,17 @@ body, html, #root {
 }
 
 .game-title {
-  font-size: 2.5rem;
+  font-size: 2.2rem;
   font-weight: 900;
+  line-height: 1.2;
+  padding-bottom: 4px;
   background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
-  margin-bottom: 6px;
+  color: transparent;
+  margin-bottom: 8px;
+  word-break: break-word;
 }
 
 .subtitle {
