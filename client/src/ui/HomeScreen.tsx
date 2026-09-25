@@ -91,7 +91,7 @@ export const HomeScreen: React.FC = () => {
           </div>
 
           <div className="rules-highlight">
-            <div className="highlight-pill">Auto-buy on landing</div>
+            <div className="highlight-pill">Property deed purchase</div>
             <div className="highlight-pill">Force-buy opponents at 2x</div>
             <div className="highlight-pill">Landmark protection</div>
             <div className="highlight-pill">Triple &amp; Line Victory</div>

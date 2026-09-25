@@ -19,18 +19,20 @@ export const GameHUD: React.FC = () => {
     return audioManager.subscribe(setMuted);
   }, []);
 
+  // Play turn start alert chime when it becomes active player's turn
+  useEffect(() => {
+    if (!gameState) return;
+    const curPlayer = gameState.players[gameState.currentPlayerIndex];
+    if (curPlayer?.playerId === myPlayerId && gameState.phase === 'ROLLING') {
+      audioManager.playTurnAlert();
+    }
+  }, [gameState?.turnNumber, gameState?.currentPlayerIndex, gameState?.phase, myPlayerId]);
+
   if (!gameState) return null;
 
   const curPlayer = gameState.players[gameState.currentPlayerIndex];
   const isMyTurn = curPlayer.playerId === myPlayerId;
   const myPlayer = gameState.players.find((p) => p.playerId === myPlayerId);
-
-  // Play turn start alert chime when it becomes active player's turn
-  useEffect(() => {
-    if (isMyTurn && gameState.phase === 'ROLLING') {
-      audioManager.playTurnAlert();
-    }
-  }, [gameState.turnNumber, gameState.currentPlayerIndex]);
 
   const d1 = diceRoll?.d1 ?? gameState.dice?.[0] ?? 1;
   const d2 = diceRoll?.d2 ?? gameState.dice?.[1] ?? 1;

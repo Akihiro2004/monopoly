@@ -149,11 +149,14 @@ async function main() {
   const endPromise = waitFor(
     bob,
     'game:state',
-    (s) => s.turnNumber > before.turn || s.currentPlayerIndex !== before.index
+    (s) =>
+      s.turnNumber > before.turn ||
+      s.currentPlayerIndex !== before.index ||
+      (s.phase === 'ROLLING' && !s.buyOffer)
   ).catch(() => null);
   roller.emit('game:endTurn');
   const ended = await endPromise;
-  check('turn advances after end turn', !!ended, ended ? `turn ${ended.turnNumber}` : 'turn did not advance');
+  check('turn advances after end turn', !!ended, ended ? `turn ${ended.turnNumber} (phase ${ended.phase})` : 'turn did not advance');
 
   const balancesOk = (ended?.players || []).every((p) => p.money > -5000 && p.money <= 2000);
   check('player balances stay in a sane range', balancesOk);

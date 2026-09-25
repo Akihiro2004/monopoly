@@ -8,7 +8,8 @@ import { setTimeout as sleep } from 'timers/promises';
 import WebSocket from 'ws';
 
 const CHROME = process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-const APP = 'http://127.0.0.1:5000';
+const PORT = Number(process.env.SHOT_PORT || 5056);
+const APP = `http://127.0.0.1:${PORT}`;
 const DEBUG_PORT = Number(process.env.CDP_PORT || 9333);
 const OUT_DIR = 'shots';
 
@@ -144,8 +145,14 @@ async function navigate(cdp, url) {
 async function main() {
   await fs.mkdir(OUT_DIR, { recursive: true });
 
-  server = spawn(process.execPath, ['server/dist/index.js'], { env: { ...process.env, PORT: '5000' }, stdio: 'ignore' });
-  await sleep(1500);
+  server = spawn(process.execPath, ['server/dist/index.js'], { env: { ...process.env, PORT: String(PORT) }, stdio: 'ignore' });
+  for (let i = 0; i < 40; i++) {
+    try {
+      const res = await fetch(APP);
+      if (res.ok) break;
+    } catch {}
+    await sleep(200);
+  }
 
   const profileDir = path.resolve('shots', `prof-${Date.now()}`);
   await fs.mkdir(profileDir, { recursive: true });
@@ -196,35 +203,62 @@ async function main() {
   await bob.eval(clickIf('.btn-secondary'));
   await waitForText(bob, '.code-display h2');
   console.log('Bob joined');
-  await bob.eval(clickIf('.btn-ready'));
-  await sleep(400);
+  // Bob clicks Ready
+  for (let i = 0; i < 30; i++) {
+    const res = await bob.eval(clickIf('.btn-ready'));
+    if (res === 'clicked') break;
+    await sleep(200);
+  }
 
-  await alice.eval(clickIf('.btn-start'));
-  await sleep(7000);
+  // Alice clicks Start Game once enabled
+  for (let i = 0; i < 40; i++) {
+    const res = await alice.eval(clickIf('.btn-start'));
+    if (res === 'clicked') break;
+    await sleep(250);
+  }
+
+  // Wait until canvas and HUD are mounted
+  for (let i = 0; i < 50; i++) {
+    const ready = await alice.eval(`(() => !!document.querySelector('canvas') && !!document.querySelector('.hud-top-bar'))()`);
+    if (ready) break;
+    await sleep(200);
+  }
+
+  // Bring Alice to front so Chrome composites and renders WebGL
+  await alice.send('Page.bringToFront');
+  await alice.eval(`(() => {
+    const c = document.querySelector('canvas');
+    if (c) c.dispatchEvent(new MouseEvent('mousemove', { clientX: 100, clientY: 100 }));
+  })()`);
+
+  // Allow 3D shaders, textures, and Troika fonts to finish rendering
+  await sleep(3500);
   await alice.screenshot(`${OUT_DIR}/3-board-host.png`);
 
-  const rollResult = await alice.eval(clickIf('.btn-roll'));
+  const isAliceTurn = await alice.eval(`(() => document.querySelector('.btn-roll') !== null)()`);
+  const roller = isAliceTurn ? alice : bob;
+  const rollerName = isAliceTurn ? 'Alice' : 'Bob';
+  console.log(`${rollerName} has the first turn`);
+
+  const rollResult = await roller.eval(clickIf('.btn-roll'));
   if (rollResult === 'clicked') {
-    console.log('Alice rolled the dice');
-    await sleep(4000);
-    await alice.screenshot(`${OUT_DIR}/4-board-after-roll.png`);
+    console.log(`${rollerName} rolled the dice`);
+    await sleep(5500); // Wait for dice tumble + sequential tile walking + modal appearance
+    await roller.screenshot(`${OUT_DIR}/4-board-after-roll.png`);
+
+    // Click Buy Property in the title deed modal
+    const buyResult = await roller.eval(clickIf('.btn-3d-buy'));
+    if (buyResult === 'clicked') {
+      console.log(`${rollerName} accepted buy offer`);
+      await sleep(2000); // Wait for modal to close and 3D house preview to render
+      await roller.screenshot(`${OUT_DIR}/5-board-after-buy.png`);
+    }
   } else {
-    console.log(`Alice cannot roll (${rollResult}), shooting the static board`);
+    console.log(`Could not click roll (${rollResult}), shooting static board`);
   }
-  await bob.screenshot(`${OUT_DIR}/5-board-guest.png`);
 
-  // Zoom the orbit camera out with wheel events so the whole ring (and the
-  // player tokens resting on it) fits in frame
-  await alice.eval(`(() => { const c = document.querySelector('canvas'); if (!c) return 'missing';
-    for (let i = 0; i < 5; i++) c.dispatchEvent(new WheelEvent('wheel', { deltaY: 180, bubbles: true, cancelable: true }));
-    return 'zoomed'; })()`);
-  await sleep(2500);
-  await alice.screenshot(`${OUT_DIR}/6-zoom-tokens.png`);
-
-  // Magnified crop of the bottom tile row, where the player tokens rest
-  await alice.crop(`${OUT_DIR}/7-bottom-row-crop.png`, 700, 600, 760, 220, 2.5);
-  await alice.crop(`${OUT_DIR}/8-go-corner-crop.png`, 1100, 620, 420, 280, 3);
-
+  // Magnified crop of bottom tile row
+  await alice.crop(`${OUT_DIR}/6-bottom-row-crop.png`, 700, 600, 760, 220, 2.5);
   console.log(`Screenshots written to ${OUT_DIR}`);
   alice.close();
   bob.close();
