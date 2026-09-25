@@ -5,6 +5,7 @@ import { TokenType, PlayerColor } from '@monopoly/shared';
 import { Check, ChevronLeft, Copy, Play, Share2, Trophy, Users, Palette, Shapes } from 'lucide-react';
 import { TOKENS, COLORS } from './lobbyConstants.js';
 import { LobbySeats } from './LobbySeats.js';
+import { Logo, Sky } from './common/Sky.js';
 
 export const LobbyScreen: React.FC = () => {
   const roomState = useGameStore((s) => s.roomState);
@@ -77,23 +78,20 @@ export const LobbyScreen: React.FC = () => {
 
   return (
     <div className="menu-screen lobby-screen">
-      <div className="menu-bg" />
+      <Sky />
 
       <header className="lobby-appbar">
         <button className="btn btn-ghost btn-sm btn-leave" onClick={handleLeave}>
           <ChevronLeft size={18} />
           <span>Leave</span>
         </button>
-        <div className="brand">
-          <span className="brand-mark" />
-          <span className="brand-name">Game lobby</span>
-        </div>
+        <Logo size="sm" />
         <span className="lobby-appbar-spacer" />
       </header>
 
       <div className="lobby-layout">
         <div className="lobby-main">
-          <section className="card room-card">
+          <section className="card paper room-card">
             <div className="room-code-block">
               <span className="section-title">Room code</span>
               <button className="code-display" onClick={handleCopyCode} title="Copy room code">
@@ -102,18 +100,18 @@ export const LobbyScreen: React.FC = () => {
               <p className="room-hint">Friends join from the home screen with this code.</p>
             </div>
             <div className="room-actions">
-              <button className="btn btn-secondary" onClick={handleCopyCode}>
+              <button className="btn btn-gold" onClick={handleCopyCode}>
                 <Copy size={16} /> Copy
               </button>
               {canShare && (
-                <button className="btn btn-secondary" onClick={handleShare}>
+                <button className="btn btn-blue" onClick={handleShare}>
                   <Share2 size={16} /> Share
                 </button>
               )}
             </div>
           </section>
 
-          <section className="card">
+          <section className="card paper">
             <div className="card-head">
               <span className="section-title">
                 <Users size={14} /> Players
@@ -129,7 +127,7 @@ export const LobbyScreen: React.FC = () => {
 
         <div className="lobby-side">
           {mySeat && (
-            <section className="card">
+            <section className="card paper">
               <div className="card-head">
                 <span className="section-title">
                   <Shapes size={14} /> Your token
@@ -181,7 +179,7 @@ export const LobbyScreen: React.FC = () => {
             </section>
           )}
 
-          <section className="card">
+          <section className="card paper">
             <div className="setting-row">
               <span className="setting-icon">
                 <Trophy size={18} />

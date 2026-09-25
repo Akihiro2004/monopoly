@@ -1,0 +1,4 @@
+City Builder models by Kenney (www.kenney.nl)
+Source: https://github.com/KenneyNL/Starter-Kit-City-Builder
+License: Creative Commons Zero (CC0) for the 3D models
+(the starter kit's code is MIT; only the .glb models and Textures/colormap.png are used here).

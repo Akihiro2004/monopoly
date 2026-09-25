@@ -135,7 +135,14 @@ async function main() {
 
   const moved = await movedPromise;
   const rollerState = moved.players.find((p) => p.playerId === firstPlayer.playerId);
-  check('active player token left GO', !!rollerState && rollerState.position !== 0, rollerState ? `position ${rollerState.position}` : 'no state');
+  // Check the dice walk itself: a Chance card ("Advance to GO") may legitimately
+  // put the token back on GO afterwards.
+  const move = moved.lastMove;
+  check(
+    'active player token walked off GO',
+    !!rollerState && !!move && move.playerId === firstPlayer.playerId && move.landed !== move.from,
+    move ? `walked ${move.from} -> ${move.landed}, now ${rollerState?.position}` : 'no move record'
+  );
   check('game:state carries both players', moved.players.length === 2);
 
   if (moved.phase === 'BUY_OFFER') {

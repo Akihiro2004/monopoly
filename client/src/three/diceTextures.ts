@@ -12,12 +12,12 @@ export function createDiceFaceTexture(number: number): THREE.CanvasTexture {
   ctx.fillRect(0, 0, 256, 256);
 
   // Border inset
-  ctx.strokeStyle = '#cbd5e1';
+  ctx.strokeStyle = '#efe4cc';
   ctx.lineWidth = 14;
   ctx.strokeRect(7, 7, 242, 242);
 
   // Pip color (red for 1, dark slate for 2-6)
-  ctx.fillStyle = number === 1 ? '#dc2626' : '#0f172a';
+  ctx.fillStyle = number === 1 ? '#e7352c' : '#2b1d10';
 
   const drawPip = (x: number, y: number, r = 24) => {
     ctx.beginPath();

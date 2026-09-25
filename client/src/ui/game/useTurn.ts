@@ -1,4 +1,4 @@
-import { BOARD_TILES, GameState, PlayerState, PropertyState, TileDef } from '@monopoly/shared';
+import { BOARD_TILES, GameState, PlayerState, PropertyState, TileDef, buildBlockReason } from '@monopoly/shared';
 import { useGameStore } from '../../store/gameStore.js';
 
 export interface UpgradeOption {
@@ -7,6 +7,8 @@ export interface UpgradeOption {
   nextLevel: number;
   cost: number;
   affordable: boolean;
+  // Rule that blocks it (pass GO first, landmark set rule...), null if allowed.
+  blocked: string | null;
 }
 
 export interface TurnInfo {
@@ -25,6 +27,7 @@ export interface TurnInfo {
 }
 
 // The server only allows upgrading the tile you stand on (LINE Get Rich rule).
+// Returns null when there is nothing to upgrade here at all.
 export function upgradeOptionFor(game: GameState, me: PlayerState | undefined): UpgradeOption | null {
   if (!me) return null;
   const prop = game.properties[me.position];
@@ -32,12 +35,16 @@ export function upgradeOptionFor(game: GameState, me: PlayerState | undefined): 
   if (!prop || !tile || prop.ownerId !== me.playerId) return null;
   if (prop.isMortgaged || tile.buildCost <= 0 || prop.buildLevel >= 4) return null;
   if (prop.buildLevel === 3 && prop.forceBought) return null;
+  const blocked = buildBlockReason(game, me, me.position);
+  const affordable = me.money >= tile.buildCost;
   return {
     prop,
     tile,
     nextLevel: prop.buildLevel + 1,
     cost: tile.buildCost,
-    affordable: me.money >= tile.buildCost
+    affordable,
+    // Cash shortage is shown as a disabled price, not as a rule message.
+    blocked: affordable ? blocked : null
   };
 }
 

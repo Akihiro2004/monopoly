@@ -1,8 +1,7 @@
 import React, { useRef, useMemo, useEffect, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { Text } from '@react-three/drei';
-import { BOLD_FONT } from './fonts.js';
+import { RoundedBox } from '@react-three/drei';
 import { useGameStore } from '../store/gameStore.js';
 import { createDiceFaceTexture, ROTATION_FOR_TOP_FACE } from './diceTextures.js';
 import { audioManager } from '../sound/audioManager.js';
@@ -67,9 +66,7 @@ const SingleDie: React.FC<DieProps> = ({ position, targetValue, rollTrigger }) =
 
   return (
     <group position={position}>
-      <mesh ref={meshRef} material={materials} castShadow receiveShadow>
-        <boxGeometry args={[1.0, 1.0, 1.0]} />
-      </mesh>
+      <RoundedBox ref={meshRef} args={[1, 1, 1]} radius={0.14} smoothness={4} material={materials} castShadow receiveShadow />
     </group>
   );
 };
@@ -88,8 +85,6 @@ export const Dice3D: React.FC = () => {
 
   const d1 = diceRoll?.d1 ?? gameState?.dice?.[0] ?? 1;
   const d2 = diceRoll?.d2 ?? gameState?.dice?.[1] ?? 1;
-  const total = d1 + d2;
-  const isDoubles = d1 === d2;
 
   return (
     // Placed on the open cream area in front of the diagonal logo banner
@@ -105,18 +100,6 @@ export const Dice3D: React.FC = () => {
         rollTrigger={rollCount}
       />
 
-      {/* Roll result label */}
-      <Text
-        font={BOLD_FONT}
-        position={[0, 0.26, 1.7]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        fontSize={0.55}
-        color="#b45309"
-        anchorX="center"
-        anchorY="middle"
-      >
-        {isDoubles && rollCount > 0 ? `${d1} + ${d2} = ${total} (DOUBLES!)` : `${d1} + ${d2} = ${total}`}
-      </Text>
     </group>
   );
 };

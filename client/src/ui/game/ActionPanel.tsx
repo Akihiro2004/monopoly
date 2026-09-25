@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { BOARD_TILES, JAIL_FINE } from '@monopoly/shared';
-import { ArrowUpCircle, Castle, Check, Dices, Footprints, KeyRound, RotateCcw, ShieldAlert, Zap } from 'lucide-react';
+import { ArrowUpCircle, Castle, Check, Dices, Footprints, Info, KeyRound, Lock, RotateCcw, Zap } from 'lucide-react';
 import { socket } from '../../net/socket.js';
 import { audioManager } from '../../sound/audioManager.js';
 import { useGameStore } from '../../store/gameStore.js';
@@ -20,41 +20,43 @@ const payJail = click(() => socket.emit('game:payJail'));
 const applyJailCard = click(() => socket.emit('game:useJailCard'));
 
 // The one place that decides what the player can do right now. Desktop docks
-// it under the board, mobile pins it above the tab bar.
-export const ActionPanel: React.FC<{ showShortcuts?: boolean }> = ({ showShortcuts }) => {
+// it under the board with a big round ROLL button, mobile pins it above the
+// tab bar as full-width buttons.
+export const ActionPanel: React.FC<{ variant: 'desktop' | 'mobile' }> = ({ variant }) => {
   const turn = useTurn();
   const cardOpen = useGameStore((s) => s.cardDraw !== null);
   const myPlayerId = useGameStore((s) => s.myPlayerId);
   const forceLeft = useCountdown(turn?.game.forceBuyOffer?.expiresAt);
+  const desktop = variant === 'desktop';
 
   const phase = turn?.game.phase;
   const canAct = turn?.canAct ?? false;
 
   // Desktop: Space rolls / ends the turn, like a native game client.
   useEffect(() => {
-    if (!showShortcuts || !canAct) return;
+    if (!desktop || !canAct) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== 'Space' || e.repeat || cardOpen) return;
       const t = e.target as HTMLElement;
-      if (t.closest('input, textarea, button, [contenteditable]')) return;
+      if (t.closest('input, textarea, button, [contenteditable], [role="dialog"]')) return;
       e.preventDefault();
       if (phase === 'ROLLING') roll();
       else if (phase === 'TURN_ENDED') endTurn();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [showShortcuts, canAct, phase, cardOpen]);
+  }, [desktop, canAct, phase, cardOpen]);
 
   if (!turn || phase === 'GAME_OVER') return null;
   const { game, me, current, isMyTurn, isWalking, upgrade } = turn;
-  const kbd = showShortcuts ? <kbd className="kbd">Space</kbd> : null;
+  const kbd = desktop ? <kbd className="kbd">Space</kbd> : null;
 
   if (isWalking) {
     return (
-      <div className="action-panel">
+      <div className={`action-panel ${variant}`}>
         <div className="action-status">
           <Footprints size={18} className="status-icon pulse" />
-          <span>{isMyTurn ? 'Moving your token…' : `${current.name} is moving…`}</span>
+          <span>{isMyTurn ? 'Moving…' : `${current.name} is moving…`}</span>
         </div>
       </div>
     );
@@ -62,29 +64,36 @@ export const ActionPanel: React.FC<{ showShortcuts?: boolean }> = ({ showShortcu
 
   if (isMyTurn && phase === 'ROLLING') {
     return (
-      <div className="action-panel">
+      <div className={`action-panel ${variant}`}>
         {me?.inJail && (
-          <div className="action-row jail-row">
+          <div className="jail-row">
             <span className="jail-note">
-              <ShieldAlert size={15} /> In jail. Roll doubles, pay, or use a card.
+              <Lock size={14} /> In jail: roll doubles, pay, or use a card
             </span>
-            <div className="action-row">
-              <button className="btn btn-secondary" onClick={payJail} disabled={(me?.money ?? 0) < JAIL_FINE}>
+            <div className="jail-buttons">
+              <button className="btn btn-gold btn-sm" onClick={payJail} disabled={(me?.money ?? 0) < JAIL_FINE}>
                 Pay {money(JAIL_FINE)}
               </button>
               {me.jailCards > 0 && (
-                <button className="btn btn-secondary" onClick={applyJailCard}>
-                  <KeyRound size={16} /> Use card ({me.jailCards})
+                <button className="btn btn-blue btn-sm" onClick={applyJailCard}>
+                  <KeyRound size={14} /> Free card ({me.jailCards})
                 </button>
               )}
             </div>
           </div>
         )}
-        <button className="btn btn-primary btn-xl btn-main btn-roll" onClick={roll}>
-          <Dices size={24} />
-          <span>{me?.inJail ? 'Roll for doubles' : 'Roll dice'}</span>
-          {kbd}
-        </button>
+        {desktop ? (
+          <button className="roll-btn btn-roll" onClick={roll} aria-label="Roll dice">
+            <Dices size={34} strokeWidth={2.4} />
+            <span>ROLL</span>
+          </button>
+        ) : (
+          <button className="btn btn-primary btn-xl btn-main btn-roll" onClick={roll}>
+            <Dices size={26} />
+            <span>{me?.inJail ? 'Roll for doubles' : 'Roll dice'}</span>
+          </button>
+        )}
+        {desktop && kbd}
       </div>
     );
   }
@@ -92,16 +101,21 @@ export const ActionPanel: React.FC<{ showShortcuts?: boolean }> = ({ showShortcu
   if (isMyTurn && phase === 'TURN_ENDED') {
     const again = game.doubles && !me?.inJail && !me?.isBankrupt;
     return (
-      <div className="action-panel">
+      <div className={`action-panel ${variant}`}>
+        {upgrade?.blocked && (
+          <div className="rule-hint">
+            <Info size={15} /> {upgrade.blocked}
+          </div>
+        )}
         <div className="action-row">
-          {upgrade && (
+          {upgrade && !upgrade.blocked && (
             <button
-              className={`btn btn-xl btn-upgrade ${upgrade.nextLevel === 4 ? 'landmark' : ''}`}
+              className={`btn btn-xl btn-upgrade ${upgrade.nextLevel === 4 ? 'btn-purple landmark' : 'btn-blue'}`}
               onClick={click(() => socket.emit('game:build', { tileIndex: upgrade.prop.tileIndex }))}
               disabled={!upgrade.affordable}
               title={`${upgrade.tile.name}: upgrade to ${LEVEL_NAMES[upgrade.nextLevel]}`}
             >
-              {upgrade.nextLevel === 4 ? <Castle size={20} /> : <ArrowUpCircle size={20} />}
+              {upgrade.nextLevel === 4 ? <Castle size={22} /> : <ArrowUpCircle size={22} />}
               <span className="btn-stack">
                 <span>Build {LEVEL_NAMES[upgrade.nextLevel]}</span>
                 <small className="tnum">{money(upgrade.cost)}</small>
@@ -109,8 +123,8 @@ export const ActionPanel: React.FC<{ showShortcuts?: boolean }> = ({ showShortcu
             </button>
           )}
           <button className="btn btn-success btn-xl btn-main btn-end-turn" onClick={endTurn}>
-            {again ? <RotateCcw size={20} /> : <Check size={20} strokeWidth={3} />}
-            <span>{again ? 'Doubles! Roll again' : 'End turn'}</span>
+            {again ? <RotateCcw size={22} strokeWidth={3} /> : <Check size={22} strokeWidth={3} />}
+            <span>{again ? 'Roll again!' : 'End turn'}</span>
             {kbd}
           </button>
         </div>
@@ -121,17 +135,17 @@ export const ActionPanel: React.FC<{ showShortcuts?: boolean }> = ({ showShortcu
   // Waiting states: describe what the table is waiting on.
   let tone: 'neutral' | 'danger' = 'neutral';
   let text = `${current.name} is rolling…`;
-  let icon: React.ReactNode = <PlayerAvatar token={current.tokenType} color={current.color} size={26} />;
+  let icon: React.ReactNode = <PlayerAvatar token={current.tokenType} color={current.color} size={28} />;
 
   if (isMyTurn) {
-    text = phase === 'DEBT' ? 'Raise cash to cover your debt.' : 'Make your choice…';
+    text = phase === 'DEBT' ? 'Raise cash to cover your debt' : 'Make your choice…';
   } else if (game.forceBuyOffer) {
     const fb = game.forceBuyOffer;
     const tile = BOARD_TILES[fb.tileIndex];
     if (fb.targetPlayerId === myPlayerId) {
       tone = 'danger';
-      icon = <Zap size={18} className="status-icon" />;
-      text = `${current.name} can force-buy your ${tile.name} for ${money(fb.price)}. ${forceLeft}s`;
+      icon = <Zap size={18} className="status-icon" fill="currentColor" />;
+      text = `${current.name} can force-buy your ${tile.name} for ${money(fb.price)} · ${forceLeft}s`;
     } else {
       text = `${current.name} is weighing a force-buy of ${tile.name}… ${forceLeft}s`;
     }
@@ -145,7 +159,7 @@ export const ActionPanel: React.FC<{ showShortcuts?: boolean }> = ({ showShortcu
   }
 
   return (
-    <div className="action-panel">
+    <div className={`action-panel ${variant}`}>
       <div className={`action-status ${tone}`}>
         {icon}
         <span>{text}</span>

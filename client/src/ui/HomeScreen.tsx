@@ -5,6 +5,7 @@ import {
   ArrowRight,
   Banknote,
   Castle,
+  Handshake,
   Hash,
   History,
   LogIn,
@@ -15,11 +16,15 @@ import {
   Users
 } from 'lucide-react';
 import { MiniBoard } from './common/MiniBoard.js';
+import { Logo, Sky } from './common/Sky.js';
+import { useInstall } from '../hooks/useInstall.js';
+import { Download, Share } from 'lucide-react';
 
 const FEATURES = [
   { icon: Swords, title: 'Force buy', text: 'Take rivals’ built land at 2x.' },
   { icon: Castle, title: 'Landmarks', text: 'Four build levels, landmarks are safe.' },
   { icon: Trophy, title: 'Special wins', text: 'Triple sets or a full board line.' },
+  { icon: Handshake, title: 'Trading', text: 'Swap cash and deeds with anyone.' },
   { icon: Banknote, title: 'Sell back', text: 'Raise cash instead of instant bankruptcy.' }
 ];
 
@@ -32,6 +37,8 @@ export const HomeScreen: React.FC = () => {
   const [mode, setMode] = useState<Mode>(saved?.roomId ? 'join' : 'create');
   const [busy, setBusy] = useState(false);
   const addToast = useGameStore((s) => s.addToast);
+  const install = useInstall();
+  const [iosHelp, setIosHelp] = useState(false);
 
   const handleCreate = () => {
     if (!name.trim()) return addToast('Enter your name first', 'warning');
@@ -70,27 +77,15 @@ export const HomeScreen: React.FC = () => {
 
   return (
     <div className="menu-screen home-screen">
-      <div className="menu-bg" />
+      <Sky />
 
       <div className="home-layout">
         <section className="home-hero">
-          <div className="brand">
-            <span className="brand-mark" />
-            <span className="brand-name">Monopoly 3D</span>
-            <span className="badge gold">Get Rich rules</span>
-          </div>
+          <Logo />
+          <p className="hero-sub">Real-time 3D Monopoly for up to 6 friends. Roll, buy, build, trade and get rich!</p>
 
           <div className="hero-art">
             <MiniBoard />
-          </div>
-
-          <div className="hero-copy">
-            <h1 className="hero-title">
-              Roll, build, <span>get rich.</span>
-            </h1>
-            <p className="hero-sub">
-              Real-time 3D Monopoly for up to 6 friends. Nothing to install, just share a room code.
-            </p>
           </div>
 
           <ul className="feature-list">
@@ -109,25 +104,25 @@ export const HomeScreen: React.FC = () => {
         </section>
 
         <section className="home-panel">
-          <form className="panel-card" onSubmit={submit}>
+          <form className="panel-card paper" onSubmit={submit}>
             <div className="panel-head">
-              <h2>{mode === 'create' ? 'Host a game' : 'Join a game'}</h2>
+              <h2 className="display">{mode === 'create' ? 'Host a game' : 'Join a game'}</h2>
               <p>{mode === 'create' ? 'Create a room and invite friends with the code.' : 'Enter the code your host shared.'}</p>
             </div>
 
             <div className="segmented" role="tablist">
               <button type="button" role="tab" aria-selected={mode === 'create'} className={mode === 'create' ? 'active' : ''} onClick={() => setMode('create')}>
-                <Plus size={16} /> Create
+                <Plus size={17} /> Create
               </button>
               <button type="button" role="tab" aria-selected={mode === 'join'} className={mode === 'join' ? 'active' : ''} onClick={() => setMode('join')}>
-                <Users size={16} /> Join
+                <Users size={17} /> Join
               </button>
             </div>
 
             <label className="field">
               <span className="field-label">Your name</span>
               <span className="input-wrap">
-                <User size={18} />
+                <User size={19} />
                 <input
                   className="input"
                   type="text"
@@ -145,7 +140,7 @@ export const HomeScreen: React.FC = () => {
               <label className="field">
                 <span className="field-label">Room code</span>
                 <span className="input-wrap">
-                  <Hash size={18} />
+                  <Hash size={19} />
                   <input
                     className="input code"
                     type="text"
@@ -164,17 +159,33 @@ export const HomeScreen: React.FC = () => {
 
             <button
               type="submit"
-              className={`btn btn-primary btn-lg btn-block ${mode === 'create' ? 'btn-create' : 'btn-join'}`}
+              className={`btn btn-primary btn-xl btn-block ${mode === 'create' ? 'btn-create' : 'btn-join'}`}
               disabled={busy}
             >
-              {mode === 'create' ? <Plus size={19} /> : <LogIn size={19} />}
-              <span>{busy ? (mode === 'create' ? 'Creating room…' : 'Joining…') : mode === 'create' ? 'Create room' : 'Join room'}</span>
-              {!busy && <ArrowRight size={18} className="btn-trail" />}
+              {mode === 'create' ? <Plus size={22} strokeWidth={3} /> : <LogIn size={22} strokeWidth={3} />}
+              <span>{busy ? (mode === 'create' ? 'Creating…' : 'Joining…') : mode === 'create' ? 'Create room' : 'Join room'}</span>
+              {!busy && <ArrowRight size={20} strokeWidth={3} className="btn-trail" />}
             </button>
+
+            {install.canPrompt && (
+              <button type="button" className="btn btn-gold btn-block btn-install" onClick={() => install.install()}>
+                <Download size={18} strokeWidth={2.6} /> Install app
+              </button>
+            )}
+            {install.showIosHelp && (
+              <button type="button" className="btn btn-secondary btn-block btn-install" onClick={() => setIosHelp((v) => !v)}>
+                <Share size={17} strokeWidth={2.6} /> Install on iPhone
+              </button>
+            )}
+            {iosHelp && (
+              <p className="ios-help">
+                Tap <Share size={14} /> <strong>Share</strong> in Safari, then <strong>Add to Home Screen</strong>. It opens full screen like a real app.
+              </p>
+            )}
 
             <p className="panel-hint">
               <History size={14} />
-              <span>Your seat is saved. Reload the tab any time to rejoin.</span>
+              <span>Your seat is saved. Reload any time to rejoin.</span>
             </p>
           </form>
         </section>

@@ -17,9 +17,11 @@ export const ForceBuyModal: React.FC = () => {
   const gameState = useGameStore((s) => s.gameState);
   const myPlayerId = useGameStore((s) => s.myPlayerId);
   const isWalking = useGameStore((s) => s.isWalking);
+  // One thing at a time: a Chance/Chest card is read first.
+  const cardOpen = useGameStore((s) => s.cardDraw !== null);
   const left = useCountdown(offer?.expiresAt);
 
-  if (!offer || !gameState || isWalking || offer.buyerPlayerId !== myPlayerId) return null;
+  if (!offer || !gameState || isWalking || cardOpen || offer.buyerPlayerId !== myPlayerId) return null;
 
   const tile = BOARD_TILES[offer.tileIndex];
   const prop = gameState.properties[offer.tileIndex];
@@ -91,7 +93,7 @@ export const ForceBuyModal: React.FC = () => {
           <button className="btn btn-secondary btn-lg btn-decline" onClick={() => respond(false)}>
             Pay rent
           </button>
-          <button className="btn btn-primary btn-lg btn-force-buy" onClick={() => respond(true)} disabled={!canAfford}>
+          <button className="btn btn-gold btn-lg btn-force-buy" onClick={() => respond(true)} disabled={!canAfford}>
             <Zap size={17} fill="currentColor" /> Buy for <span className="tnum">{money(offer.price)}</span>
           </button>
         </div>

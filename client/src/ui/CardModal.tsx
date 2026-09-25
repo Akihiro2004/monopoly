@@ -25,7 +25,7 @@ export const CardModal: React.FC = () => {
           <h3>{cardDraw.title}</h3>
           <p>{cardDraw.text}</p>
         </div>
-        <button className="btn btn-primary btn-lg btn-block btn-card-ok" onClick={handleClose}>
+        <button className="btn btn-gold btn-lg btn-block btn-card-ok" onClick={handleClose}>
           Got it
         </button>
       </div>

@@ -12,6 +12,9 @@ import { VictoryOverlay } from './ui/VictoryOverlay.js';
 import { ToastContainer } from './ui/ToastContainer.js';
 import { MonopolyScene } from './three/Scene.js';
 import { useIsMobile } from './hooks/useIsMobile.js';
+import { Logo, Sky } from './ui/common/Sky.js';
+import { IncomingTradeModal } from './ui/trade/IncomingTradeModal.js';
+import { RotateOverlay } from './ui/common/RotateOverlay.js';
 
 export function App() {
   const roomState = useGameStore((s) => s.roomState);
@@ -80,12 +83,13 @@ export function App() {
     return (
       <div className={rootClass}>
         <div className="menu-screen">
-          <div className="menu-bg" />
+          <Sky />
           <div className="splash">
-            <span className="brand-mark" />
-            <h1>Monopoly 3D</h1>
-            <div className="spinner" />
-            <p>Rejoining your game…</p>
+            <Logo />
+            <div className="splash-card paper">
+              <div className="spinner" />
+              <p>Rejoining your game…</p>
+            </div>
           </div>
         </div>
         <ToastContainer />
@@ -112,6 +116,7 @@ export function App() {
           <ForceBuyModal />
           <CardModal />
           <DebtModal />
+          <IncomingTradeModal />
         </>
       )}
 
@@ -120,6 +125,7 @@ export function App() {
 
       {/* Global Notifications */}
       <ToastContainer />
+      <RotateOverlay />
     </div>
   );
 }

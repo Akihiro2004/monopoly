@@ -4,33 +4,20 @@ A real-time multiplayer 3D Monopoly website built with React, Three.js (@react-t
 
 ---
 
-## Game Features (LINE Get Rich)
+## Game Features (LINE Get Rich + real Monopoly touches)
 
-1. **Auto-Buy on Landing**:
-   - Landing on unowned property buys it automatically if you have the cash.
-   - If you're broke, it stays unowned. No auctions, no bidding.
-2. **2× Force-Buy from Opponents**:
-   - Landing on an opponent's developed property (house, building, or hotel) opens a 15-second offer to buy it for 2× the total cost (land + buildings).
-   - The sale is forced. The owner cannot refuse once the buyer accepts.
-   - Decline or timeout, and you pay rent as normal.
-3. **4 Build Levels & Landmark Protection**:
-   - `House (Lv 1) → Building (Lv 2) → Hotel (Lv 3) → LANDMARK (Lv 4)`
-   - Landmarks are permanent. Opponents cannot buy them.
-   - Force-bought properties keep their build level and can be upgraded to Hotel, but never to Landmark.
-   - Buildings accumulate on the tile and are tinted in the owner color; upgrades only on the property you stand on.
-4. **Debt & Sell-Back (no instant bankruptcy)**:
-   - Cannot afford rent, tax, or a card payment? The game enters a DEBT phase: sell buildings back for half price and the debt auto-pays once covered, or declare bankruptcy.
-5. **Multiple Victory Conditions**:
-   - **Bankruptcy**: last non-bankrupt player standing.
-   - **Triple Victory** (toggleable): own all properties of 3 complete color sets.
-   - **Line Victory** (toggleable): own every purchasable property on one board side.
-6. **3D Interactive Visuals**:
-   - Full 3D board rendered via Three.js with OrbitControls (drag to rotate, pinch or scroll to zoom).
-   - 6 custom 3D tokens (Race Car, Top Hat, Dog, Battleship, Thimble, Boot) that track the active player.
-   - Animated dice with real pips.
-   - Real-time chat and an activity feed.
-
----
+1. **Buying**: landing on an unowned property offers it at list price (Buy / Pass). No auctions.
+2. **Building (4 levels)**: `House (Lv 1) → Building (Lv 2) → Hotel (Lv 3) → LANDMARK (Lv 4)`
+   - You can only upgrade the property you are standing on.
+   - You must **pass GO once** before you can start building on land.
+   - A **Landmark** needs the **whole color set** owned and built up to Hotels first.
+3. **2× Force-Buy**: landing on an opponent's developed property opens a 15-second offer to buy it for 2× its value (land + buildings). **Landmarks can never be acquired**, and force-bought properties can never become Landmarks.
+4. **Trading**: trade cash and/or unbuilt deeds with any player at any time (propose, accept, decline, cancel). A trade can settle your own debt.
+5. **Debt & Bankruptcy**: cannot pay rent, tax or a card? Sell buildings back (half price) or mortgage land; the debt auto-pays once covered. Declaring bankruptcy **sells everything back to the bank**: the creditor receives only the owed amount (capped at what the sale raised), and properties return to the bank unowned.
+6. **Chance & Community Chest**: the card is revealed once your token has actually arrived; "Advance to…" cards move you there and resolve that tile (buy / rent / force-buy).
+7. **Victory**: last player standing, or (toggleable) **Triple Victory** (3 complete color sets) / **Line Victory** (every property on one side).
+8. **3D board in a little town**: hand-painted tiles, animated classic tokens (car, top hat, Scottie dog, battleship, thimble, boot), houses → townhouse → hotel → domed Landmark, rolling dice, and a sunny diorama.
+9. **Desktop & phone**: floating player cards, a collapsible side panel (Assets / Trade / Log / Chat) and a big ROLL button on PC; a portrait-first layout with a tab bar on phones. **Installable** as an app (Add to Home Screen / Install), locked to portrait when installed.
 
 ## How to Run Locally
 
@@ -102,4 +89,9 @@ Since the backend runs on your machine, you can expose it to friends over the in
    - Full WebSockets supported.
    - Make sure your PC stays awake while you play.
 
+---
 
+## Credits
+
+- Town models: [Kenney City Builder kit](https://github.com/KenneyNL/Starter-Kit-City-Builder), CC0 (see `client/public/models/city/LICENSE.txt`).
+- Fonts: Lilita One and Nunito (SIL Open Font License) via Fontsource.

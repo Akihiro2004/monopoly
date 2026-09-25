@@ -125,8 +125,8 @@ export const Portfolio: React.FC<PortfolioProps> = ({ hideSummary, liquidOnly })
                         <button
                           className={`mini-btn ${upgrade.nextLevel === 4 ? 'gold' : 'blue'}`}
                           onClick={() => build(p.tileIndex)}
-                          disabled={!upgrade.affordable}
-                          title={`Upgrade to ${LEVEL_NAMES[upgrade.nextLevel]} for ${money(upgrade.cost)}`}
+                          disabled={!upgrade.affordable || !!upgrade.blocked}
+                          title={upgrade.blocked ?? `Upgrade to ${LEVEL_NAMES[upgrade.nextLevel]} for ${money(upgrade.cost)}`}
                         >
                           {upgrade.nextLevel === 4 ? <Castle size={14} /> : <ArrowUpCircle size={14} />}
                           <span className="tnum">{money(upgrade.cost)}</span>

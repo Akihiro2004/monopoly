@@ -32,6 +32,15 @@ interface GameStore {
   buyOffer: BuyOffer | null;
   forceBuyOffer: ForceBuyOffer | null;
   isWalking: boolean;
+  // Token paused on the tile it rolled onto before a follow-up move
+  // (card target / go-to-jail): events for that landing may show now.
+  walkPaused: boolean;
+  // Latest event line for the compact mobile ticker.
+  ticker: ToastMessage | null;
+  // Incoming trade ids the player chose to look at later.
+  snoozedTrades: string[];
+  // Desktop: right panel collapsed into the compact dock.
+  panelCollapsed: boolean;
   chatMessages: ChatMessage[];
   toasts: ToastMessage[];
   winner: { winnerId: string; victoryType: VictoryType } | null;
@@ -46,12 +55,32 @@ interface GameStore {
   setForceBuyOffer: (offer: ForceBuyOffer | null) => void;
   setCardDraw: (draw: CardDraw | null) => void;
   setIsWalking: (isWalking: boolean) => void;
+  setWalkPaused: (paused: boolean) => void;
+  snoozeTrade: (id: string) => void;
+  setPanelCollapsed: (collapsed: boolean) => void;
   addChatMessage: (msg: ChatMessage) => void;
   addToast: (text: string, type?: 'info' | 'success' | 'warning' | 'danger') => void;
   removeToast: (id: string) => void;
   setWinner: (winner: { winnerId: string; victoryType: VictoryType } | null) => void;
   pushActivity: (text: string, type?: ToastMessage['type']) => void;
   resetAll: () => void;
+}
+
+// Per-device UI preferences; storage can be unavailable (private mode).
+function readPref(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writePref(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // ignore
+  }
 }
 
 export const useGameStore = create<GameStore>((set) => ({
@@ -62,6 +91,10 @@ export const useGameStore = create<GameStore>((set) => ({
   buyOffer: null,
   forceBuyOffer: null,
   isWalking: false,
+  walkPaused: false,
+  ticker: null,
+  snoozedTrades: [],
+  panelCollapsed: readPref('ui.panelCollapsed') === '1',
   chatMessages: [],
   toasts: [],
   winner: null,
@@ -86,12 +119,18 @@ export const useGameStore = create<GameStore>((set) => ({
   setForceBuyOffer: (forceBuyOffer) => set({ forceBuyOffer }),
   setCardDraw: (cardDraw) => set({ cardDraw }),
   setIsWalking: (isWalking) => set({ isWalking }),
+  setWalkPaused: (walkPaused) => set({ walkPaused }),
+  setPanelCollapsed: (panelCollapsed) => {
+    writePref('ui.panelCollapsed', panelCollapsed ? '1' : '0');
+    set({ panelCollapsed });
+  },
+  snoozeTrade: (id) => set((s) => ({ snoozedTrades: [...s.snoozedTrades, id] })),
   addChatMessage: (msg) =>
     set((s) => ({ chatMessages: [...s.chatMessages.slice(-50), msg] })),
   addToast: (text, type = 'info') => {
     const id = Math.random().toString(36).substring(2, 9);
     // Keep the stack short so it never covers the board.
-    set((s) => ({ toasts: [...s.toasts.slice(-2), { id, text, type }] }));
+    set((s) => ({ toasts: [...s.toasts.slice(-2), { id, text, type }], ticker: { id, text, type } }));
     setTimeout(() => {
       set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
     }, 4500);
@@ -115,9 +154,52 @@ export const useGameStore = create<GameStore>((set) => ({
       cardDraw: null,
       chatMessages: [],
       activity: [],
+      snoozedTrades: [],
+      ticker: null,
       winner: null,
     }),
 }));
+
+// ------------------------------------------------------------------
+// Event gate: the server sends landing toasts and Chance/Chest cards the
+// moment dice are rolled, before the token has walked there. Hold them until
+// the walk finishes (or pauses on the landing tile) so nothing is spoiled.
+// ------------------------------------------------------------------
+const eventQueue: (() => void)[] = [];
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+let waitUnsub: (() => void) | null = null;
+
+function flushEvents() {
+  waitUnsub?.();
+  waitUnsub = null;
+  const batch = eventQueue.splice(0);
+  batch.forEach((fn) => fn());
+}
+
+function settled(s: GameStore) {
+  return !s.isWalking || s.walkPaused;
+}
+
+function enqueueEvent(fn: () => void) {
+  eventQueue.push(fn);
+  if (flushTimer || waitUnsub) return;
+  // Give the matching game:state / game:dice a moment to start the walk.
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    if (settled(useGameStore.getState())) return flushEvents();
+    const safety = setTimeout(flushEvents, 15000);
+    const unsub = useGameStore.subscribe((s) => {
+      if (settled(s)) {
+        clearTimeout(safety);
+        flushEvents();
+      }
+    });
+    waitUnsub = () => {
+      clearTimeout(safety);
+      unsub();
+    };
+  }, 260);
+}
 
 // Setup global socket event bindings into store (idempotent: safe under StrictMode)
 let listenersInitialized = false;
@@ -125,6 +207,7 @@ let listenersInitialized = false;
 export function initSocketListeners() {
   if (listenersInitialized) return;
   listenersInitialized = true;
+  registerLateListeners();
 
   socket.on('room:state', (room) => {
     useGameStore.getState().setRoomState(room);
@@ -136,7 +219,8 @@ export function initSocketListeners() {
     const myId = prev.myPlayerId;
     prev.setGameState(game);
     if (game.lastActionText && game.lastActionText !== prevGame?.lastActionText) {
-      prev.pushActivity(game.lastActionText);
+      const text = game.lastActionText;
+      enqueueEvent(() => useGameStore.getState().pushActivity(text));
     }
 
     // Transition sounds only for live updates, not the first sync after
@@ -182,8 +266,10 @@ export function initSocketListeners() {
   });
 
   socket.on('game:card', (draw) => {
-    useGameStore.getState().setCardDraw(draw);
-    audioManager.playCardDraw();
+    enqueueEvent(() => {
+      useGameStore.getState().setCardDraw(draw);
+      audioManager.playCardDraw();
+    });
   });
 
   socket.on('game:forceBuyOffer', (offer) => {
@@ -191,18 +277,24 @@ export function initSocketListeners() {
   });
 
   socket.on('game:toast', ({ text, type }) => {
-    useGameStore.getState().addToast(text, type);
-    useGameStore.getState().pushActivity(text, type ?? 'info');
-    // Debt entry already plays the debt alarm via the DEBT phase change,
-    // and bankruptcy plays its own dirge via the state change — the toasts
-    // for those arrive alongside, so skip them here to avoid stacking.
-    const coveredByStateSound = /owes \$|cannot afford|cannot pay|bankrupt|game over/i.test(text);
-    if (type === 'success') audioManager.playCoin();
-    else if (type === 'danger' && !coveredByStateSound) audioManager.playError();
-    else if (type === 'warning' && !coveredByStateSound) audioManager.playModal();
-    else if (!type || type === 'info') audioManager.playTick();
+    enqueueEvent(() => showGameToast(text, type));
   });
+}
 
+function showGameToast(text: string, type?: ToastMessage['type']) {
+  useGameStore.getState().addToast(text, type);
+  useGameStore.getState().pushActivity(text, type ?? 'info');
+  // Debt entry already plays the debt alarm via the DEBT phase change,
+  // and bankruptcy plays its own dirge via the state change — the toasts
+  // for those arrive alongside, so skip them here to avoid stacking.
+  const coveredByStateSound = /owes \$|cannot afford|cannot pay|bankrupt|game over/i.test(text);
+  if (type === 'success') audioManager.playCoin();
+  else if (type === 'danger' && !coveredByStateSound) audioManager.playError();
+  else if (type === 'warning' && !coveredByStateSound) audioManager.playModal();
+  else if (!type || type === 'info') audioManager.playTick();
+}
+
+function registerLateListeners() {
   socket.on('game:ended', (winner) => {
     useGameStore.getState().setWinner(winner);
     audioManager.playVictory();

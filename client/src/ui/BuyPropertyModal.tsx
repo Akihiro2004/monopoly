@@ -3,7 +3,7 @@ import { socket } from '../net/socket.js';
 import { useGameStore } from '../store/gameStore.js';
 import { BOARD_TILES } from '@monopoly/shared';
 import { audioManager } from '../sound/audioManager.js';
-import { AlertTriangle, ShoppingBag } from 'lucide-react';
+import { AlertTriangle, Check, ShoppingBag, X } from 'lucide-react';
 import { Modal } from './common/Modal.js';
 import { TitleDeed } from './common/TitleDeed.js';
 import { money } from './theme.js';
@@ -14,8 +14,10 @@ export const BuyPropertyModal: React.FC = () => {
   const gameState = useGameStore((s) => s.gameState);
   const myPlayerId = useGameStore((s) => s.myPlayerId);
   const isWalking = useGameStore((s) => s.isWalking);
+  // One thing at a time: a Chance/Chest card is read first.
+  const cardOpen = useGameStore((s) => s.cardDraw !== null);
 
-  if (!buyOffer || !gameState || isWalking || buyOffer.buyerPlayerId !== myPlayerId) return null;
+  if (!buyOffer || !gameState || isWalking || cardOpen || buyOffer.buyerPlayerId !== myPlayerId) return null;
 
   const tile = BOARD_TILES[buyOffer.tileIndex];
   const buyer = gameState.players.find((p) => p.playerId === buyOffer.buyerPlayerId);
@@ -59,11 +61,11 @@ export const BuyPropertyModal: React.FC = () => {
         )}
 
         <div className="modal-actions">
-          <button className="btn btn-secondary btn-lg btn-pass" onClick={() => respond(false)}>
-            Pass
+          <button className="btn btn-danger btn-lg btn-pass" onClick={() => respond(false)}>
+            <X size={20} strokeWidth={3} /> Pass
           </button>
-          <button className="btn btn-primary btn-lg btn-buy" onClick={() => respond(true)} disabled={!canAfford}>
-            Buy for <span className="tnum">{money(buyOffer.price)}</span>
+          <button className="btn btn-success btn-lg btn-buy" onClick={() => respond(true)} disabled={!canAfford}>
+            <Check size={20} strokeWidth={3} /> Buy <span className="tnum">{money(buyOffer.price)}</span>
           </button>
         </div>
       </div>
