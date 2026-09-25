@@ -5,7 +5,8 @@ import {
   TokenType,
   PlayerColor,
   VictoryType,
-  ForceBuyOffer
+  ForceBuyOffer,
+  CardDraw
 } from './types.js';
 
 // Client -> Server events
@@ -17,7 +18,11 @@ export interface ClientToServerEvents {
   'room:ready': (payload: { ready: boolean }) => void;
   'room:toggleSpecialVictory': (payload: { enabled: boolean }) => void;
   'room:start': () => void;
-  'room:reconnect': (payload: { roomId: string; playerId: string }, callback: (res: { ok: boolean; error?: string }) => void) => void;
+  'room:reconnect': (
+    payload: { roomId: string; playerId: string; name?: string },
+    callback: (res: { ok: boolean; error?: string }) => void
+  ) => void;
+  'room:leave': (callback?: (res: { ok: boolean; error?: string }) => void) => void;
 
   // In-Game
   'game:roll': () => void;
@@ -26,6 +31,8 @@ export interface ClientToServerEvents {
   'game:buyResponse': (payload: { accept: boolean }) => void;
   'game:forceBuyResponse': (payload: { accept: boolean }) => void;
   'game:build': (payload: { tileIndex: number }) => void;
+  'game:sell': (payload: { tileIndex: number }) => void;
+  'game:declareBankruptcy': () => void;
   'game:mortgage': (payload: { tileIndex: number; mortgage: boolean }) => void;
   'game:endTurn': () => void;
 
@@ -38,6 +45,7 @@ export interface ServerToClientEvents {
   'room:state': (state: RoomState) => void;
   'game:state': (state: GameState) => void;
   'game:dice': (payload: { d1: number; d2: number; doubles: boolean }) => void;
+  'game:card': (draw: CardDraw) => void;
   'game:forceBuyOffer': (offer: ForceBuyOffer) => void;
   'game:toast': (payload: { text: string; type?: 'info' | 'success' | 'warning' | 'danger' }) => void;
   'game:ended': (payload: { winnerId: string; victoryType: VictoryType }) => void;

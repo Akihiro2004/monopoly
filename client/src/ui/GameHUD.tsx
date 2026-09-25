@@ -1,11 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { socket } from '../net/socket.js';
 import { useGameStore } from '../store/gameStore.js';
-import { BOARD_TILES } from '@monopoly/shared';
-import { Dices, Check, Hammer, Lock, Castle, Volume2, VolumeX } from 'lucide-react';
+import { BOARD_TILES, TileGroup } from '@monopoly/shared';
+import { Dices, Check, Hammer, Lock, Castle, Volume2, VolumeX, Home, Banknote } from 'lucide-react';
 import { PlayersSidebar } from './PlayersSidebar.js';
 import { PipDie } from './PipDie.js';
 import { audioManager } from '../sound/audioManager.js';
+
+const GROUP_COLORS: Record<TileGroup, string> = {
+  brown: '#92400e',
+  lightblue: '#38bdf8',
+  pink: '#ec4899',
+  orange: '#f97316',
+  red: '#ef4444',
+  yellow: '#eab308',
+  green: '#22c55e',
+  darkblue: '#3b82f6',
+  railroad: '#a8a29e',
+  utility: '#fbbf24',
+  special: '#64748b'
+};
 
 export const GameHUD: React.FC = () => {
   const gameState = useGameStore((s) => s.gameState);
@@ -64,13 +78,26 @@ export const GameHUD: React.FC = () => {
     socket.emit('game:build', { tileIndex });
   };
 
+  const handleSell = (tileIndex: number) => {
+    audioManager.playClick();
+    socket.emit('game:sell', { tileIndex });
+  };
+
+  const canAct = isMyTurn && (gameState.phase === 'ROLLING' || gameState.phase === 'TURN_ENDED');
+  const canSell =
+    isMyTurn &&
+    (gameState.phase === 'ROLLING' || gameState.phase === 'TURN_ENDED' || gameState.phase === 'DEBT');
+
   return (
     <div className="game-hud">
       {/* Top Banner */}
-      <div className="hud-top-bar">
+      <div className={`hud-top-bar ${isMyTurn ? 'my-turn' : ''}`}>
         <div className="turn-indicator">
           <span className="turn-label">TURN {gameState.turnNumber}</span>
-          <span className="active-player" style={{ color: curPlayer.color }}>
+          <span
+            className={`active-player ${isMyTurn ? 'your-turn' : ''}`}
+            style={isMyTurn ? undefined : { color: curPlayer.color }}
+          >
             {isMyTurn ? "IT'S YOUR TURN!" : `${curPlayer.name}'s turn`}
           </span>
           <span className="phase-pill">{gameState.phase}</span>
@@ -83,11 +110,11 @@ export const GameHUD: React.FC = () => {
           </div>
           {/* Audio Mute/Unmute Toggle */}
           <button
-            className="btn-audio-toggle"
+            className={`btn-audio-toggle ${muted ? 'muted' : ''}`}
             title={muted ? 'Unmute Audio & BGM' : 'Mute Audio & BGM'}
             onClick={() => audioManager.toggleMute()}
           >
-            {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+            {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
           </button>
         </div>
         <div className="action-ticker">{gameState.lastActionText}</div>
@@ -141,35 +168,60 @@ export const GameHUD: React.FC = () => {
 
       {/* Properties Drawer */}
       <div className="my-properties-tray">
-        <span className="tray-title">My Properties:</span>
+        <span className="tray-title">
+          <Home size={13} />
+          MY PROPERTIES
+          <span className="tray-count">
+            {Object.values(gameState.properties).filter((p) => p.ownerId === myPlayerId).length}
+          </span>
+        </span>
         <div className="tray-props">
+          {Object.values(gameState.properties).filter((p) => p.ownerId === myPlayerId).length === 0 && (
+            <div className="tray-empty">No properties yet — land on tiles to buy them.</div>
+          )}
           {Object.values(gameState.properties)
             .filter((p) => p.ownerId === myPlayerId)
             .map((p) => {
               const tile = BOARD_TILES[p.tileIndex];
               const levelNames = ['', 'House', 'Building', 'Hotel', 'LANDMARK'];
               return (
-                <div key={p.tileIndex} className="prop-chip">
+                <div
+                  key={p.tileIndex}
+                  className={`prop-chip ${p.isMortgaged ? 'mortgaged' : ''}`}
+                  style={{ borderLeftColor: GROUP_COLORS[tile.group] }}
+                >
                   <span className="chip-name">{tile.name}</span>
-                  <span className="chip-lvl">{p.buildLevel > 0 ? levelNames[p.buildLevel] : 'Land'}</span>
+                  <span className={`chip-lvl ${p.buildLevel === 0 ? 'land' : ''}`}>
+                    {p.buildLevel > 0 ? levelNames[p.buildLevel] : 'Land'}
+                  </span>
+                  {p.isMortgaged && <span className="chip-tag mortgage-tag">MORTGAGED</span>}
                   {p.forceBought && (
                     <span className="chip-tag" title="Landmark locked">
                       <Lock size={10} />
                     </span>
                   )}
-                  {isMyTurn && !p.isMortgaged && p.buildLevel < 3 && tile.buildCost > 0 && (
+                  {canSell && !p.isMortgaged && p.buildLevel > 0 && tile.buildCost > 0 && (
+                    <button
+                      className="chip-btn-sell"
+                      title={`Sell one level for $${Math.floor(tile.buildCost / 2)}`}
+                      onClick={() => handleSell(p.tileIndex)}
+                    >
+                      <Banknote size={12} />
+                    </button>
+                  )}
+                  {canAct && myPlayer && myPlayer.position === p.tileIndex && !p.isMortgaged && p.buildLevel < 3 && tile.buildCost > 0 && (
                     <button
                       className="chip-btn-build"
-                      title={`Upgrade for $${tile.buildCost}`}
+                      title={`Upgrade for $${tile.buildCost} (you stand here)`}
                       onClick={() => handleBuild(p.tileIndex)}
                     >
                       <Hammer size={12} />
                     </button>
                   )}
-                  {isMyTurn && !p.isMortgaged && p.buildLevel === 3 && !p.forceBought && (
+                  {canAct && myPlayer && myPlayer.position === p.tileIndex && !p.isMortgaged && p.buildLevel === 3 && !p.forceBought && (
                     <button
                       className="chip-btn-landmark"
-                      title={`Build Landmark for $${tile.buildCost}`}
+                      title={`Build Landmark for $${tile.buildCost} (you stand here)`}
                       onClick={() => handleBuild(p.tileIndex)}
                     >
                       <Castle size={14} />

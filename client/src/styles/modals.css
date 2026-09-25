@@ -137,27 +137,111 @@
 .chat-toggle-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  background: rgba(15, 23, 42, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  gap: 8px;
+  padding: 9px 16px;
+  background: rgba(30, 41, 59, 0.9);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
   color: #f8fafc;
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35), 0 10px 18px rgba(0, 0, 0, 0.4);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, border-color 0.15s ease;
+}
+
+.chat-toggle-btn:hover {
+  border-color: rgba(251, 191, 36, 0.45);
+}
+
+.chat-toggle-btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35), 0 4px 8px rgba(0, 0, 0, 0.35);
+}
+
+.chat-toggle-btn svg {
+  color: #fbbf24;
+}
+
+.chat-toggle-btn.has-unread {
+  border-color: rgba(251, 191, 36, 0.6);
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35), 0 0 18px rgba(251, 191, 36, 0.4);
+}
+
+.chat-unread-badge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fcd34d 0%, #f59e0b 100%);
+  color: #422006;
+  font-size: 0.68rem;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .chat-body {
   order: -1;
-  margin: 0 0 8px;
-  width: 280px;
-  height: 320px;
-  background: rgba(15, 23, 42, 0.95);
+  margin: 0 0 10px;
+  width: min(300px, calc(100vw - 32px));
+  height: 340px;
+  background: rgba(30, 41, 59, 0.95);
+  backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  border-radius: 16px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
-  padding: 10px;
+  padding: 12px;
+  overflow: hidden;
+  animation: chat-pop 0.18s ease-out;
+  position: relative;
+}
+
+.chat-body::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #f59e0b, transparent);
+  opacity: 0.6;
+}
+
+@keyframes chat-pop {
+  from { transform: translateY(10px) scale(0.98); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.chat-header-title {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #cbd5e1;
+}
+
+.chat-header-count {
+  font-size: 0.62rem;
+  font-weight: 900;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  color: #fbbf24;
+  padding: 1px 8px;
+  border-radius: 999px;
 }
 
 .messages-list {
@@ -166,35 +250,70 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  padding-right: 2px;
+}
+
+.chat-empty {
+  font-size: 0.75rem;
+  color: #64748b;
+  text-align: center;
+  padding: 16px 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
 }
 
 .message-item {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 6px 9px;
+  color: #e2e8f0;
+  word-break: break-word;
 }
 
 .msg-sender {
-  font-weight: 700;
+  font-weight: 800;
   margin-right: 6px;
 }
 
 .chat-input-row {
   display: flex;
-  gap: 6px;
-  margin-top: 8px;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .chat-input-row input {
   flex: 1;
-  padding: 6px 10px;
+  min-width: 0;
+  padding: 9px 12px;
+  font-size: 0.82rem;
 }
 
-.chat-input-row button {
-  background: #3b82f6;
+.chat-input-row input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+
+.chat-send-btn {
+  background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 55%, #2563eb 100%);
   border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.35);
   color: white;
-  border-radius: 6px;
-  padding: 6px 10px;
+  border-radius: 10px;
+  padding: 9px 13px;
   cursor: pointer;
+  box-shadow: 0 4px 0 #1e40af;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-send-btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #1e40af;
 }
 
 /* Toast */
@@ -246,26 +365,66 @@
   align-items: center;
   justify-content: center;
   z-index: 200;
+  padding: 16px;
 }
 
 .victory-card {
   text-align: center;
-  background: rgba(30, 41, 59, 0.9);
-  border: 2px solid #fbbf24;
+  background: rgba(30, 41, 59, 0.92);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(251, 191, 36, 0.45);
   border-radius: 24px;
-  padding: 48px;
+  padding: clamp(28px, 5vw, 48px);
+  width: 100%;
   max-width: 500px;
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.6),
+    0 0 60px rgba(245, 158, 11, 0.18);
+  position: relative;
+  overflow: hidden;
+}
+
+.victory-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #fbbf24, transparent);
+}
+
+.trophy-ring {
+  width: 96px;
+  height: 96px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 158, 11, 0.12);
+  border: 2px solid rgba(251, 191, 36, 0.5);
+  box-shadow: 0 0 30px rgba(251, 191, 36, 0.3);
 }
 
 .winner-title {
-  font-size: 2.5rem;
+  font-size: clamp(1.6rem, 5vw, 2.5rem);
   font-weight: 900;
+  letter-spacing: 0.03em;
   margin-bottom: 12px;
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  word-break: break-word;
 }
 
 .victory-badge {
-  background: rgba(251, 191, 36, 0.2);
+  background: rgba(251, 191, 36, 0.15);
+  border: 1px solid rgba(251, 191, 36, 0.4);
   color: #fbbf24;
+  font-size: 0.8rem;
   font-weight: 800;
   padding: 8px 16px;
   border-radius: 999px;
@@ -275,7 +434,43 @@
 
 .final-net-worth {
   color: #94a3b8;
-  margin-bottom: 32px;
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+}
+
+.final-net-worth strong {
+  color: #f8fafc;
+  font-size: 1.2rem;
+  font-weight: 900;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.victory-stats {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 28px;
+}
+
+.victory-stat {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 0.72rem;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.victory-stat strong {
+  display: block;
+  font-size: 1rem;
+  color: #f8fafc;
+  font-weight: 900;
+}
+
+.btn-play-again {
+  width: 100%;
 }
 
 /* Title Deed Property Buy Modal */
@@ -458,6 +653,29 @@
   font-size: 0.85rem;
   font-weight: 700;
   text-align: center;
+}
+
+/* Chance / Chest card modal */
+.card-icon-row {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 2px;
+}
+
+.card-text {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0f172a;
+  text-align: center;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.card-note {
+  font-size: 0.78rem;
+  color: #64748b;
+  text-align: center;
+  margin: 0;
 }
 
 /* 3D Tactile Buttons */

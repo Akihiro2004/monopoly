@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { useGameStore } from '../store/gameStore.js';
+import { socket, clearSession } from '../net/socket.js';
 import { Trophy, RefreshCw } from 'lucide-react';
 
 export const VictoryOverlay: React.FC = () => {
@@ -22,27 +23,48 @@ export const VictoryOverlay: React.FC = () => {
 
   const winningPlayer = gameState.players.find((p) => p.playerId === winner.winnerId);
 
+  const handleReturnHome = () => {
+    socket.emit('room:leave');
+    clearSession();
+    resetAll();
+  };
+
   const getVictoryLabel = () => {
     switch (winner.victoryType) {
       case 'triple_victory':
-        return 'Triple Victory: 3 complete color sets';
+        return 'Triple Victory · 3 complete color sets';
       case 'line_victory':
-        return 'Line Victory: every property on one board side';
+        return 'Line Victory · every property on one board side';
       case 'bankruptcy':
       default:
-        return 'Bankruptcy: last player standing';
+        return 'Bankruptcy · last player standing';
     }
   };
 
   return (
     <div className="victory-overlay">
       <div className="victory-card">
-        <Trophy size={64} className="trophy-icon" color="#fbbf24" />
+        <div className="trophy-ring">
+          <Trophy size={48} className="trophy-icon" color="#fbbf24" />
+        </div>
         <h1 className="winner-title">{winningPlayer?.name} WINS!</h1>
         <div className="victory-badge">{getVictoryLabel()}</div>
-        <p className="final-net-worth">Final Balance: ${winningPlayer?.money}</p>
+        <p className="final-net-worth">
+          Final Balance: <strong>${winningPlayer?.money}</strong>
+        </p>
 
-        <button className="btn btn-primary btn-play-again" onClick={resetAll}>
+        <div className="victory-stats">
+          <div className="victory-stat">
+            <strong>{gameState.turnNumber}</strong>
+            TURNS
+          </div>
+          <div className="victory-stat">
+            <strong>{gameState.players.length}</strong>
+            PLAYERS
+          </div>
+        </div>
+
+        <button className="btn btn-primary btn-play-again" onClick={handleReturnHome}>
           <RefreshCw size={18} />
           <span>RETURN TO HOME</span>
         </button>

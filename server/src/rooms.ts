@@ -177,6 +177,15 @@ export class RoomManager {
     if (!info) return {};
 
     this.socketToPlayer.delete(socketId);
+
+    // If the same player still has another live socket (e.g. two tabs open
+    // with the same playerId), keep them marked as connected.
+    for (const mapped of this.socketToPlayer.values()) {
+      if (mapped.roomId === info.roomId && mapped.playerId === info.playerId) {
+        return { room: this.rooms.get(info.roomId) };
+      }
+    }
+
     const room = this.rooms.get(info.roomId);
     if (!room) return {};
 
@@ -190,6 +199,77 @@ export class RoomManager {
     }
 
     return { room, seat };
+  }
+
+  public reconnectSocket(
+    socketId: string,
+    roomId: string,
+    playerId: string,
+    displayName?: string
+  ): { ok: boolean; room?: RoomSession; error?: string } {
+    const room = this.rooms.get(roomId.toUpperCase());
+    if (!room) return { ok: false, error: 'Room not found' };
+
+    const seat = room.seats.find((s) => s.playerId === playerId);
+    if (!seat) return { ok: false, error: 'Player seat not found' };
+
+    if (displayName) {
+      seat.displayName = displayName;
+    }
+    seat.isConnected = true;
+    this.socketToPlayer.set(socketId, { roomId: room.roomId, playerId });
+
+    if (room.engine) {
+      const player = room.engine.state.players.find((p) => p.playerId === playerId);
+      if (player) {
+        player.isConnected = true;
+        if (displayName) player.name = displayName;
+      }
+    }
+
+    return { ok: true, room };
+  }
+
+  public leaveRoom(socketId: string): { ok: boolean; room?: RoomSession; error?: string } {
+    const info = this.socketToPlayer.get(socketId);
+    if (!info) return { ok: false, error: 'Not in a room' };
+
+    const room = this.rooms.get(info.roomId);
+    if (!room) {
+      this.socketToPlayer.delete(socketId);
+      return { ok: true };
+    }
+
+    // Remove every socket mapping for this player in this room.
+    for (const [sid, mapped] of [...this.socketToPlayer.entries()]) {
+      if (mapped.roomId === info.roomId && mapped.playerId === info.playerId) {
+        this.socketToPlayer.delete(sid);
+      }
+    }
+
+    const seatIdx = room.seats.findIndex((s) => s.playerId === info.playerId);
+    if (seatIdx >= 0) {
+      const wasHost = room.seats[seatIdx].isHost;
+      room.seats.splice(seatIdx, 1);
+      room.seats.forEach((s, i) => {
+        s.seatIndex = i;
+      });
+      if (wasHost && room.seats.length > 0) {
+        room.seats[0].isHost = true;
+        room.hostPlayerId = room.seats[0].playerId;
+      }
+      if (room.engine) {
+        const p = room.engine.state.players.find((pl) => pl.playerId === info.playerId);
+        if (p) p.isConnected = false;
+      }
+    }
+
+    if (room.seats.length === 0) {
+      this.rooms.delete(room.roomId);
+      return { ok: true };
+    }
+
+    return { ok: true, room };
   }
 
   public toRoomState(room: RoomSession): RoomState {

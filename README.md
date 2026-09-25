@@ -17,11 +17,14 @@ A real-time multiplayer 3D Monopoly website built with React, Three.js (@react-t
    - `House (Lv 1) → Building (Lv 2) → Hotel (Lv 3) → LANDMARK (Lv 4)`
    - Landmarks are permanent. Opponents cannot buy them.
    - Force-bought properties keep their build level and can be upgraded to Hotel, but never to Landmark.
-4. **Multiple Victory Conditions**:
+   - Buildings accumulate on the tile and are tinted in the owner color; upgrades only on the property you stand on.
+4. **Debt & Sell-Back (no instant bankruptcy)**:
+   - Cannot afford rent, tax, or a card payment? The game enters a DEBT phase: sell buildings back for half price and the debt auto-pays once covered, or declare bankruptcy.
+5. **Multiple Victory Conditions**:
    - **Bankruptcy**: last non-bankrupt player standing.
    - **Triple Victory** (toggleable): own all properties of 3 complete color sets.
    - **Line Victory** (toggleable): own every purchasable property on one board side.
-5. **3D Interactive Visuals**:
+6. **3D Interactive Visuals**:
    - Full 3D board rendered via Three.js with OrbitControls (drag to rotate, pinch or scroll to zoom).
    - 6 custom 3D tokens (Race Car, Top Hat, Dog, Battleship, Thimble, Boot) that track the active player.
    - Animated dice with real pips.

@@ -1,14 +1,15 @@
 import React from 'react';
-import { socket } from '../net/socket.js';
+import { socket, clearSession } from '../net/socket.js';
 import { useGameStore } from '../store/gameStore.js';
 import { TokenType, PlayerColor } from '@monopoly/shared';
-import { Users, CheckCircle, Copy, Play, Trophy } from 'lucide-react';
+import { Users, CheckCircle, Copy, Play, Trophy, LogOut } from 'lucide-react';
 import { TOKENS, COLORS } from './lobbyConstants.js';
 import { LobbySeats } from './LobbySeats.js';
 
 export const LobbyScreen: React.FC = () => {
   const roomState = useGameStore((s) => s.roomState);
   const myPlayerId = useGameStore((s) => s.myPlayerId);
+  const resetAll = useGameStore((s) => s.resetAll);
   const addToast = useGameStore((s) => s.addToast);
 
   if (!roomState) return null;
@@ -43,6 +44,12 @@ export const LobbyScreen: React.FC = () => {
   const handleStartGame = () => {
     if (!isHost) return;
     socket.emit('room:start');
+  };
+
+  const handleLeave = () => {
+    socket.emit('room:leave');
+    clearSession();
+    resetAll();
   };
 
   return (
@@ -128,6 +135,11 @@ export const LobbyScreen: React.FC = () => {
               <span>START GAME ({roomState.seats.length}/6)</span>
             </button>
           )}
+
+          <button className="btn btn-secondary btn-leave" onClick={handleLeave}>
+            <LogOut size={18} />
+            <span>LEAVE</span>
+          </button>
         </div>
       </div>
     </div>

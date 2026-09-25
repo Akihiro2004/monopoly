@@ -61,32 +61,46 @@ export function calculateRent(
 }
 
 /**
- * Transfers rent money, handles bankruptcy if player cannot pay
+ * Transfers rent money. If the tenant cannot afford it, no money moves and
+ * the shortfall is returned as debt so the game can enter the DEBT phase
+ * (sell buildings / mortgage to pay, or declare bankruptcy).
  */
 export function payRent(
   gameState: GameState,
   tenant: PlayerState,
   landlord: PlayerState,
   amount: number
-): { paid: number; bankrupt: boolean } {
+): { paid: number; bankrupt: boolean; debt?: number } {
   if (tenant.money >= amount) {
     tenant.money -= amount;
     landlord.money += amount;
     return { paid: amount, bankrupt: false };
-  } else {
-    // Bankrupt to landlord!
-    const transferred = tenant.money;
-    landlord.money += transferred;
-    tenant.money = 0;
-    tenant.isBankrupt = true;
-
-    // Transfer all properties of tenant to landlord
-    Object.values(gameState.properties).forEach((p) => {
-      if (p.ownerId === tenant.playerId) {
-        p.ownerId = landlord.playerId;
-      }
-    });
-
-    return { paid: transferred, bankrupt: true };
   }
+  return { paid: 0, bankrupt: false, debt: amount };
+}
+
+/**
+ * Applies bankruptcy: tenant loses everything to the creditor.
+ * creditorId null means the bank: properties return to unowned land.
+ */
+export function applyBankruptcy(
+  gameState: GameState,
+  tenant: PlayerState,
+  creditorId: string | null
+): void {
+  tenant.money = 0;
+  tenant.isBankrupt = true;
+
+  Object.values(gameState.properties).forEach((p) => {
+    if (p.ownerId === tenant.playerId) {
+      if (creditorId) {
+        p.ownerId = creditorId;
+      } else {
+        p.ownerId = null;
+        p.buildLevel = 0;
+        p.isMortgaged = false;
+        p.forceBought = false;
+      }
+    }
+  });
 }

@@ -50,8 +50,27 @@ body, html, #root {
   padding: 32px 28px;
   width: 100%;
   max-width: 480px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.5),
+    0 0 60px rgba(245, 158, 11, 0.06);
   text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.home-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #f59e0b, transparent);
+  opacity: 0.7;
+}
+
+.home-header {
+  margin-bottom: 4px;
 }
 
 .logo-badge {
@@ -59,17 +78,20 @@ body, html, #root {
   align-items: center;
   gap: 6px;
   background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(251, 191, 36, 0.35);
   color: #fbbf24;
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
   padding: 6px 12px;
   border-radius: 999px;
   margin-bottom: 12px;
 }
 
 .game-title {
-  font-size: 2.2rem;
+  font-size: clamp(1.9rem, 5vw, 2.2rem);
   font-weight: 900;
+  letter-spacing: 0.04em;
   line-height: 1.2;
   padding-bottom: 4px;
   background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
@@ -79,12 +101,19 @@ body, html, #root {
   color: transparent;
   margin-bottom: 8px;
   word-break: break-word;
+  text-shadow: none;
+  filter: drop-shadow(0 2px 8px rgba(245, 158, 11, 0.25));
 }
 
 .subtitle {
   font-size: 0.85rem;
   color: #94a3b8;
   margin-bottom: 28px;
+}
+
+.subtitle strong {
+  color: #cbd5e1;
+  font-weight: 700;
 }
 
 .input-group {
@@ -94,10 +123,28 @@ body, html, #root {
 
 .input-group label {
   display: block;
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
   color: #cbd5e1;
   margin-bottom: 6px;
+}
+
+.input-with-icon {
+  position: relative;
+}
+
+.input-with-icon .input-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #64748b;
+  pointer-events: none;
+}
+
+.input-with-icon input[type="text"] {
+  padding-left: 38px;
 }
 
 input[type="text"] {
@@ -109,10 +156,29 @@ input[type="text"] {
   color: #f8fafc;
   font-size: 1rem;
   outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input[type="text"]::placeholder {
+  color: #475569;
 }
 
 input[type="text"]:focus {
   border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+
+input[type="text"].code-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+input[type="text"].code-input:focus {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.22);
 }
 
 .btn {
@@ -178,18 +244,37 @@ input[type="text"]:focus {
   margin: 20px 0;
   position: relative;
   text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .divider span {
-  background: #1e293b;
-  padding: 0 12px;
-  font-size: 0.75rem;
+  background: transparent;
+  padding: 0;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
   color: #64748b;
+  white-space: nowrap;
 }
 
 .join-group {
   display: flex;
   gap: 8px;
+}
+
+.join-group input {
+  flex: 1;
+  min-width: 0;
 }
 
 .rules-highlight {
@@ -200,10 +285,74 @@ input[type="text"]:focus {
 }
 
 .highlight-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   background: rgba(15, 23, 42, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.05);
-  padding: 8px;
+  padding: 8px 10px;
   border-radius: 8px;
   font-size: 0.75rem;
+  font-weight: 600;
   color: #cbd5e1;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.highlight-pill:hover {
+  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.highlight-pill svg {
+  flex-shrink: 0;
+  color: #fbbf24;
+}
+
+.session-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 18px;
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.session-hint svg {
+  color: #38bdf8;
+  flex-shrink: 0;
+}
+
+/* Reconnecting state */
+.reconnect-spinner {
+  width: 36px;
+  height: 36px;
+  margin: 8px auto 16px;
+  border-radius: 50%;
+  border: 3px solid rgba(251, 191, 36, 0.2);
+  border-top-color: #fbbf24;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 480px) {
+  .home-card {
+    padding: 24px 18px;
+  }
+
+  .join-group {
+    flex-direction: column;
+  }
+
+  .join-group .btn {
+    width: 100%;
+  }
+
+  .rules-highlight {
+    grid-template-columns: 1fr;
+  }
 }

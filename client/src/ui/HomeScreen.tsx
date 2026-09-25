@@ -1,11 +1,25 @@
 import React, { useState } from 'react';
-import { socket } from '../net/socket.js';
+import { socket, saveSession, loadSession } from '../net/socket.js';
 import { useGameStore } from '../store/gameStore.js';
-import { Play, LogIn, Sparkles } from 'lucide-react';
+import {
+  Play,
+  LogIn,
+  Dices,
+  User,
+  Hash,
+  ScrollText,
+  Swords,
+  Castle,
+  Trophy,
+  History,
+  Banknote,
+  Gift
+} from 'lucide-react';
 
 export const HomeScreen: React.FC = () => {
-  const [name, setName] = useState('');
-  const [joinCode, setJoinCode] = useState('');
+  const saved = loadSession();
+  const [name, setName] = useState(saved?.name || '');
+  const [joinCode, setJoinCode] = useState(saved?.roomId || '');
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const addToast = useGameStore((s) => s.addToast);
@@ -17,8 +31,10 @@ export const HomeScreen: React.FC = () => {
     setIsCreating(true);
     socket.emit('room:create', { name: name.trim() }, (res) => {
       setIsCreating(false);
-      if (!res.ok) {
+      if (!res.ok || !res.roomId) {
         addToast(res.error || 'Failed to create room', 'danger');
+      } else {
+        saveSession(res.roomId, name.trim());
       }
     });
   };
@@ -31,10 +47,13 @@ export const HomeScreen: React.FC = () => {
       return addToast('Please enter the 6-character room code', 'warning');
     }
     setIsJoining(true);
-    socket.emit('room:join', { roomId: joinCode.trim().toUpperCase(), name: name.trim() }, (res) => {
+    const code = joinCode.trim().toUpperCase();
+    socket.emit('room:join', { roomId: code, name: name.trim() }, (res) => {
       setIsJoining(false);
       if (!res.ok) {
         addToast(res.error || 'Failed to join room', 'danger');
+      } else {
+        saveSession(code, name.trim());
       }
     });
   };
@@ -44,7 +63,7 @@ export const HomeScreen: React.FC = () => {
       <div className="home-card">
         <div className="home-header">
           <div className="logo-badge">
-            <Sparkles className="badge-icon" size={20} />
+            <Dices size={14} />
             <span>LINE GET RICH EDITION</span>
           </div>
           <h1 className="game-title">3D MONOPOLY</h1>
@@ -54,14 +73,17 @@ export const HomeScreen: React.FC = () => {
         <div className="home-form">
           <div className="input-group">
             <label>YOUR NAME</label>
-            <input
-              type="text"
-              placeholder="e.g. Alice"
-              maxLength={15}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-            />
+            <div className="input-with-icon">
+              <User size={16} className="input-icon" />
+              <input
+                type="text"
+                placeholder="e.g. Alice"
+                maxLength={15}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+              />
+            </div>
           </div>
 
           <div className="actions-section">
@@ -75,14 +97,18 @@ export const HomeScreen: React.FC = () => {
             </div>
 
             <div className="join-group">
-              <input
-                type="text"
-                placeholder="6-CHAR ROOM CODE"
-                maxLength={6}
-                value={joinCode}
-                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
-              />
+              <div className="input-with-icon" style={{ flex: 1, minWidth: 0 }}>
+                <Hash size={16} className="input-icon" />
+                <input
+                  type="text"
+                  className="code-input"
+                  placeholder="6-CHAR ROOM CODE"
+                  maxLength={6}
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
+                />
+              </div>
               <button className="btn btn-secondary" onClick={handleJoin} disabled={isJoining}>
                 <LogIn size={18} />
                 <span>{isJoining ? 'Joining...' : 'JOIN'}</span>
@@ -91,10 +117,35 @@ export const HomeScreen: React.FC = () => {
           </div>
 
           <div className="rules-highlight">
-            <div className="highlight-pill">Property deed purchase</div>
-            <div className="highlight-pill">Force-buy opponents at 2x</div>
-            <div className="highlight-pill">Landmark protection</div>
-            <div className="highlight-pill">Triple &amp; Line Victory</div>
+            <div className="highlight-pill">
+              <ScrollText size={14} />
+              <span>Property deed purchase</span>
+            </div>
+            <div className="highlight-pill">
+              <Swords size={14} />
+              <span>Force-buy opponents at 2x</span>
+            </div>
+            <div className="highlight-pill">
+              <Castle size={14} />
+              <span>Landmark protection</span>
+            </div>
+            <div className="highlight-pill">
+              <Trophy size={14} />
+              <span>Triple &amp; Line Victory</span>
+            </div>
+            <div className="highlight-pill">
+              <Banknote size={14} />
+              <span>Sell back buildings at half price</span>
+            </div>
+            <div className="highlight-pill">
+              <Gift size={14} />
+              <span>Chance &amp; Chest card modals</span>
+            </div>
+          </div>
+
+          <div className="session-hint">
+            <History size={14} />
+            <span>Session auto-saves — reload the tab to rejoin your room.</span>
           </div>
         </div>
       </div>

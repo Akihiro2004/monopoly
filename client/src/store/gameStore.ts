@@ -5,9 +5,11 @@ import {
   ChatMessage,
   BuyOffer,
   ForceBuyOffer,
-  VictoryType
+  VictoryType,
+  CardDraw
 } from '@monopoly/shared';
 import { socket, getOrCreatePlayerId } from '../net/socket.js';
+import { audioManager } from '../sound/audioManager.js';
 
 export interface ToastMessage {
   id: string;
@@ -26,6 +28,7 @@ interface GameStore {
   chatMessages: ChatMessage[];
   toasts: ToastMessage[];
   winner: { winnerId: string; victoryType: VictoryType } | null;
+  cardDraw: CardDraw | null;
 
   // Actions
   setRoomState: (room: RoomState) => void;
@@ -33,6 +36,7 @@ interface GameStore {
   setDiceRoll: (dice: { d1: number; d2: number; doubles: boolean }) => void;
   setBuyOffer: (offer: BuyOffer | null) => void;
   setForceBuyOffer: (offer: ForceBuyOffer | null) => void;
+  setCardDraw: (draw: CardDraw | null) => void;
   setIsWalking: (isWalking: boolean) => void;
   addChatMessage: (msg: ChatMessage) => void;
   addToast: (text: string, type?: 'info' | 'success' | 'warning' | 'danger') => void;
@@ -52,17 +56,25 @@ export const useGameStore = create<GameStore>((set) => ({
   chatMessages: [],
   toasts: [],
   winner: null,
+  cardDraw: null,
 
   setRoomState: (roomState) => set({ roomState }),
   setGameState: (gameState) =>
-    set({
+    set((s) => ({
       gameState,
       buyOffer: gameState.buyOffer,
       forceBuyOffer: gameState.forceBuyOffer,
-    }),
+      // Persist winner locally so a tab reload during GAME_OVER still shows
+      // the victory overlay (the server only emits game:ended on transition).
+      winner:
+        gameState.phase === 'GAME_OVER' && gameState.winnerId && gameState.victoryType
+          ? { winnerId: gameState.winnerId, victoryType: gameState.victoryType }
+          : s.winner,
+    })),
   setDiceRoll: (diceRoll) => set({ diceRoll }),
   setBuyOffer: (buyOffer) => set({ buyOffer }),
   setForceBuyOffer: (forceBuyOffer) => set({ forceBuyOffer }),
+  setCardDraw: (cardDraw) => set({ cardDraw }),
   setIsWalking: (isWalking) => set({ isWalking }),
   addChatMessage: (msg) =>
     set((s) => ({ chatMessages: [...s.chatMessages.slice(-50), msg] })),
@@ -82,25 +94,74 @@ export const useGameStore = create<GameStore>((set) => ({
       gameState: null,
       diceRoll: null,
       forceBuyOffer: null,
+      cardDraw: null,
       chatMessages: [],
       winner: null,
     }),
 }));
 
-// Setup global socket event bindings into store
+// Setup global socket event bindings into store (idempotent: safe under StrictMode)
+let listenersInitialized = false;
+
 export function initSocketListeners() {
-  const store = useGameStore.getState();
+  if (listenersInitialized) return;
+  listenersInitialized = true;
 
   socket.on('room:state', (room) => {
     useGameStore.getState().setRoomState(room);
   });
 
   socket.on('game:state', (game) => {
-    useGameStore.getState().setGameState(game);
+    const prev = useGameStore.getState();
+    const prevGame = prev.gameState;
+    const myId = prev.myPlayerId;
+    prev.setGameState(game);
+
+    // Transition sounds only for live updates, not the first sync after
+    // (re)connect — otherwise a reload replays every sound at once.
+    if (!prevGame) return;
+
+    const wasMine = (pid: string | undefined) => pid === myId;
+
+    // Buy / force-buy offers addressed to me
+    if (!prevGame.buyOffer && game.buyOffer && wasMine(game.buyOffer.buyerPlayerId)) {
+      audioManager.playModal();
+    }
+    if (!prevGame.forceBuyOffer && game.forceBuyOffer && wasMine(game.forceBuyOffer.buyerPlayerId)) {
+      audioManager.playForceBuyAlarm();
+    }
+
+    // Debt entered and I am the debtor
+    const cur = game.players[game.currentPlayerIndex];
+    if (prevGame.phase !== 'DEBT' && game.phase === 'DEBT' && cur?.playerId === myId) {
+      audioManager.playDebtAlarm();
+    }
+
+    // I went bankrupt
+    const prevMe = prevGame.players.find((p) => p.playerId === myId);
+    const nextMe = game.players.find((p) => p.playerId === myId);
+    if (prevMe && !prevMe.isBankrupt && nextMe?.isBankrupt) {
+      audioManager.playBankrupt();
+    }
+
+    // My buildings changed level (upgrade / sell)
+    if (prevMe && nextMe) {
+      for (const [idx, prop] of Object.entries(game.properties)) {
+        if (prop.ownerId !== myId) continue;
+        const before = prevGame.properties[Number(idx)]?.buildLevel ?? 0;
+        if (prop.buildLevel > before) audioManager.playBuild();
+        else if (prop.buildLevel < before) audioManager.playSell();
+      }
+    }
   });
 
   socket.on('game:dice', (dice) => {
     useGameStore.getState().setDiceRoll(dice);
+  });
+
+  socket.on('game:card', (draw) => {
+    useGameStore.getState().setCardDraw(draw);
+    audioManager.playCardDraw();
   });
 
   socket.on('game:forceBuyOffer', (offer) => {
@@ -109,17 +170,33 @@ export function initSocketListeners() {
 
   socket.on('game:toast', ({ text, type }) => {
     useGameStore.getState().addToast(text, type);
+    // Debt entry already plays the debt alarm via the DEBT phase change,
+    // and bankruptcy plays its own dirge via the state change — the toasts
+    // for those arrive alongside, so skip them here to avoid stacking.
+    const coveredByStateSound = /owes \$|cannot afford|cannot pay|bankrupt|game over/i.test(text);
+    if (type === 'success') audioManager.playCoin();
+    else if (type === 'danger' && !coveredByStateSound) audioManager.playError();
+    else if (type === 'warning' && !coveredByStateSound) audioManager.playModal();
+    else if (!type || type === 'info') audioManager.playTick();
   });
 
   socket.on('game:ended', (winner) => {
     useGameStore.getState().setWinner(winner);
+    audioManager.playVictory();
   });
 
   socket.on('chat:message', (msg) => {
-    useGameStore.getState().addChatMessage(msg);
+    const st = useGameStore.getState();
+    st.addChatMessage(msg);
+    // Skip the echo of my own messages.
+    const mySeat = st.roomState?.seats.find((s) => s.playerId === st.myPlayerId);
+    if (!mySeat || msg.senderName !== mySeat.displayName) {
+      audioManager.playChat();
+    }
   });
 
   socket.on('error', ({ message }) => {
     useGameStore.getState().addToast(message, 'danger');
+    audioManager.playError();
   });
 }

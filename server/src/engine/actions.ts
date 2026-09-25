@@ -52,8 +52,8 @@ export function executeAutoBuy(
  * Level 2 -> 3 (Hotel)
  * Level 3 -> 4 (Landmark) - ONLY if forceBought is false!
  *
- * Rule: must own all properties in the color group to build (or at least 1? In LINE Get Rich you build on your own turn/landing).
- * In classic LINE Get Rich, you build upon landing or whenever you pass. Here player can build on their turn.
+ * LINE Get Rich rule: you may only upgrade the property your token is
+ * currently standing on (i.e. right after landing on your own property).
  */
 export function buildProperty(
   gameState: GameState,
@@ -69,6 +69,13 @@ export function buildProperty(
 
   if (prop.ownerId !== player.playerId) {
     return { success: false, text: 'You do not own this property' };
+  }
+
+  if (player.position !== tileIndex) {
+    return {
+      success: false,
+      text: `You must stand on ${tile.name} to upgrade it. Build right after landing on your own property.`
+    };
   }
 
   if (prop.isMortgaged) {
@@ -108,6 +115,45 @@ export function buildProperty(
   const msg = `${player.name} upgraded ${tile.name} to ${newLevelName} for $${tile.buildCost}.`;
   gameState.lastActionText = msg;
   return { success: true, text: msg };
+}
+
+/**
+ * Sells one building level back (Hotel -> Building -> House -> Land).
+ * Refunds half of the tile's build cost per level.
+ * Use this to raise cash when you cannot afford rent, tax, or card payments.
+ */
+export function sellBuilding(
+  gameState: GameState,
+  player: PlayerState,
+  tileIndex: number
+): { success: boolean; text: string; refund?: number } {
+  const tile = BOARD_TILES[tileIndex];
+  const prop = gameState.properties[tileIndex];
+
+  if (!tile || !prop) {
+    return { success: false, text: 'Invalid property' };
+  }
+
+  if (prop.ownerId !== player.playerId) {
+    return { success: false, text: 'You do not own this property' };
+  }
+
+  if (prop.buildLevel <= 0) {
+    return { success: false, text: `${tile.name} has no buildings to sell` };
+  }
+
+  if (tile.buildCost <= 0) {
+    return { success: false, text: 'This property has nothing to sell' };
+  }
+
+  const refund = Math.floor(tile.buildCost / 2);
+  prop.buildLevel = (prop.buildLevel - 1) as BuildLevel;
+  player.money += refund;
+
+  const levelNames = ['Land', 'House (Lv 1)', 'Building (Lv 2)', 'Hotel (Lv 3)', 'LANDMARK (Lv 4)'];
+  const msg = `${player.name} sold a building on ${tile.name} for $${refund} (now ${levelNames[prop.buildLevel]}).`;
+  gameState.lastActionText = msg;
+  return { success: true, text: msg, refund };
 }
 
 /**

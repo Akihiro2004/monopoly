@@ -102,6 +102,7 @@ export type GamePhase =
   | 'RESOLVING'
   | 'BUY_OFFER'
   | 'FORCE_BUY_OFFER'
+  | 'DEBT'
   | 'TURN_ENDED'
   | 'GAME_OVER';
 
@@ -120,6 +121,23 @@ export interface ForceBuyOffer {
   expiresAt: number; // timestamp ms
 }
 
+// Pending payment the active player cannot afford yet.
+// While debt is set, the game sits in DEBT phase: the debtor may sell
+// buildings (or mortgage) to raise cash, then the debt auto-pays.
+// creditorId null means the debt is owed to the bank (tax / cards).
+export interface DebtOffer {
+  amount: number;
+  creditorId: string | null;
+  reason: string;
+}
+
+// A drawn Chance / Community Chest card, broadcast for the info modal.
+export interface CardDraw {
+  deck: 'chance' | 'chest';
+  title: string;
+  text: string;
+}
+
 export interface GameState {
   roomId: string;
   phase: GamePhase;
@@ -132,6 +150,7 @@ export interface GameState {
   doublesCount: number;
   buyOffer: BuyOffer | null;
   forceBuyOffer: ForceBuyOffer | null;
+  debt: DebtOffer | null;
   winnerId: string | null;
   victoryType: VictoryType | null;
   lastActionText: string;

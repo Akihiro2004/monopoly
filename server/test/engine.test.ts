@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { MonopolyGameEngine } from '../src/engine/game.js';
-import { Seat } from '@monopoly/shared';
+import { CardDraw, Seat } from '@monopoly/shared';
 
 describe('Monopoly Game Engine (LINE Get Rich rules)', () => {
   let seats: Seat[];
@@ -122,6 +122,7 @@ describe('Monopoly Game Engine (LINE Get Rich rules)', () => {
     engine.state.properties[3].ownerId = 'p1';
     engine.state.properties[3].buildLevel = 2;
     engine.state.properties[3].forceBought = true;
+    engine.state.players[0].position = 3;
 
     engine.build(3);
     expect(engine.state.properties[3].buildLevel).toBe(3);
@@ -175,7 +176,7 @@ describe('Monopoly Game Engine (LINE Get Rich rules)', () => {
     expect(engine.state.phase).toBe('GAME_OVER');
   });
 
-  it('handles bankruptcy elimination when player cannot pay rent', () => {
+  it('enters DEBT (not instant bankruptcy) when player cannot pay rent, then bankruptcy transfers properties', () => {
     const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
     engine.state.properties[37].ownerId = 'p2';
     engine.state.properties[37].buildLevel = 3;
@@ -185,9 +186,91 @@ describe('Monopoly Game Engine (LINE Get Rich rules)', () => {
 
     engine.rollDice(1, 1);
 
+    expect(engine.state.players[0].isBankrupt).toBe(false);
+    expect(engine.state.phase).toBe('DEBT');
+    expect(engine.state.debt).not.toBeNull();
+    expect(engine.state.debt?.creditorId).toBe('p2');
+
+    engine.declareBankruptcy();
+
     expect(engine.state.players[0].isBankrupt).toBe(true);
     expect(engine.state.winnerId).toBe('p2');
     expect(engine.state.victoryType).toBe('bankruptcy');
     expect(engine.state.phase).toBe('GAME_OVER');
+  });
+
+  it('only allows upgrading the property the player stands on', () => {
+    const engine = new MonopolyGameEngine('room123', seats, { specialVictory: true });
+    engine.state.properties[1].ownerId = 'p1';
+    engine.state.properties[3].ownerId = 'p1';
+    engine.state.players[0].position = 1;
+
+    expect(() => engine.build(3)).toThrow(/must stand on/i);
+    expect(engine.state.properties[3].buildLevel).toBe(0);
+
+    engine.build(1);
+    expect(engine.state.properties[1].buildLevel).toBe(1);
+  });
+
+  it('sells one building level for half the build cost and auto-pays debt when covered', () => {
+    const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+    // Alice owns Baltic (tile 3, buildCost 50) with a house, stands on it.
+    engine.state.properties[3].ownerId = 'p1';
+    engine.state.properties[3].buildLevel = 1;
+    engine.state.players[0].position = 3;
+    // Park Place (tile 37, hotel rent 900) owned by Bob; Alice has $100.
+    engine.state.properties[37].ownerId = 'p2';
+    engine.state.properties[37].buildLevel = 3;
+    engine.state.players[0].money = 100;
+    engine.state.players[0].position = 35;
+
+    engine.rollDice(1, 1);
+    expect(engine.state.phase).toBe('DEBT');
+
+    // Give Alice enough cash (minus one refund) so selling covers the $1100 debt.
+    engine.state.properties[3].buildLevel = 1;
+    engine.state.players[0].money = 1080;
+    engine.sell(3);
+
+    expect(engine.state.properties[3].buildLevel).toBe(0);
+    expect(engine.state.debt).toBeNull();
+    expect(engine.state.phase).toBe('TURN_ENDED');
+    // 1080 + 25 refund - 1100 debt = 5 left; Bob got 1100.
+    expect(engine.state.players[0].money).toBe(5);
+    expect(engine.state.players[1].money).toBe(1500 + 1100);
+  });
+
+  it('rejects selling when there is nothing to sell', () => {
+    const engine = new MonopolyGameEngine('room123', seats, { specialVictory: true });
+    engine.state.properties[1].ownerId = 'p1';
+    expect(() => engine.sell(1)).toThrow(/no buildings/i);
+  });
+
+  it('emits a card draw for the modal when landing on a chest tile', () => {
+    const draws: CardDraw[] = [];
+    const engine = new MonopolyGameEngine('room123', seats, {
+      specialVictory: true,
+      onCard: (d) => draws.push(d)
+    });
+    engine.rollDice(1, 1); // tile 2 = Community Chest
+
+    expect(engine.state.players[0].position).not.toBe(0);
+    expect(draws.length).toBe(1);
+    expect(draws[0].deck).toBe('chest');
+    expect(draws[0].title).toBe('COMMUNITY CHEST');
+    expect(draws[0].text.length).toBeGreaterThan(0);
+  });
+
+  it('enters DEBT for unaffordable tax instead of instant bankruptcy', () => {
+    const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+    engine.state.players[0].money = 50;
+    engine.state.players[0].position = 2; // tile 4 = Income Tax $200
+
+    engine.rollDice(1, 1);
+
+    expect(engine.state.phase).toBe('DEBT');
+    expect(engine.state.debt?.amount).toBe(200);
+    expect(engine.state.debt?.creditorId).toBeNull();
+    expect(engine.state.players[0].isBankrupt).toBe(false);
   });
 });

@@ -2,9 +2,7 @@ import { Server, Socket } from 'socket.io';
 import {
   ClientToServerEvents,
   ServerToClientEvents,
-  GameState,
-  Seat,
-  PlayerState
+  GameState
 } from '@monopoly/shared';
 import { RoomManager } from '../rooms.js';
 
@@ -33,6 +31,10 @@ export function registerLobbyHandlers(
 
     room.engine.options.onToast = (toast: { text: string; type?: 'info' | 'success' | 'warning' | 'danger' }) => {
       io.to(roomId).emit('game:toast', toast);
+    };
+
+    room.engine.options.onCard = (draw) => {
+      io.to(roomId).emit('game:card', draw);
     };
   };
 
@@ -96,23 +98,38 @@ export function registerLobbyHandlers(
     io.to(info.roomId).emit('game:state', res.engine.state);
   });
 
-  socket.on('room:reconnect', ({ roomId, playerId }, callback) => {
-    const room = roomManager.getRoom(roomId);
-    if (!room) return callback({ ok: false, error: 'Room not found' });
+  socket.on('room:reconnect', ({ roomId, playerId, name }, callback) => {
+    const result = roomManager.reconnectSocket(socket.id, roomId, playerId, name);
+    if (!result.ok || !result.room) {
+      return callback({ ok: false, error: result.error || 'Reconnect failed' });
+    }
 
-    const seat = room.seats.find((s: Seat) => s.playerId === playerId);
-    if (!seat) return callback({ ok: false, error: 'Player seat not found' });
-
-    seat.isConnected = true;
-    socket.join(roomId);
+    const room = result.room;
+    socket.join(room.roomId);
     callback({ ok: true });
-    broadcastRoom(roomId);
+    broadcastRoom(room.roomId);
 
     if (room.engine) {
-      const p = room.engine.state.players.find((pl: PlayerState) => pl.playerId === playerId);
-      if (p) p.isConnected = true;
       socket.emit('game:state', room.engine.state);
     }
+  });
+
+  socket.on('room:leave', (...args: unknown[]) => {
+    const callback = args.find((a) => typeof a === 'function') as
+      | ((res: { ok: boolean; error?: string }) => void)
+      | undefined;
+    const info = roomManager.getPlayerBySocket(socket.id);
+    if (!info) {
+      callback?.({ ok: true });
+      return;
+    }
+    const roomId = info.roomId;
+    const result = roomManager.leaveRoom(socket.id);
+    socket.leave(roomId);
+    if (result.room) {
+      broadcastRoom(result.room.roomId);
+    }
+    callback?.({ ok: true });
   });
 }
 

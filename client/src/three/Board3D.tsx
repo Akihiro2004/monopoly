@@ -20,6 +20,16 @@ const GROUP_COLORS: Record<string, string> = {
   special: '#D1D5DB'
 };
 
+// Owner tint for buildings / ownership stripe (matches lobby token colors)
+const PLAYER_HEX: Record<string, string> = {
+  red: '#ef4444',
+  blue: '#3b82f6',
+  green: '#10b981',
+  yellow: '#f59e0b',
+  purple: '#8b5cf6',
+  orange: '#f97316'
+};
+
 const FRAME_H = 0.6; // frame rail height
 const FRAME_Y = -0.05; // rail center, so rails rest on the table and rise past the tiles
 const RAIL = 0.4; // rail thickness
@@ -68,10 +78,12 @@ export const Board3D: React.FC = () => {
         const priceZ = coord.size[2] * 0.32;
 
         // Check if tile has an owner
-        let ownerColor: string | undefined;
+        let ownerHex: string | undefined;
         if (prop?.ownerId && gameState) {
           const owner = gameState.players.find((p) => p.playerId === prop.ownerId);
-          ownerColor = owner?.color;
+          if (owner) {
+            ownerHex = PLAYER_HEX[owner.color] || owner.color;
+          }
         }
 
         return (
@@ -121,12 +133,20 @@ export const Board3D: React.FC = () => {
               </Text>
             )}
 
+            {/* Ownership stripe on the outer edge in the owner's color */}
+            {ownerHex && (
+              <mesh position={[0, coord.size[1] / 2 + 0.01, coord.size[2] * 0.44]}>
+                <boxGeometry args={[coord.size[0] * 0.95, 0.025, coord.size[2] * 0.1]} />
+                <meshStandardMaterial color={ownerHex} roughness={0.3} metalness={0.2} />
+              </mesh>
+            )}
+
             {/* 3D Buildings/House preview attached to the inner edge ("ujung land") */}
             {prop && prop.ownerId && (
               <BuildingMesh
                 level={prop.buildLevel}
                 position={[0, coord.size[1] / 2, -coord.size[2] * 0.32]}
-                color={ownerColor}
+                color={ownerHex}
               />
             )}
           </group>

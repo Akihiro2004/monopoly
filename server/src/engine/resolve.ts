@@ -1,6 +1,7 @@
 import {
   BOARD_TILES,
   CardDef,
+  CardDraw,
   GO_TO_JAIL_TILE_INDEX,
   JAIL_TILE_INDEX,
   GameState,
@@ -19,7 +20,8 @@ export function resolveLanding(
   gameState: GameState,
   player: PlayerState,
   chanceDeck: CardDef[],
-  chestDeck: CardDef[]
+  chestDeck: CardDef[],
+  onCard?: (draw: CardDraw) => void
 ): ResolveResult {
   const tileIndex = player.position;
   const tile = BOARD_TILES[tileIndex];
@@ -43,13 +45,11 @@ export function resolveLanding(
       const msg = `${player.name} paid $${tax} in ${tile.name}.`;
       gameState.lastActionText = msg;
       return { needsForceBuyChoice: false, toast: msg };
-    } else {
-      player.money = 0;
-      player.isBankrupt = true;
-      const msg = `${player.name} went bankrupt from ${tile.name}.`;
-      gameState.lastActionText = msg;
-      return { needsForceBuyChoice: false, toast: msg };
     }
+    gameState.debt = { amount: tax, creditorId: null, reason: `${tile.name} tax` };
+    const debtMsg = `${player.name} cannot afford the $${tax} ${tile.name}. Sell buildings to pay or go bankrupt.`;
+    gameState.lastActionText = debtMsg;
+    return { needsForceBuyChoice: false, toast: debtMsg };
   }
 
   // 3. Chance / Chest
@@ -61,11 +61,24 @@ export function resolveLanding(
     const action = card.action;
     let toast = `[${tile.name}] ${action.text}`;
 
+    onCard?.({
+      deck: tile.type,
+      title: tile.type === 'chance' ? 'CHANCE' : 'COMMUNITY CHEST',
+      text: action.text
+    });
+
     if (action.type === 'money') {
-      player.money += action.amount;
-      if (player.money < 0) {
-        player.money = 0;
-        player.isBankrupt = true;
+      if (player.money + action.amount >= 0) {
+        player.money += action.amount;
+      } else {
+        gameState.debt = {
+          amount: -action.amount,
+          creditorId: null,
+          reason: tile.type === 'chance' ? 'Chance card payment' : 'Community Chest card payment'
+        };
+        const debtMsg = `${player.name} cannot pay $${-action.amount}. Sell buildings to pay or go bankrupt.`;
+        gameState.lastActionText = debtMsg;
+        return { needsForceBuyChoice: false, toast: debtMsg };
       }
     } else if (action.type === 'moveTo') {
       if (action.passGoCheck && player.position > action.tileIndex) {
@@ -149,10 +162,18 @@ export function resolveLanding(
     const rent = calculateRent(gameState, tileIndex, diceTotal);
     const result = payRent(gameState, player, opponent, rent);
 
-    let msg = `${player.name} paid $${result.paid} rent to ${opponent.name} for ${tile.name}.`;
-    if (result.bankrupt) {
-      msg = `${player.name} went BANKRUPT paying $${rent} rent to ${opponent.name}.`;
+    if (result.debt !== undefined) {
+      gameState.debt = {
+        amount: result.debt,
+        creditorId: opponent.playerId,
+        reason: `rent for ${tile.name}`
+      };
+      const debtMsg = `${player.name} cannot afford $${rent} rent to ${opponent.name}. Sell buildings to pay or go bankrupt.`;
+      gameState.lastActionText = debtMsg;
+      return { needsForceBuyChoice: false, toast: debtMsg };
     }
+
+    const msg = `${player.name} paid $${result.paid} rent to ${opponent.name} for ${tile.name}.`;
     gameState.lastActionText = msg;
     return { needsForceBuyChoice: false, toast: msg };
   }

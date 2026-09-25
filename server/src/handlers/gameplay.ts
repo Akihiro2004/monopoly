@@ -84,6 +84,42 @@ export function registerGameHandlers(
     }
   });
 
+  socket.on('game:sell', ({ tileIndex }) => {
+    const info = roomManager.getPlayerBySocket(socket.id);
+    if (!info) return;
+    const room = roomManager.getRoom(info.roomId);
+    if (!room || !room.engine) return;
+
+    const cur = room.engine.getCurrentPlayer();
+    if (cur.playerId !== info.playerId) {
+      return socket.emit('error', { message: 'Can only sell on your turn' });
+    }
+
+    try {
+      room.engine.sell(tileIndex);
+    } catch (e: any) {
+      socket.emit('error', { message: e.message });
+    }
+  });
+
+  socket.on('game:declareBankruptcy', () => {
+    const info = roomManager.getPlayerBySocket(socket.id);
+    if (!info) return;
+    const room = roomManager.getRoom(info.roomId);
+    if (!room || !room.engine) return;
+
+    const cur = room.engine.getCurrentPlayer();
+    if (cur.playerId !== info.playerId) {
+      return socket.emit('error', { message: 'Not your turn!' });
+    }
+
+    try {
+      room.engine.declareBankruptcy();
+    } catch (e: any) {
+      socket.emit('error', { message: e.message });
+    }
+  });
+
   socket.on('game:mortgage', ({ tileIndex, mortgage }) => {
     const info = roomManager.getPlayerBySocket(socket.id);
     if (!info) return;

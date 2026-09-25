@@ -7,14 +7,16 @@ import {
   JAIL_TILE_INDEX,
   STARTING_MONEY,
   CardDef,
+  CardDraw,
+  DebtOffer,
   GameState,
   PlayerState,
   PropertyState,
   Seat
 } from '@monopoly/shared';
 import { executeForceBuy } from './forceBuy.js';
-import { buildProperty, toggleMortgage } from './actions.js';
-import { calculateRent, payRent } from './rent.js';
+import { buildProperty, sellBuilding, toggleMortgage } from './actions.js';
+import { applyBankruptcy, calculateRent, payRent } from './rent.js';
 import { resolveLanding } from './resolve.js';
 import { checkVictory } from './victory.js';
 
@@ -22,6 +24,7 @@ export interface GameEngineOptions {
   specialVictory: boolean;
   onStateChange?: (state: GameState) => void;
   onToast?: (toast: { text: string; type?: 'info' | 'success' | 'warning' | 'danger' }) => void;
+  onCard?: (draw: CardDraw) => void;
 }
 
 export class MonopolyGameEngine {
@@ -76,6 +79,7 @@ export class MonopolyGameEngine {
       doublesCount: 0,
       buyOffer: null,
       forceBuyOffer: null,
+      debt: null,
       winnerId: null,
       victoryType: null,
       lastActionText: 'Game started. Roll to begin.'
@@ -148,13 +152,21 @@ export class MonopolyGameEngine {
     player.position = newPos;
     (this.state as any).phase = 'RESOLVING';
 
-    const res = resolveLanding(this.state, player, this.chanceDeck, this.chestDeck);
+    const res = resolveLanding(
+      this.state,
+      player,
+      this.chanceDeck,
+      this.chestDeck,
+      (draw: CardDraw) => this.options.onCard?.(draw)
+    );
     if (res.toast) {
       this.emitToast(res.toast, 'info');
     }
 
     const currentPhase = this.state.phase as string;
-    if (currentPhase === 'FORCE_BUY_OFFER' && this.state.forceBuyOffer) {
+    if (this.state.debt) {
+      this.state.phase = 'DEBT';
+    } else if (currentPhase === 'FORCE_BUY_OFFER' && this.state.forceBuyOffer) {
       this.setupForceBuyTimeout();
     } else if (currentPhase === 'BUY_OFFER' && this.state.buyOffer) {
       // Stay in BUY_OFFER phase waiting for player's purchase choice
@@ -216,19 +228,25 @@ export class MonopolyGameEngine {
         this.emitToast(res.text, 'danger');
         if (opponent) {
           const rent = calculateRent(this.state, offer.tileIndex, this.state.dice[0] + this.state.dice[1]);
-          payRent(this.state, player, opponent, rent);
+          this.payRentOrDebt(player, opponent, rent, `rent for ${BOARD_TILES[offer.tileIndex].name}`);
         }
       }
     } else {
       this.state.forceBuyOffer = null;
       if (opponent) {
         const rent = calculateRent(this.state, offer.tileIndex, this.state.dice[0] + this.state.dice[1]);
-        const r = payRent(this.state, player, opponent, rent);
-        this.emitToast(`${player.name} declined force-buy. Paid $${r.paid} rent to ${opponent.name}.`, 'info');
+        const result = payRent(this.state, player, opponent, rent);
+        if (result.debt !== undefined) {
+          this.enterDebt(player, result.debt, opponent.playerId, `rent for ${BOARD_TILES[offer.tileIndex].name}`);
+        } else {
+          this.emitToast(`${player.name} declined force-buy. Paid $${result.paid} rent to ${opponent.name}.`, 'info');
+        }
       }
     }
 
-    this.state.phase = 'TURN_ENDED';
+    if (!this.state.debt) {
+      this.state.phase = 'TURN_ENDED';
+    }
     this.checkAndApplyVictory();
     this.notify();
   }
@@ -258,6 +276,9 @@ export class MonopolyGameEngine {
   }
 
   public build(tileIndex: number): void {
+    if (this.state.phase !== 'ROLLING' && this.state.phase !== 'TURN_ENDED') {
+      throw new Error(`Cannot build in phase ${this.state.phase}`);
+    }
     const player = this.getCurrentPlayer();
     const res = buildProperty(this.state, player, tileIndex);
     if (!res.success) {
@@ -268,13 +289,122 @@ export class MonopolyGameEngine {
     this.notify();
   }
 
+  public sell(tileIndex: number): void {
+    if (this.state.phase !== 'ROLLING' && this.state.phase !== 'TURN_ENDED' && this.state.phase !== 'DEBT') {
+      throw new Error(`Cannot sell in phase ${this.state.phase}`);
+    }
+    const player = this.getCurrentPlayer();
+    const res = sellBuilding(this.state, player, tileIndex);
+    if (!res.success) {
+      throw new Error(res.text);
+    }
+    this.emitToast(res.text, 'info');
+    this.tryPayDebt();
+    this.checkAndApplyVictory();
+    this.notify();
+  }
+
+  public declareBankruptcy(): void {
+    if (this.state.phase !== 'DEBT' || !this.state.debt) {
+      throw new Error('No pending debt to go bankrupt from');
+    }
+    const player = this.getCurrentPlayer();
+    const debt = this.state.debt;
+    this.clearForceBuyTimeout();
+    this.state.buyOffer = null;
+    this.state.forceBuyOffer = null;
+    this.state.debt = null;
+
+    applyBankruptcy(this.state, player, debt.creditorId);
+    const creditor = debt.creditorId
+      ? this.state.players.find((p) => p.playerId === debt.creditorId)
+      : null;
+    const msg = creditor
+      ? `${player.name} went BANKRUPT. All properties transfer to ${creditor.name}.`
+      : `${player.name} went BANKRUPT. Properties return to the bank.`;
+    this.state.lastActionText = msg;
+    this.emitToast(msg, 'danger');
+
+    if (!this.checkAndApplyVictory()) {
+      this.state.phase = 'TURN_ENDED';
+    }
+    this.notify();
+  }
+
+  /**
+   * Pays rent when affordable, otherwise parks the shortfall as DEBT
+   * so the debtor can sell buildings / mortgage before paying.
+   */
+  private payRentOrDebt(
+    debtor: PlayerState,
+    creditor: PlayerState,
+    amount: number,
+    reason: string
+  ): void {
+    const result = payRent(this.state, debtor, creditor, amount);
+    if (result.debt !== undefined) {
+      this.enterDebt(debtor, result.debt, creditor.playerId, reason);
+    } else {
+      this.emitToast(`${debtor.name} paid $${result.paid} rent to ${creditor.name}.`, 'info');
+    }
+  }
+
+  private enterDebt(
+    debtor: PlayerState,
+    amount: number,
+    creditorId: string | null,
+    reason: string
+  ): void {
+    const debt: DebtOffer = { amount, creditorId, reason };
+    this.state.debt = debt;
+    this.state.phase = 'DEBT';
+    const creditor = creditorId
+      ? this.state.players.find((p) => p.playerId === creditorId)
+      : null;
+    const toWhom = creditor ? ` to ${creditor.name}` : '';
+    this.emitToast(
+      `${debtor.name} owes $${amount}${toWhom} (${reason}). Sell buildings to pay, or declare bankruptcy.`,
+      'warning'
+    );
+  }
+
+  /**
+   * After the debtor raises cash (sell / mortgage), auto-pay the debt
+   * as soon as it is covered.
+   */
+  private tryPayDebt(): void {
+    const debt = this.state.debt;
+    if (!debt || this.state.phase !== 'DEBT') return;
+    const debtor = this.getCurrentPlayer();
+    if (debtor.money < debt.amount) return;
+
+    debtor.money -= debt.amount;
+    const creditor = debt.creditorId
+      ? this.state.players.find((p) => p.playerId === debt.creditorId)
+      : null;
+    if (creditor && !creditor.isBankrupt) {
+      creditor.money += debt.amount;
+    }
+    this.state.debt = null;
+    this.state.phase = 'TURN_ENDED';
+    const msg = creditor
+      ? `${debtor.name} paid off $${debt.amount} debt to ${creditor.name}.`
+      : `${debtor.name} paid off $${debt.amount} debt to the bank.`;
+    this.state.lastActionText = msg;
+    this.emitToast(msg, 'success');
+  }
+
   public mortgage(tileIndex: number, isMortgage: boolean): void {
+    if (this.state.phase !== 'ROLLING' && this.state.phase !== 'TURN_ENDED' && this.state.phase !== 'DEBT') {
+      throw new Error(`Cannot mortgage in phase ${this.state.phase}`);
+    }
     const player = this.getCurrentPlayer();
     const res = toggleMortgage(this.state, player, tileIndex, isMortgage);
     if (!res.success) {
       throw new Error(res.text);
     }
     this.emitToast(res.text, 'info');
+    this.tryPayDebt();
     this.notify();
   }
 
