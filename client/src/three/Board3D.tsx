@@ -20,20 +20,36 @@ const GROUP_COLORS: Record<string, string> = {
   special: '#D1D5DB'
 };
 
+const FRAME_H = 0.6; // frame rail height
+const FRAME_Y = -0.05; // rail center, so rails rest on the table and rise past the tiles
+const RAIL = 0.4; // rail thickness
+const OUTER = 21.4; // outer board size
+const INNER = 20.6; // inner size, flush with the white tile-ring base
+
 export const Board3D: React.FC = () => {
   const gameState = useGameStore((s) => s.gameState);
 
   return (
     <group>
-      {/* Blue board frame (raised border like a real board) */}
-      <mesh receiveShadow castShadow position={[0, 0.05, 0]}>
-        <boxGeometry args={[21.4, 0.3, 21.4]} />
-        <meshStandardMaterial color="#2563eb" roughness={0.55} />
-      </mesh>
+      {/* Blue board frame: four rails forming a raised border (a solid slab
+          would swallow the tiles sitting inside it) */}
+      {(
+        [
+          [0, -(OUTER - RAIL) / 2, OUTER, RAIL],
+          [0, (OUTER - RAIL) / 2, OUTER, RAIL],
+          [-(OUTER - RAIL) / 2, 0, RAIL, INNER],
+          [(OUTER - RAIL) / 2, 0, RAIL, INNER]
+        ] as const
+      ).map(([x, z, sx, sz], i) => (
+        <mesh key={`frame-${i}`} receiveShadow castShadow position={[x, FRAME_Y, z]}>
+          <boxGeometry args={[sx, FRAME_H, sz]} />
+          <meshStandardMaterial color="#2563eb" roughness={0.55} />
+        </mesh>
+      ))}
 
       {/* White tile-ring base */}
-      <mesh receiveShadow position={[0, 0.18, 0]}>
-        <boxGeometry args={[20.6, 0.16, 20.6]} />
+      <mesh receiveShadow position={[0, 0, 0]}>
+        <boxGeometry args={[20.6, 0.3, 20.6]} />
         <meshStandardMaterial color="#f8fafc" roughness={0.7} />
       </mesh>
 
@@ -46,6 +62,12 @@ export const Board3D: React.FC = () => {
         const prop = gameState?.properties[coord.index];
         const isCorner = coord.index % 10 === 0;
         const groupColor = GROUP_COLORS[tile.group] || '#D1D5DB';
+
+        // Color band and price sit on opposite edges of the tile.
+        // Both must face the board center so all four sides read consistently.
+        const bandSign = coord.index >= 10 && coord.index <= 29 ? 1 : -1;
+        const bandZ = bandSign * coord.size[2] * 0.35;
+        const priceZ = -bandSign * coord.size[2] * 0.32;
 
         // Check if tile has an owner
         let ownerColor: string | undefined;
@@ -65,9 +87,9 @@ export const Board3D: React.FC = () => {
               />
             </mesh>
 
-            {/* Color Band for purchasable properties */}
+            {/* Color Band for purchasable properties (inner edge, facing center) */}
             {!isCorner && tile.price > 0 && (
-              <mesh position={[0, coord.size[1] / 2 + 0.01, -coord.size[2] * 0.35]}>
+              <mesh position={[0, coord.size[1] / 2 + 0.01, bandZ]}>
                 <boxGeometry args={[coord.size[0] * 0.95, 0.02, coord.size[2] * 0.25]} />
                 <meshStandardMaterial color={groupColor} roughness={0.3} />
               </mesh>
@@ -95,10 +117,10 @@ export const Board3D: React.FC = () => {
               {tile.name}
             </Text>
 
-            {/* Price text */}
+            {/* Price text on the outer edge */}
             {tile.price > 0 && (
               <Text
-                position={[0, coord.size[1] / 2 + 0.03, coord.size[2] * 0.3]}
+                position={[0, coord.size[1] / 2 + 0.03, priceZ]}
                 rotation={[-Math.PI / 2, 0, 0]}
                 fontSize={0.2}
                 color="#475569"

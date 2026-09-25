@@ -57,6 +57,26 @@ cd client && npm run dev
 npm test
 ```
 
+### 5. End-to-End Smoke Test
+```bash
+npm run smoke
+```
+Boots the built server on a spare port, connects two real Socket.IO clients, and checks the full path: create room, join, pick tokens, ready up, start, chat, reject out-of-turn rolls, roll dice, move a token, and end the turn.
+
+### 6. Screenshot Script (3D Visual Review)
+
+```bash
+npm run shot
+```
+
+Drives headless Chrome through a real 2-player game via CDP and saves screenshots to `shots/` (git-ignored): home, lobby, board, post-roll, guest view, zoomed token view, plus magnified crops of the bottom tile row and GO corner so token placement can be reviewed without a manual click-through. Requires Chrome installed (`CHROME_PATH` overrides the default path, `CDP_PORT` overrides 9333).
+
+### 7. Emoji Guard
+```bash
+npm run check:emoji
+```
+Fails the build if any emoji character sneaks into source or copy.
+
 ---
 
 ## How to Play with Friends Online (Using Your PC as Host)

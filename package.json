@@ -12,6 +12,8 @@
     "build": "npm run build --workspace=shared && npm run build --workspace=client && npm run build --workspace=server",
     "test": "npm run test --workspace=server",
     "check:emoji": "node scripts/check-emojis.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "shot": "node scripts/shot.mjs",
     "start": "npm run start --workspace=server"
   }
 }

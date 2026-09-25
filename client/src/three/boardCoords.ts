@@ -16,14 +16,16 @@ export function calculateTileCoordinates(): TileCoordinate[] {
   const half = boardSize / 2;
   const cornerSize = 2.4;
   const standardWidth = (boardSize - 2 * cornerSize) / 9; // ~1.688
-  const tileHeight = 0.3;
+  const tileHeight = 0.14;
+  const surfaceY = 0.1; // top of the blue frame / white ring
+  const tileY = surfaceY + tileHeight / 2;
   const tileDepth = cornerSize;
 
   // Bottom side: 0 to 9 (moving right to left: X goes from +half to -half at Z = +half)
   // 0 is Bottom-Right corner
   coords.push({
     index: 0,
-    position: [half - cornerSize / 2, tileHeight / 2, half - cornerSize / 2],
+    position: [half - cornerSize / 2, tileY, half - cornerSize / 2],
     rotation: [0, 0, 0],
     size: [cornerSize, tileHeight, cornerSize]
   });
@@ -32,7 +34,7 @@ export function calculateTileCoordinates(): TileCoordinate[] {
     const x = half - cornerSize - (i - 0.5) * standardWidth;
     coords.push({
       index: i,
-      position: [x, tileHeight / 2, half - tileDepth / 2],
+      position: [x, tileY, half - tileDepth / 2],
       rotation: [0, 0, 0],
       size: [standardWidth * 0.95, tileHeight, tileDepth]
     });
@@ -42,7 +44,7 @@ export function calculateTileCoordinates(): TileCoordinate[] {
   // 10 is Bottom-Left corner
   coords.push({
     index: 10,
-    position: [-half + cornerSize / 2, tileHeight / 2, half - cornerSize / 2],
+    position: [-half + cornerSize / 2, tileY, half - cornerSize / 2],
     rotation: [0, 0, 0],
     size: [cornerSize, tileHeight, cornerSize]
   });
@@ -51,7 +53,7 @@ export function calculateTileCoordinates(): TileCoordinate[] {
     const z = half - cornerSize - (i - 0.5) * standardWidth;
     coords.push({
       index: 10 + i,
-      position: [-half + tileDepth / 2, tileHeight / 2, z],
+      position: [-half + tileDepth / 2, tileY, z],
       rotation: [0, Math.PI / 2, 0],
       size: [standardWidth * 0.95, tileHeight, tileDepth]
     });
@@ -61,7 +63,7 @@ export function calculateTileCoordinates(): TileCoordinate[] {
   // 20 is Top-Left corner
   coords.push({
     index: 20,
-    position: [-half + cornerSize / 2, tileHeight / 2, -half + cornerSize / 2],
+    position: [-half + cornerSize / 2, tileY, -half + cornerSize / 2],
     rotation: [0, 0, 0],
     size: [cornerSize, tileHeight, cornerSize]
   });
@@ -70,7 +72,7 @@ export function calculateTileCoordinates(): TileCoordinate[] {
     const x = -half + cornerSize + (i - 0.5) * standardWidth;
     coords.push({
       index: 20 + i,
-      position: [x, tileHeight / 2, -half + tileDepth / 2],
+      position: [x, tileY, -half + tileDepth / 2],
       rotation: [0, 0, 0],
       size: [standardWidth * 0.95, tileHeight, tileDepth]
     });
@@ -80,7 +82,7 @@ export function calculateTileCoordinates(): TileCoordinate[] {
   // 30 is Top-Right corner
   coords.push({
     index: 30,
-    position: [half - cornerSize / 2, tileHeight / 2, -half + cornerSize / 2],
+    position: [half - cornerSize / 2, tileY, -half + cornerSize / 2],
     rotation: [0, 0, 0],
     size: [cornerSize, tileHeight, cornerSize]
   });
@@ -89,7 +91,7 @@ export function calculateTileCoordinates(): TileCoordinate[] {
     const z = -half + cornerSize + (i - 0.5) * standardWidth;
     coords.push({
       index: 30 + i,
-      position: [half - tileDepth / 2, tileHeight / 2, z],
+      position: [half - tileDepth / 2, tileY, z],
       rotation: [0, Math.PI / 2, 0],
       size: [standardWidth * 0.95, tileHeight, tileDepth]
     });

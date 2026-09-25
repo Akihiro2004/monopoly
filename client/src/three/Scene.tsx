@@ -14,12 +14,12 @@ export const MonopolyScene: React.FC = () => {
     <div className="canvas-container">
       <Canvas shadows>
         {/* Low, tilted front view like a player sitting at the table */}
-        <PerspectiveCamera makeDefault position={[0, 11.5, 15]} fov={45} />
+        <PerspectiveCamera makeDefault position={[0, 15, 19]} fov={45} />
         <OrbitControls
           maxPolarAngle={Math.PI / 2.15}
-          minDistance={8}
-          maxDistance={32}
-          target={[0, 0.5, 0]}
+          minDistance={10}
+          maxDistance={38}
+          target={[0, 0.4, 0]}
           enableDamping
         />
 

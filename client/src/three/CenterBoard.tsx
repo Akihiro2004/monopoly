@@ -47,14 +47,14 @@ const CardDeck: React.FC<{
 export const CenterBoard: React.FC = () => {
   return (
     <group>
-      {/* Cream playing surface (flush with tile ring) */}
-      <mesh receiveShadow position={[0, 0.29, 0]}>
-        <boxGeometry args={[14.6, 0.06, 14.6]} />
+      {/* Cream playing surface (top flush with the tile tops) */}
+      <mesh receiveShadow position={[0, 0.15, 0]}>
+        <boxGeometry args={[14.6, 0.18, 14.6]} />
         <meshStandardMaterial color="#eef2e9" roughness={0.85} />
       </mesh>
 
       {/* Diagonal red logo banner */}
-      <group position={[0, 0.37, 0]} rotation={[0, Math.PI / 5, 0]}>
+      <group position={[0, 0.29, 0]} rotation={[0, Math.PI / 5, 0]}>
         <mesh castShadow receiveShadow>
           <boxGeometry args={[11.5, 0.1, 2.1]} />
           <meshStandardMaterial color="#dc2626" roughness={0.5} />
@@ -73,7 +73,7 @@ export const CenterBoard: React.FC = () => {
 
       {/* Chance deck (yellow, upper-left area) */}
       <CardDeck
-        position={[-3.6, 0.32, -3.4]}
+        position={[-3.6, 0.2625, -3.4]}
         rotation={[0, 0.25, 0]}
         color="#facc15"
         label="?"
@@ -82,7 +82,7 @@ export const CenterBoard: React.FC = () => {
 
       {/* Community Chest deck (blue, lower-right area) */}
       <CardDeck
-        position={[3.6, 0.32, 3.2]}
+        position={[3.6, 0.2625, 3.2]}
         rotation={[0, 0.25, 0]}
         color="#3b82f6"
         label="CHEST"

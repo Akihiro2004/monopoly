@@ -48,16 +48,16 @@ const SingleDie: React.FC<DieProps> = ({ position, targetValue, rollTrigger }) =
         meshRef.current.rotation.x += delta * 18;
         meshRef.current.rotation.y += delta * 14;
         meshRef.current.rotation.z += delta * 16;
-        meshRef.current.position.y = 0.7 + Math.sin((animTime.current / duration) * Math.PI) * 1.5;
+        meshRef.current.position.y = 0.74 + Math.sin((animTime.current / duration) * Math.PI) * 1.5;
       } else {
         // Finished rolling: land with the correct pips face on top!
         isRolling.current = false;
-        meshRef.current.position.y = 0.82;
+        meshRef.current.position.y = 0.74;
         const targetRot = ROTATION_FOR_TOP_FACE[targetValue] || [0, 0, 0];
         meshRef.current.rotation.set(targetRot[0], targetRot[1], targetRot[2]);
       }
     } else {
-      meshRef.current.position.y = 0.82;
+      meshRef.current.position.y = 0.74;
       const targetRot = ROTATION_FOR_TOP_FACE[targetValue] || [0, 0, 0];
       meshRef.current.rotation.set(targetRot[0], targetRot[1], targetRot[2]);
     }
@@ -89,7 +89,8 @@ export const Dice3D: React.FC = () => {
   const isDoubles = d1 === d2;
 
   return (
-    <group position={[0, 0, 0]}>
+    // Placed on the open cream area in front of the diagonal logo banner
+    <group position={[0, 0, 4.9]}>
       <SingleDie
         position={[-1.1, 0, 0]}
         targetValue={d1}
@@ -101,12 +102,12 @@ export const Dice3D: React.FC = () => {
         rollTrigger={rollCount}
       />
 
-      {/* 3D Dice Banner */}
+      {/* Roll result label */}
       <Text
-        position={[0, 0.45, 2.2]}
+        position={[0, 0.26, 1.7]}
         rotation={[-Math.PI / 2, 0, 0]}
         fontSize={0.55}
-        color="#fbbf24"
+        color="#b45309"
         anchorX="center"
         anchorY="middle"
       >
