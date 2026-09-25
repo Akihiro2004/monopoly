@@ -40,6 +40,10 @@ class AudioManager {
     this.bgmGain = this.ctx.createGain();
     this.bgmGain.gain.value = 0.25;
     this.bgmGain.connect(this.masterGain);
+
+    if (!this.muted && !this.bgmPlaying) {
+      this.startBGM();
+    }
   }
 
   public isMuted(): boolean {
