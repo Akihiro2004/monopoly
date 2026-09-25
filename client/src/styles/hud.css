@@ -1,0 +1,187 @@
+.game-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.hud-top-bar {
+  pointer-events: auto;
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  padding: 8px 20px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.turn-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.turn-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #94a3b8;
+}
+
+.active-player {
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.phase-pill {
+  font-size: 0.65rem;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #38bdf8;
+}
+
+.action-ticker {
+  font-size: 0.8rem;
+  color: #cbd5e1;
+}
+
+.players-hud {
+  pointer-events: auto;
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 220px;
+}
+
+.player-badge {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  border-left: 4px solid #64748b;
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.player-badge.active-turn {
+  transform: scale(1.04);
+  background: rgba(30, 41, 59, 0.95);
+  box-shadow: 0 0 15px rgba(251, 191, 36, 0.3);
+}
+
+.player-badge.bankrupt {
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+
+.p-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.p-money {
+  color: #10b981;
+}
+
+.p-details {
+  display: flex;
+  gap: 6px;
+  font-size: 0.7rem;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+.jail-badge {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.hud-controls-dock {
+  pointer-events: auto;
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+}
+
+.btn-roll {
+  padding: 16px 36px;
+  font-size: 1.1rem;
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.5);
+}
+
+.btn-end-turn {
+  padding: 14px 32px;
+  background: #10b981;
+  border-radius: 999px;
+  color: white;
+}
+
+.my-properties-tray {
+  pointer-events: auto;
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  right: 16px;
+  max-width: 500px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tray-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #94a3b8;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.tray-props {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.prop-chip {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.chip-btn-build, .chip-btn-landmark {
+  background: #3b82f6;
+  border: none;
+  color: white;
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.chip-btn-landmark {
+  background: #f59e0b;
+}

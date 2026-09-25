@@ -1,0 +1,128 @@
+import {
+  BOARD_TILES,
+  FORCE_BUY_TIMER_MS,
+  GameState,
+  PlayerState,
+  PropertyState,
+  ForceBuyOffer
+} from '@monopoly/shared';
+
+/**
+ * Calculates force-buy price for a property:
+ * price = (tile.price + tile.buildCost * currentBuildLevel) * 2
+ */
+export function calculateForceBuyPrice(tileIndex: number, buildLevel: number): number {
+  const tile = BOARD_TILES[tileIndex];
+  if (!tile) return 0;
+  return (tile.price + tile.buildCost * buildLevel) * 2;
+}
+
+/**
+ * Checks if a property can be force-bought by the landing player:
+ * - Property must be owned by an opponent
+ * - Property must be DEVELOPED (buildLevel >= 1) — empty land is not force-bought (just pay rent)
+ * - Property CANNOT be a Landmark (buildLevel === 4 is immune!)
+ * - Property cannot be mortgaged
+ * - Buyer must have sufficient cash
+ */
+export function canForceBuy(
+  tileIndex: number,
+  buyer: PlayerState,
+  property: PropertyState | undefined
+): { eligible: boolean; price: number; reason?: string } {
+  if (!property || !property.ownerId) {
+    return { eligible: false, price: 0, reason: 'Tile is unowned' };
+  }
+
+  if (property.ownerId === buyer.playerId) {
+    return { eligible: false, price: 0, reason: 'Already owned by buyer' };
+  }
+
+  if (property.isMortgaged) {
+    return { eligible: false, price: 0, reason: 'Property is mortgaged' };
+  }
+
+  // LINE Get Rich rule: only developed properties can be force-bought
+  if (property.buildLevel < 1) {
+    return { eligible: false, price: 0, reason: 'Tile has no buildings (empty land cannot be force-bought)' };
+  }
+
+  // Landmark is untouchable
+  if (property.buildLevel >= 4) {
+    return { eligible: false, price: 0, reason: 'Landmarks cannot be bought from opponents!' };
+  }
+
+  const price = calculateForceBuyPrice(tileIndex, property.buildLevel);
+  if (buyer.money < price) {
+    return { eligible: false, price, reason: `Insufficient funds (needs $${price}, has $${buyer.money})` };
+  }
+
+  return { eligible: true, price };
+}
+
+/**
+ * Creates a ForceBuyOffer for the active player landing on opponent's property
+ */
+export function createForceBuyOffer(
+  tileIndex: number,
+  buyer: PlayerState,
+  property: PropertyState
+): ForceBuyOffer {
+  const price = calculateForceBuyPrice(tileIndex, property.buildLevel);
+  return {
+    tileIndex,
+    targetPlayerId: property.ownerId!,
+    buyerPlayerId: buyer.playerId,
+    price,
+    currentBuildLevel: property.buildLevel,
+    expiresAt: Date.now() + FORCE_BUY_TIMER_MS
+  };
+}
+
+/**
+ * Executes a force-buy transfer:
+ * - Deducts 2x price from buyer
+ * - Pays 2x price to seller (victim)
+ * - Transfers ownership to buyer
+ * - KEEPS existing buildLevel (decision 2)
+ * - Sets forceBought = true -> LANDMARK LOCKED (cannot upgrade to level 4)
+ */
+export function executeForceBuy(
+  gameState: GameState,
+  tileIndex: number
+): { success: boolean; text: string } {
+  const offer = gameState.forceBuyOffer;
+  if (!offer || offer.tileIndex !== tileIndex) {
+    return { success: false, text: 'No active force-buy offer for this tile' };
+  }
+
+  const buyer = gameState.players.find((p) => p.playerId === offer.buyerPlayerId);
+  const seller = gameState.players.find((p) => p.playerId === offer.targetPlayerId);
+  const prop = gameState.properties[tileIndex];
+  const tile = BOARD_TILES[tileIndex];
+
+  if (!buyer || !seller || !prop || !tile) {
+    return { success: false, text: 'Invalid participants or property' };
+  }
+
+  if (buyer.money < offer.price) {
+    return { success: false, text: `${buyer.name} cannot afford the force-buy of $${offer.price}!` };
+  }
+
+  // Transaction
+  buyer.money -= offer.price;
+  seller.money += offer.price;
+  prop.ownerId = buyer.playerId;
+  // KEEP existing build level!
+  prop.buildLevel = offer.currentBuildLevel;
+  // LANDMARK LOCKED: cannot ever upgrade to 4 (landmark)
+  prop.forceBought = true;
+
+  // Clear offer
+  gameState.forceBuyOffer = null;
+
+  const msg = `⚡ FORCE BUY! ${buyer.name} forcefully bought ${tile.name} from ${seller.name} for $${offer.price}! (Kept Lv.${prop.buildLevel}, Landmark locked)`;
+  gameState.lastActionText = msg;
+
+  return { success: true, text: msg };
+}
