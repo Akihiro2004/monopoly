@@ -4,7 +4,8 @@ import {
   BuildLevel,
   GameState,
   PlayerState,
-  PropertyState
+  PropertyState,
+  buildBlockReason
 } from '@monopoly/shared';
 
 /**
@@ -50,7 +51,9 @@ export function executeAutoBuy(
  * Level 0 -> 1 (House)
  * Level 1 -> 2 (Building)
  * Level 2 -> 3 (Hotel)
- * Level 3 -> 4 (Landmark) - ONLY if forceBought is false!
+ * Level 3 -> 4 (Landmark) - only if not force-bought AND the whole color set
+ *   is owned and built to Hotels.
+ * Building on raw land needs the player to have passed GO at least once.
  *
  * LINE Get Rich rule: you may only upgrade the property your token is
  * currently standing on (i.e. right after landing on your own property).
@@ -62,48 +65,9 @@ export function buildProperty(
 ): { success: boolean; text: string } {
   const tile = BOARD_TILES[tileIndex];
   const prop = gameState.properties[tileIndex];
-
-  if (!tile || !prop) {
-    return { success: false, text: 'Invalid property' };
-  }
-
-  if (prop.ownerId !== player.playerId) {
-    return { success: false, text: 'You do not own this property' };
-  }
-
-  if (player.position !== tileIndex) {
-    return {
-      success: false,
-      text: `You must stand on ${tile.name} to upgrade it. Build right after landing on your own property.`
-    };
-  }
-
-  if (prop.isMortgaged) {
-    return { success: false, text: 'Cannot build on mortgaged property' };
-  }
-
-  if (tile.buildCost <= 0) {
-    return { success: false, text: 'This property cannot be built on (railroad/utility)' };
-  }
-
-  // Check landmark lock
-  if (prop.buildLevel === 3 && prop.forceBought) {
-    return {
-      success: false,
-      text: `Landmark locked. ${tile.name} was force-bought and cannot be upgraded to a Landmark.`
-    };
-  }
-
-  if (prop.buildLevel >= 4) {
-    return { success: false, text: `${tile.name} is already at max level (Landmark)` };
-  }
-
-  // Cost check
-  if (player.money < tile.buildCost) {
-    return {
-      success: false,
-      text: `Insufficient funds: upgrade costs $${tile.buildCost}, you have $${player.money}`
-    };
+  const blocked = buildBlockReason(gameState, player, tileIndex);
+  if (blocked || !tile || !prop) {
+    return { success: false, text: blocked ?? 'Invalid property' };
   }
 
   player.money -= tile.buildCost;

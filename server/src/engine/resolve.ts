@@ -21,7 +21,8 @@ export function resolveLanding(
   player: PlayerState,
   chanceDeck: CardDef[],
   chestDeck: CardDef[],
-  onCard?: (draw: CardDraw) => void
+  onCard?: (draw: CardDraw) => void,
+  depth = 0
 ): ResolveResult {
   const tileIndex = player.position;
   const tile = BOARD_TILES[tileIndex];
@@ -81,10 +82,19 @@ export function resolveLanding(
         return { needsForceBuyChoice: false, toast: debtMsg };
       }
     } else if (action.type === 'moveTo') {
-      if (action.passGoCheck && player.position > action.tileIndex) {
-        player.money += 200; // Passed GO
+      if (action.passGoCheck && player.position >= action.tileIndex) {
+        player.money += 200; // Passed or landed on GO
+        player.lapsCompleted++;
       }
       player.position = action.tileIndex;
+      // Real Monopoly: the destination tile is resolved as a normal landing
+      // (buy offer, rent, force-buy...). One level deep is enough for cards.
+      if (depth === 0 && action.tileIndex !== 0) {
+        const landed = resolveLanding(gameState, player, chanceDeck, chestDeck, onCard, depth + 1);
+        const combined = landed.toast ? `${toast} ${landed.toast}` : toast;
+        gameState.lastActionText = combined;
+        return { needsForceBuyChoice: landed.needsForceBuyChoice, toast: combined };
+      }
     } else if (action.type === 'jail') {
       player.position = JAIL_TILE_INDEX;
       player.inJail = true;

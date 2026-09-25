@@ -6,8 +6,11 @@ import {
   PlayerColor,
   VictoryType,
   ForceBuyOffer,
-  CardDraw
+  CardDraw,
+  TradeOffer
 } from './types.js';
+
+export type TradeProposal = Omit<TradeOffer, 'id' | 'fromId' | 'createdAt'>;
 
 // Client -> Server events
 export interface ClientToServerEvents {
@@ -35,6 +38,9 @@ export interface ClientToServerEvents {
   'game:declareBankruptcy': () => void;
   'game:mortgage': (payload: { tileIndex: number; mortgage: boolean }) => void;
   'game:endTurn': () => void;
+  'trade:propose': (payload: TradeProposal) => void;
+  'trade:respond': (payload: { tradeId: string; accept: boolean }) => void;
+  'trade:cancel': (payload: { tradeId: string }) => void;
 
   // Chat
   'chat:send': (payload: { text: string }) => void;

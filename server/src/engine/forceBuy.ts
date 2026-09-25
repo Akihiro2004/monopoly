@@ -105,6 +105,12 @@ export function executeForceBuy(
     return { success: false, text: 'Invalid participants or property' };
   }
 
+  // Re-check at execution: a Landmark is never acquirable.
+  if (prop.buildLevel >= 4) {
+    gameState.forceBuyOffer = null;
+    return { success: false, text: `${tile.name} is a Landmark and cannot be acquired` };
+  }
+
   if (buyer.money < offer.price) {
     return { success: false, text: `${buyer.name} cannot afford the $${offer.price} force-buy` };
   }

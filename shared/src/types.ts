@@ -94,6 +94,8 @@ export interface PlayerState {
   isBankrupt: boolean;
   isConnected: boolean;
   consecutiveDoubles: number;
+  // Times this player has passed / landed on GO. Building on land needs >= 1.
+  lapsCompleted: number;
 }
 
 export type GamePhase =
@@ -131,11 +133,34 @@ export interface DebtOffer {
   reason: string;
 }
 
+// Player-to-player trade proposal. `give*` flows from -> to, `get*` flows
+// to -> from. Only unbuilt properties can change hands.
+export interface TradeOffer {
+  id: string;
+  fromId: string;
+  toId: string;
+  giveMoney: number;
+  giveProps: number[];
+  getMoney: number;
+  getProps: number[];
+  createdAt: number;
+}
+
 // A drawn Chance / Community Chest card, broadcast for the info modal.
 export interface CardDraw {
   deck: 'chance' | 'chest';
   title: string;
   text: string;
+}
+
+// The last dice move, so clients can animate walk -> landing -> follow-up
+// (e.g. walk onto Chance, show the card, then travel to the card target).
+export interface MoveRecord {
+  seq: number;
+  playerId: string;
+  from: number;
+  landed: number; // tile the dice walk ends on
+  to: number; // final tile after the landing resolved (card / go-to-jail)
 }
 
 export interface GameState {
@@ -151,6 +176,8 @@ export interface GameState {
   buyOffer: BuyOffer | null;
   forceBuyOffer: ForceBuyOffer | null;
   debt: DebtOffer | null;
+  trades: TradeOffer[];
+  lastMove: MoveRecord | null;
   winnerId: string | null;
   victoryType: VictoryType | null;
   lastActionText: string;

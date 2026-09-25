@@ -3,7 +3,8 @@ import {
   COLOR_GROUPS,
   GameState,
   PlayerState,
-  PropertyState
+  PropertyState,
+  liquidationValue
 } from '@monopoly/shared';
 
 /**
@@ -80,27 +81,39 @@ export function payRent(
 }
 
 /**
- * Applies bankruptcy: tenant loses everything to the creditor.
- * creditorId null means the bank: properties return to unowned land.
+ * Applies bankruptcy the "sell everything" way: every building and deed goes
+ * back to the bank (unowned, unbuilt), and the creditor receives the owed
+ * amount out of what that liquidation raised (cash + half the build cost of
+ * each building + half the price of each unmortgaged deed). Nothing is handed
+ * to an opponent directly. creditorId null means the debt is owed to the bank.
  */
 export function applyBankruptcy(
   gameState: GameState,
   tenant: PlayerState,
-  creditorId: string | null
-): void {
+  creditorId: string | null,
+  debtAmount: number
+): { raised: number; paid: number } {
+  const raised = tenant.money + liquidationValue(gameState, tenant.playerId);
+  const creditor = creditorId ? gameState.players.find((p) => p.playerId === creditorId) : null;
+  const paid = creditor && !creditor.isBankrupt ? Math.min(debtAmount, raised) : 0;
+  if (creditor) creditor.money += paid;
+
   tenant.money = 0;
   tenant.isBankrupt = true;
+  tenant.jailCards = 0;
 
   Object.values(gameState.properties).forEach((p) => {
     if (p.ownerId === tenant.playerId) {
-      if (creditorId) {
-        p.ownerId = creditorId;
-      } else {
-        p.ownerId = null;
-        p.buildLevel = 0;
-        p.isMortgaged = false;
-        p.forceBought = false;
-      }
+      p.ownerId = null;
+      p.buildLevel = 0;
+      p.isMortgaged = false;
+      p.forceBought = false;
     }
   });
+
+  gameState.trades = gameState.trades.filter(
+    (t) => t.fromId !== tenant.playerId && t.toId !== tenant.playerId
+  );
+
+  return { raised, paid };
 }

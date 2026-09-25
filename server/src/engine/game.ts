@@ -12,7 +12,10 @@ import {
   GameState,
   PlayerState,
   PropertyState,
-  Seat
+  Seat,
+  TradeOffer,
+  TradeProposal,
+  tradeBlockReason
 } from '@monopoly/shared';
 import { executeForceBuy } from './forceBuy.js';
 import { buildProperty, sellBuilding, toggleMortgage } from './actions.js';
@@ -50,7 +53,8 @@ export class MonopolyGameEngine {
       jailCards: 0,
       isBankrupt: false,
       isConnected: true,
-      consecutiveDoubles: 0
+      consecutiveDoubles: 0,
+      lapsCompleted: 0
     }));
 
     const properties: Record<number, PropertyState> = {};
@@ -80,9 +84,21 @@ export class MonopolyGameEngine {
       buyOffer: null,
       forceBuyOffer: null,
       debt: null,
+      trades: [],
+      lastMove: null,
       winnerId: null,
       victoryType: null,
       lastActionText: 'Game started. Roll to begin.'
+    };
+  }
+
+  private recordMove(player: PlayerState, from: number, landed: number, to: number): void {
+    this.state.lastMove = {
+      seq: (this.state.lastMove?.seq ?? 0) + 1,
+      playerId: player.playerId,
+      from,
+      landed,
+      to
     };
   }
 
@@ -127,6 +143,7 @@ export class MonopolyGameEngine {
     if (doubles) {
       this.state.doublesCount++;
       if (this.state.doublesCount >= 3) {
+        this.recordMove(player, player.position, JAIL_TILE_INDEX, JAIL_TILE_INDEX);
         player.position = JAIL_TILE_INDEX;
         player.inJail = true;
         player.jailTurns = 0;
@@ -146,6 +163,7 @@ export class MonopolyGameEngine {
 
     if (newPos < oldPos) {
       player.money += GO_SALARY;
+      player.lapsCompleted++;
       this.emitToast(`${player.name} passed GO and collected $${GO_SALARY}.`, 'success');
     }
 
@@ -159,6 +177,7 @@ export class MonopolyGameEngine {
       this.chestDeck,
       (draw: CardDraw) => this.options.onCard?.(draw)
     );
+    this.recordMove(player, oldPos, newPos, player.position);
     if (res.toast) {
       this.emitToast(res.toast, 'info');
     }
@@ -315,19 +334,119 @@ export class MonopolyGameEngine {
     this.state.forceBuyOffer = null;
     this.state.debt = null;
 
-    applyBankruptcy(this.state, player, debt.creditorId);
+    const { raised, paid } = applyBankruptcy(this.state, player, debt.creditorId, debt.amount);
     const creditor = debt.creditorId
       ? this.state.players.find((p) => p.playerId === debt.creditorId)
       : null;
     const msg = creditor
-      ? `${player.name} went BANKRUPT. All properties transfer to ${creditor.name}.`
-      : `${player.name} went BANKRUPT. Properties return to the bank.`;
-    this.state.lastActionText = msg;
+      ? `${player.name} went BANKRUPT. Everything was sold to the bank for $${raised}; ${creditor.name} receives $${paid}.`
+      : `${player.name} went BANKRUPT. Everything was sold back to the bank.`;
     this.emitToast(msg, 'danger');
 
     if (!this.checkAndApplyVictory()) {
-      this.state.phase = 'TURN_ENDED';
+      // The bankrupt player has nothing left to do: move straight on.
+      this.state.doubles = false;
+      this.state.doublesCount = 0;
+      this.advanceToNextPlayer();
+      return;
     }
+    this.notify();
+  }
+
+  // ------------------------------------------------------------------
+  // Trading (any time, any player, like the real game)
+  // ------------------------------------------------------------------
+
+  private validateTrade(t: Omit<TradeOffer, 'id' | 'createdAt'>): string | null {
+    const from = this.state.players.find((p) => p.playerId === t.fromId);
+    const to = this.state.players.find((p) => p.playerId === t.toId);
+    if (!from || !to || from === to) return 'Pick another player to trade with';
+    if (from.isBankrupt || to.isBankrupt) return 'Bankrupt players cannot trade';
+    const ints = [t.giveMoney, t.getMoney];
+    if (ints.some((n) => !Number.isInteger(n) || n < 0)) return 'Money amounts must be whole, non-negative numbers';
+    if (new Set([...t.giveProps, ...t.getProps]).size !== t.giveProps.length + t.getProps.length) {
+      return 'A property can only appear once in a trade';
+    }
+    if (t.giveMoney === 0 && t.getMoney === 0 && t.giveProps.length === 0 && t.getProps.length === 0) {
+      return 'The trade is empty';
+    }
+    if (from.money < t.giveMoney) return `${from.name} does not have $${t.giveMoney}`;
+    if (to.money < t.getMoney) return `${to.name} does not have $${t.getMoney}`;
+    for (const i of t.giveProps) {
+      const reason = tradeBlockReason(this.state.properties[i], from.playerId);
+      if (reason) return reason;
+    }
+    for (const i of t.getProps) {
+      const reason = tradeBlockReason(this.state.properties[i], to.playerId);
+      if (reason) return reason;
+    }
+    return null;
+  }
+
+  public proposeTrade(fromId: string, proposal: TradeProposal): TradeOffer {
+    if (this.state.phase === 'GAME_OVER') throw new Error('The game is over');
+    const draft = {
+      fromId,
+      toId: proposal.toId,
+      giveMoney: Math.floor(Number(proposal.giveMoney) || 0),
+      getMoney: Math.floor(Number(proposal.getMoney) || 0),
+      giveProps: [...new Set((proposal.giveProps ?? []).map(Number))],
+      getProps: [...new Set((proposal.getProps ?? []).map(Number))]
+    };
+    const invalid = this.validateTrade(draft);
+    if (invalid) throw new Error(invalid);
+
+    // One open offer per pair: a new proposal replaces the previous one.
+    this.state.trades = this.state.trades.filter((t) => !(t.fromId === fromId && t.toId === draft.toId));
+    const offer: TradeOffer = { ...draft, id: Math.random().toString(36).slice(2, 10), createdAt: Date.now() };
+    this.state.trades.push(offer);
+
+    const from = this.state.players.find((p) => p.playerId === fromId)!;
+    const to = this.state.players.find((p) => p.playerId === draft.toId)!;
+    this.emitToast(`${from.name} sent a trade offer to ${to.name}.`, 'info');
+    this.notify();
+    return offer;
+  }
+
+  public respondToTrade(tradeId: string, playerId: string, accept: boolean): void {
+    const trade = this.state.trades.find((t) => t.id === tradeId);
+    if (!trade) throw new Error('That trade is no longer available');
+    if (trade.toId !== playerId) throw new Error('Only the receiving player can answer this trade');
+    const from = this.state.players.find((p) => p.playerId === trade.fromId)!;
+    const to = this.state.players.find((p) => p.playerId === trade.toId)!;
+    this.state.trades = this.state.trades.filter((t) => t.id !== tradeId);
+
+    if (!accept) {
+      this.emitToast(`${to.name} declined ${from.name}'s trade.`, 'info');
+      this.notify();
+      return;
+    }
+
+    const invalid = this.validateTrade(trade);
+    if (invalid) {
+      this.notify();
+      throw new Error(`Trade cancelled: ${invalid}`);
+    }
+
+    from.money += trade.getMoney - trade.giveMoney;
+    to.money += trade.giveMoney - trade.getMoney;
+    for (const i of trade.giveProps) this.state.properties[i].ownerId = to.playerId;
+    for (const i of trade.getProps) this.state.properties[i].ownerId = from.playerId;
+
+    // Offers that referenced these deeds or this cash may now be stale.
+    this.state.trades = this.state.trades.filter((t) => this.validateTrade(t) === null);
+
+    this.emitToast(`${from.name} and ${to.name} completed a trade.`, 'success');
+    this.tryPayDebt();
+    this.checkAndApplyVictory();
+    this.notify();
+  }
+
+  public cancelTrade(tradeId: string, playerId: string): void {
+    const trade = this.state.trades.find((t) => t.id === tradeId);
+    if (!trade) return;
+    if (trade.fromId !== playerId) throw new Error('Only the sender can cancel this trade');
+    this.state.trades = this.state.trades.filter((t) => t.id !== tradeId);
     this.notify();
   }
 
