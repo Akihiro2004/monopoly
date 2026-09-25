@@ -23,6 +23,7 @@ export interface ClientToServerEvents {
   'game:roll': () => void;
   'game:payJail': () => void;
   'game:useJailCard': () => void;
+  'game:buyResponse': (payload: { accept: boolean }) => void;
   'game:forceBuyResponse': (payload: { accept: boolean }) => void;
   'game:build': (payload: { tileIndex: number }) => void;
   'game:mortgage': (payload: { tileIndex: number; mortgage: boolean }) => void;

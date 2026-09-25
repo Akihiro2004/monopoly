@@ -100,9 +100,16 @@ export type GamePhase =
   | 'ROLLING'
   | 'MOVING'
   | 'RESOLVING'
+  | 'BUY_OFFER'
   | 'FORCE_BUY_OFFER'
   | 'TURN_ENDED'
   | 'GAME_OVER';
+
+export interface BuyOffer {
+  tileIndex: number;
+  price: number;
+  buyerPlayerId: string;
+}
 
 export interface ForceBuyOffer {
   tileIndex: number;
@@ -123,6 +130,7 @@ export interface GameState {
   dice: [number, number];
   doubles: boolean;
   doublesCount: number;
+  buyOffer: BuyOffer | null;
   forceBuyOffer: ForceBuyOffer | null;
   winnerId: string | null;
   victoryType: VictoryType | null;
