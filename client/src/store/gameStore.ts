@@ -3,6 +3,7 @@ import {
   GameState,
   RoomState,
   ChatMessage,
+  BuyOffer,
   ForceBuyOffer,
   VictoryType
 } from '@monopoly/shared';
@@ -19,7 +20,9 @@ interface GameStore {
   roomState: RoomState | null;
   gameState: GameState | null;
   diceRoll: { d1: number; d2: number; doubles: boolean } | null;
+  buyOffer: BuyOffer | null;
   forceBuyOffer: ForceBuyOffer | null;
+  isWalking: boolean;
   chatMessages: ChatMessage[];
   toasts: ToastMessage[];
   winner: { winnerId: string; victoryType: VictoryType } | null;
@@ -28,7 +31,9 @@ interface GameStore {
   setRoomState: (room: RoomState) => void;
   setGameState: (game: GameState) => void;
   setDiceRoll: (dice: { d1: number; d2: number; doubles: boolean }) => void;
+  setBuyOffer: (offer: BuyOffer | null) => void;
   setForceBuyOffer: (offer: ForceBuyOffer | null) => void;
+  setIsWalking: (isWalking: boolean) => void;
   addChatMessage: (msg: ChatMessage) => void;
   addToast: (text: string, type?: 'info' | 'success' | 'warning' | 'danger') => void;
   removeToast: (id: string) => void;
@@ -41,7 +46,9 @@ export const useGameStore = create<GameStore>((set) => ({
   roomState: null,
   gameState: null,
   diceRoll: null,
+  buyOffer: null,
   forceBuyOffer: null,
+  isWalking: false,
   chatMessages: [],
   toasts: [],
   winner: null,
@@ -50,10 +57,13 @@ export const useGameStore = create<GameStore>((set) => ({
   setGameState: (gameState) =>
     set({
       gameState,
+      buyOffer: gameState.buyOffer,
       forceBuyOffer: gameState.forceBuyOffer,
     }),
   setDiceRoll: (diceRoll) => set({ diceRoll }),
+  setBuyOffer: (buyOffer) => set({ buyOffer }),
   setForceBuyOffer: (forceBuyOffer) => set({ forceBuyOffer }),
+  setIsWalking: (isWalking) => set({ isWalking }),
   addChatMessage: (msg) =>
     set((s) => ({ chatMessages: [...s.chatMessages.slice(-50), msg] })),
   addToast: (text, type = 'info') => {

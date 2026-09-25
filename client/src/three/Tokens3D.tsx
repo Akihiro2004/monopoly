@@ -1,8 +1,10 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { PlayerState, TokenType } from '@monopoly/shared';
 import { getTileCenter } from './boardCoords.js';
+import { useGameStore } from '../store/gameStore.js';
+import { audioManager } from '../sound/audioManager.js';
 
 interface TokensProps {
   players: PlayerState[];
@@ -88,35 +90,128 @@ const AnimatedToken: React.FC<{
   offset: [number, number, number];
 }> = ({ player, isCurrent, offset }) => {
   const groupRef = useRef<THREE.Group>(null);
-  const targetPos = useRef(new THREE.Vector3());
   const snapped = useRef(false);
+  const visualTile = useRef(player.position);
+  const pathQueue = useRef<number[]>([]);
+  const stepTimer = useRef(0);
+  const stepFromPos = useRef(new THREE.Vector3());
+  const stepToPos = useRef(new THREE.Vector3());
+  const rollWaitTimer = useRef(0);
+  const isStepping = useRef(false);
+
+  // When player.position changes, queue path and wait for dice roll tumble
+  useEffect(() => {
+    if (!snapped.current) return;
+    const from = visualTile.current;
+    const to = player.position;
+    if (from === to) return;
+
+    const diff = (to - from + 40) % 40;
+    // If it's a regular dice walk (1 to 12 steps)
+    if (diff >= 1 && diff <= 12) {
+      const steps: number[] = [];
+      for (let i = 1; i <= diff; i++) {
+        steps.push((from + i) % 40);
+      }
+      pathQueue.current = steps;
+      rollWaitTimer.current = 0.95; // wait for dice roll animation in Dice3D to complete
+      isStepping.current = false;
+      stepTimer.current = 0;
+      if (isCurrent) {
+        useGameStore.getState().setIsWalking(true);
+      }
+    } else {
+      // Teleport (e.g. Go to Jail or Card warp)
+      pathQueue.current = [to];
+      rollWaitTimer.current = 0.2;
+      isStepping.current = false;
+      stepTimer.current = 0;
+    }
+  }, [player.position, isCurrent]);
 
   useFrame((state, delta) => {
     if (!groupRef.current) return;
 
-    // Tile center is the middle of the tile box; tokens rest on the top face.
-    const center = getTileCenter(player.position);
-    targetPos.current.set(
-      center[0] + offset[0],
-      center[1] + 0.07 + offset[1],
-      center[2] + offset[2]
-    );
-
-    // Snap onto the tile on the first frame so tokens never fly in from origin.
+    // First frame initialization: snap immediately to starting tile
     if (!snapped.current) {
-      groupRef.current.position.copy(targetPos.current);
+      const center = getTileCenter(player.position);
+      groupRef.current.position.set(
+        center[0] + offset[0],
+        center[1] + 0.07 + offset[1],
+        center[2] + offset[2]
+      );
+      visualTile.current = player.position;
       snapped.current = true;
       return;
     }
 
-    // Smooth Lerp towards destination tile
-    groupRef.current.position.lerp(targetPos.current, Math.min(1, delta * 8));
+    // Wait for dice roll animation
+    if (rollWaitTimer.current > 0) {
+      rollWaitTimer.current -= delta;
+      const center = getTileCenter(visualTile.current);
+      const hoverY = isCurrent ? 0.08 + Math.sin(state.clock.elapsedTime * 5) * 0.04 : 0;
+      groupRef.current.position.set(
+        center[0] + offset[0],
+        center[1] + 0.07 + offset[1] + hoverY,
+        center[2] + offset[2]
+      );
+      return;
+    }
 
-    // Active player hovers above their tile. This must be set from the target
-    // position each frame, never added to the lerped value, or the offset
-    // accumulates and sinks the token through the board.
+    // Walking path execution
+    if (pathQueue.current.length > 0) {
+      const STEP_DURATION = 0.17; // seconds per tile hop
+      if (!isStepping.current) {
+        const nextTile = pathQueue.current[0];
+        const fromCenter = getTileCenter(visualTile.current);
+        const toCenter = getTileCenter(nextTile);
+        stepFromPos.current.set(fromCenter[0] + offset[0], fromCenter[1] + 0.07 + offset[1], fromCenter[2] + offset[2]);
+        stepToPos.current.set(toCenter[0] + offset[0], toCenter[1] + 0.07 + offset[1], toCenter[2] + offset[2]);
+        stepTimer.current = 0;
+        isStepping.current = true;
+      }
+
+      stepTimer.current += delta;
+      const progress = Math.min(1, stepTimer.current / STEP_DURATION);
+
+      // Interpolate horizontal position, parabolic arc for vertical hop
+      const curX = THREE.MathUtils.lerp(stepFromPos.current.x, stepToPos.current.x, progress);
+      const curZ = THREE.MathUtils.lerp(stepFromPos.current.z, stepToPos.current.z, progress);
+      const arcY = Math.sin(progress * Math.PI) * 0.35;
+      const curY = THREE.MathUtils.lerp(stepFromPos.current.y, stepToPos.current.y, progress) + arcY;
+
+      groupRef.current.position.set(curX, curY, curZ);
+
+      if (progress >= 1) {
+        const completedTile = pathQueue.current.shift()!;
+        visualTile.current = completedTile;
+        isStepping.current = false;
+        audioManager.playStep();
+
+        if (pathQueue.current.length === 0) {
+          // Finished entire path!
+          if (isCurrent) {
+            useGameStore.getState().setIsWalking(false);
+          }
+        }
+      }
+      return;
+    }
+
+    // Idle on final destination tile
+    const center = getTileCenter(player.position);
+    const targetX = center[0] + offset[0];
+    const targetY = center[1] + 0.07 + offset[1];
+    const targetZ = center[2] + offset[2];
+
     if (isCurrent) {
-      groupRef.current.position.y = targetPos.current.y + 0.12 + Math.sin(state.clock.elapsedTime * 3) * 0.06;
+      groupRef.current.position.x = THREE.MathUtils.lerp(groupRef.current.position.x, targetX, Math.min(1, delta * 10));
+      groupRef.current.position.z = THREE.MathUtils.lerp(groupRef.current.position.z, targetZ, Math.min(1, delta * 10));
+      groupRef.current.position.y = targetY + 0.12 + Math.sin(state.clock.elapsedTime * 3) * 0.06;
+    } else {
+      groupRef.current.position.x = THREE.MathUtils.lerp(groupRef.current.position.x, targetX, Math.min(1, delta * 10));
+      groupRef.current.position.z = THREE.MathUtils.lerp(groupRef.current.position.z, targetZ, Math.min(1, delta * 10));
+      groupRef.current.position.y = THREE.MathUtils.lerp(groupRef.current.position.y, targetY, Math.min(1, delta * 10));
     }
   });
 

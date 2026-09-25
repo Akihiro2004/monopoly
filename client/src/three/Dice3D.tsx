@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { Text } from '@react-three/drei';
 import { useGameStore } from '../store/gameStore.js';
 import { createDiceFaceTexture, ROTATION_FOR_TOP_FACE } from './diceTextures.js';
+import { audioManager } from '../sound/audioManager.js';
 
 interface DieProps {
   position: [number, number, number];
@@ -80,6 +81,7 @@ export const Dice3D: React.FC = () => {
   useEffect(() => {
     if (diceRoll) {
       setRollCount((c) => c + 1);
+      audioManager.playDiceRoll();
     }
   }, [diceRoll]);
 
