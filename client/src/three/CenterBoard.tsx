@@ -1,5 +1,6 @@
 import React from 'react';
 import { Text } from '@react-three/drei';
+import { BOLD_FONT } from './fonts.js';
 
 // One deck of cards (stack of thin boxes with a labeled top card)
 const CardDeck: React.FC<{
@@ -25,6 +26,7 @@ const CardDeck: React.FC<{
       ))}
       {/* Label on top card */}
       <Text
+        font={BOLD_FONT}
         position={[0, cardCount * cardH + 0.01, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
         fontSize={0.55}
@@ -60,6 +62,7 @@ export const CenterBoard: React.FC = () => {
           <meshStandardMaterial color="#dc2626" roughness={0.5} />
         </mesh>
         <Text
+          font={BOLD_FONT}
           position={[0, 0.06, 0]}
           rotation={[-Math.PI / 2, 0, 0]}
           fontSize={1.15}

@@ -9,14 +9,16 @@ import { ForceBuyModal } from './ui/ForceBuyModal.js';
 import { CardModal } from './ui/CardModal.js';
 import { DebtModal } from './ui/DebtModal.js';
 import { VictoryOverlay } from './ui/VictoryOverlay.js';
-import { ChatPanel } from './ui/ChatPanel.js';
 import { ToastContainer } from './ui/ToastContainer.js';
 import { MonopolyScene } from './three/Scene.js';
-import './App.css';
+import { useIsMobile } from './hooks/useIsMobile.js';
 
 export function App() {
   const roomState = useGameStore((s) => s.roomState);
   const [isReconnecting, setIsReconnecting] = useState(() => loadSession() !== null);
+  const isMobile = useIsMobile();
+  const inGame = roomState?.status === 'playing';
+  const rootClass = `app-root ${isMobile ? 'layout-mobile' : 'layout-desktop'} ${inGame ? 'screen-game' : 'screen-menu'}`;
 
   useEffect(() => {
     initSocketListeners();
@@ -76,13 +78,14 @@ export function App() {
 
   if (isReconnecting && !roomState) {
     return (
-      <div className="app-root">
-        <div className="home-container">
-          <div className="home-card">
-            <div className="logo-badge">SESSION FOUND</div>
-            <h1 className="game-title">3D MONOPOLY</h1>
-            <div className="reconnect-spinner" />
-            <p className="subtitle" style={{ marginBottom: 0 }}>Restoring your session...</p>
+      <div className={rootClass}>
+        <div className="menu-screen">
+          <div className="menu-bg" />
+          <div className="splash">
+            <span className="brand-mark" />
+            <h1>Monopoly 3D</h1>
+            <div className="spinner" />
+            <p>Rejoining your game…</p>
           </div>
         </div>
         <ToastContainer />
@@ -91,7 +94,7 @@ export function App() {
   }
 
   return (
-    <div className="app-root">
+    <div className={rootClass}>
       {/* 3D Monopoly Canvas (rendered when in playing/finished state) */}
       {roomState?.status === 'playing' && <MonopolyScene />}
 
@@ -109,7 +112,6 @@ export function App() {
           <ForceBuyModal />
           <CardModal />
           <DebtModal />
-          <ChatPanel />
         </>
       )}
 

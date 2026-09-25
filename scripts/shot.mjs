@@ -187,9 +187,9 @@ async function main() {
   await sleep(600);
   await alice.screenshot(`${OUT_DIR}/1-home.png`);
 
-  await alice.eval(setInput('input[placeholder="e.g. Alice"]', 'Alice'));
+  await alice.eval(setInput('input[name="player-name"]', 'Alice'));
   await sleep(150);
-  await alice.eval(clickIf('.btn-primary'));
+  await alice.eval(clickIf('.btn-create'));
   const roomCode = await waitForText(alice, '.code-display h2');
   console.log(`Room ${roomCode} created`);
   await sleep(400);
@@ -197,10 +197,12 @@ async function main() {
 
   await navigate(bob, APP);
   await sleep(600);
-  await bob.eval(setInput('input[placeholder="e.g. Alice"]', 'Bob'));
-  await bob.eval(setInput('input[placeholder="6-CHAR ROOM CODE"]', roomCode));
+  await bob.eval(setInput('input[name="player-name"]', 'Bob'));
+  await bob.eval(clickIf('.segmented button:nth-child(2)'));
   await sleep(150);
-  await bob.eval(clickIf('.btn-secondary'));
+  await bob.eval(setInput('input[name="room-code"]', roomCode));
+  await sleep(150);
+  await bob.eval(clickIf('.btn-join'));
   await waitForText(bob, '.code-display h2');
   console.log('Bob joined');
   // Bob clicks Ready
@@ -247,7 +249,7 @@ async function main() {
     await roller.screenshot(`${OUT_DIR}/4-board-after-roll.png`);
 
     // Click Buy Property in the title deed modal
-    const buyResult = await roller.eval(clickIf('.btn-3d-buy'));
+    const buyResult = await roller.eval(clickIf('.btn-buy'));
     if (buyResult === 'clicked') {
       console.log(`${rollerName} accepted buy offer`);
       await sleep(2000); // Wait for modal to close and 3D house preview to render

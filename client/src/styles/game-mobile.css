@@ -1,0 +1,371 @@
+/* ------------------------------------------------------------------ */
+/* Game: mobile chrome                                                */
+/* ------------------------------------------------------------------ */
+.m-hud {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.m-hud > * {
+  pointer-events: auto;
+}
+
+.m-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: calc(8px + var(--safe-top)) calc(10px + var(--safe-right)) 8px calc(12px + var(--safe-left));
+  background: linear-gradient(180deg, rgba(11, 15, 20, 0.92) 0%, rgba(11, 15, 20, 0.78) 100%);
+  backdrop-filter: blur(18px) saturate(1.5);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.m-top.my-turn {
+  border-bottom-color: rgba(245, 184, 61, 0.45);
+}
+
+.m-top-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.m-top-row .turn-identity {
+  flex: 1;
+}
+
+.m-top-row .turn-title {
+  font-size: 0.98rem;
+}
+
+.m-top-row .turn-sub {
+  font-size: 0.7rem;
+}
+
+.m-top-row .dice-readout .dbl {
+  display: none;
+}
+
+.m-top-row .dice-sum {
+  font-size: 1rem;
+}
+
+/* Horizontal player chips */
+.player-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 -10px 0 -12px;
+  padding: 0 10px 0 12px;
+}
+
+.player-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.strip-chip {
+  --c: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  height: 36px;
+  padding: 0 10px 0 5px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+}
+
+.strip-chip.active {
+  background: color-mix(in srgb, var(--c) 22%, transparent);
+  border-color: color-mix(in srgb, var(--c) 70%, transparent);
+}
+
+.strip-chip.bankrupt {
+  opacity: 0.4;
+}
+
+.strip-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.05;
+  min-width: 0;
+}
+
+.strip-name {
+  font-size: 0.68rem;
+  color: var(--text-2);
+  max-width: 76px;
+}
+
+.strip-money {
+  font-family: var(--font-display);
+  font-weight: 750;
+  font-size: 0.86rem;
+}
+
+.strip-jail {
+  color: var(--danger);
+}
+
+/* Bottom: action + tab bar */
+.m-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+}
+
+.m-action {
+  padding: 0 14px 12px;
+  pointer-events: none;
+}
+
+.m-action .action-panel > * {
+  pointer-events: auto;
+}
+
+.m-action .action-panel,
+.m-action .action-row {
+  width: 100%;
+  align-items: stretch;
+}
+
+.m-action .action-row > .btn {
+  flex: 1;
+  min-width: 0;
+}
+
+.m-action .btn-main {
+  width: 100%;
+  min-width: 0;
+  height: 58px;
+}
+
+.m-action .btn-upgrade {
+  height: 58px;
+  padding: 0 16px;
+}
+
+.m-action .action-status {
+  align-self: center;
+  font-size: 0.86rem;
+}
+
+.m-action .jail-row .action-row .btn {
+  flex: 1;
+}
+
+.m-tabbar {
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding: 6px calc(6px + var(--safe-right)) calc(6px + var(--safe-bottom)) calc(6px + var(--safe-left));
+  background: rgba(11, 15, 20, 0.9);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border-top: 1px solid var(--border);
+}
+
+.m-tabbar button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 52px;
+  border-radius: var(--radius-md);
+  color: var(--text-3);
+  transition: color 0.15s ease;
+}
+
+.m-tabbar button.active {
+  color: var(--gold);
+}
+
+.m-tabbar button:active {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.tab-icon {
+  position: relative;
+  display: flex;
+}
+
+.tab-badge {
+  position: absolute;
+  top: -5px;
+  right: -10px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: var(--radius-full);
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: 0.62rem;
+  font-weight: 750;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--bg);
+}
+
+.tab-badge.alert {
+  background: var(--danger-strong);
+  color: #fff;
+}
+
+.tab-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+/* Bottom sheet for Assets / Activity / Chat */
+.m-sheet-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: rgba(4, 7, 11, 0.45);
+  animation: fade-in 0.2s ease;
+}
+
+.m-sheet {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  bottom: calc(64px + var(--safe-bottom));
+  height: min(68dvh, calc(100dvh - 150px - var(--safe-top)));
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-1);
+  border-radius: 24px 24px 0 0;
+  border: 1px solid var(--border-strong);
+  border-bottom: none;
+  box-shadow: 0 -20px 50px rgba(0, 0, 0, 0.5);
+  animation: sheet-in 0.34s var(--ease-out);
+}
+
+.m-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 14px 8px 18px;
+}
+
+.m-sheet-head h2 {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+.m-sheet-head .icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.m-sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 14px 16px;
+}
+
+.m-sheet-body.no-scroll {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Bigger touch targets in lists on phones */
+.layout-mobile .mini-btn {
+  height: 36px;
+  padding: 0 11px;
+}
+
+.layout-mobile .chat-input,
+.layout-mobile .chat-send {
+  height: 44px;
+}
+
+.layout-mobile .chat-send {
+  width: 44px;
+}
+
+.layout-mobile .chat-input {
+  font-size: 16px; /* prevents iOS zoom on focus */
+}
+
+/* Toasts sit under the status bar on phones */
+.layout-mobile .toast-stack {
+  top: calc(112px + var(--safe-top));
+  left: 50%;
+  width: calc(100vw - 24px);
+}
+
+.layout-mobile .toast {
+  padding: 9px 12px;
+  font-size: 0.82rem;
+}
+
+/* Landscape phones: slimmer chrome */
+@media (pointer: coarse) and (max-height: 540px) {
+  .m-top {
+    flex-direction: row;
+    align-items: center;
+    padding-top: calc(6px + var(--safe-top));
+    padding-bottom: 6px;
+  }
+  .m-top-row {
+    flex-shrink: 0;
+  }
+  .player-strip {
+    margin: 0;
+    padding: 0;
+    flex: 1;
+    justify-content: flex-end;
+  }
+  .m-tabbar button {
+    height: 42px;
+    flex-direction: row;
+    gap: 6px;
+  }
+  .m-action .btn-main,
+  .m-action .btn-upgrade {
+    height: 48px;
+  }
+  .m-action {
+    display: flex;
+    justify-content: center;
+  }
+  .m-action .action-panel {
+    width: min(420px, 100%);
+  }
+  .m-sheet {
+    bottom: calc(54px + var(--safe-bottom));
+    height: calc(100dvh - 110px - var(--safe-top));
+    left: auto;
+    width: min(440px, 100%);
+    border-radius: 20px 0 0 0;
+  }
+  .layout-mobile .toast-stack {
+    top: calc(60px + var(--safe-top));
+    width: min(420px, calc(100vw - 24px));
+  }
+}

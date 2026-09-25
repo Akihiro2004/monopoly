@@ -1,0 +1,729 @@
+/* ------------------------------------------------------------------ */
+/* Game: shared building blocks (both layouts)                        */
+/* ------------------------------------------------------------------ */
+.canvas-container {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  touch-action: none;
+  background: #071912;
+}
+
+.layout-desktop .canvas-container {
+  top: var(--topbar-h);
+  left: var(--rail-left);
+  right: var(--rail-right);
+}
+
+/* Turn identity (avatar + whose turn) */
+.turn-identity {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.turn-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.turn-title {
+  font-family: var(--font-display);
+  font-weight: 750;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.turn-identity.mine .turn-title {
+  color: var(--gold);
+}
+
+.turn-sub {
+  font-size: 0.74rem;
+  color: var(--text-3);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Dice readout */
+.dice-readout {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.dice-sum {
+  min-width: 22px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: var(--text);
+  text-align: center;
+}
+
+.dice-readout .dbl {
+  animation: pulse-glow 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  50% {
+    box-shadow: 0 0 12px rgba(245, 184, 61, 0.5);
+  }
+}
+
+.btn-audio-toggle.muted {
+  color: var(--text-3);
+}
+
+/* ------------------------------------------------------------------ */
+/* Action panel                                                       */
+/* ------------------------------------------------------------------ */
+.action-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.action-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-main {
+  min-width: 240px;
+}
+
+.btn-main .kbd {
+  margin-left: 6px;
+}
+
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 5px;
+  font-family: var(--font-ui);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: rgba(0, 0, 0, 0.16);
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  color: inherit;
+  opacity: 0.75;
+}
+
+.btn-roll {
+  animation: roll-breathe 2.2s ease-in-out infinite;
+}
+
+@keyframes roll-breathe {
+  0%,
+  100% {
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.35) inset,
+      0 8px 24px rgba(227, 156, 23, 0.3);
+  }
+  50% {
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.35) inset,
+      0 8px 34px rgba(245, 184, 61, 0.55);
+  }
+}
+
+.btn-upgrade {
+  --btn-bg: linear-gradient(180deg, #5b8cff 0%, #3b6cf0 55%, #2b55d3 100%);
+  --btn-hover: linear-gradient(180deg, #6d99ff 0%, #4a78f5 55%, #3160dc 100%);
+  --btn-fg: #fff;
+  --btn-border: rgba(150, 180, 255, 0.5);
+  box-shadow: 0 6px 18px rgba(59, 108, 240, 0.3);
+}
+
+.btn-upgrade.landmark {
+  --btn-bg: linear-gradient(180deg, #c084fc 0%, #9d5cf0 55%, #7c3fd6 100%);
+  --btn-hover: linear-gradient(180deg, #cb97fd 0%, #a86af3 55%, #874adf 100%);
+  --btn-border: rgba(210, 170, 255, 0.5);
+  box-shadow: 0 6px 18px rgba(157, 92, 240, 0.35);
+}
+
+.btn-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.1;
+}
+
+.btn-stack small {
+  font-size: 0.74rem;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.action-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  max-width: 100%;
+  padding: 8px 18px 8px 10px;
+  border-radius: var(--radius-full);
+  background: var(--surface-glass);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-md);
+  font-size: 0.9rem;
+  font-weight: 550;
+  color: var(--text-2);
+}
+
+.action-status .status-icon {
+  margin-left: 6px;
+  color: var(--info);
+  flex-shrink: 0;
+}
+
+.action-status.danger {
+  color: #fecaca;
+  background: rgba(60, 14, 14, 0.85);
+  border-color: rgba(248, 113, 113, 0.5);
+  animation: danger-pulse 1.2s ease-in-out infinite;
+}
+
+.action-status.danger .status-icon {
+  color: var(--danger);
+}
+
+@keyframes danger-pulse {
+  50% {
+    box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.18), var(--shadow-md);
+  }
+}
+
+.pulse {
+  animation: step 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes step {
+  to {
+    transform: translateY(-2px);
+  }
+}
+
+.jail-row {
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+}
+
+.jail-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: #fecaca;
+}
+
+/* ------------------------------------------------------------------ */
+/* Players                                                            */
+/* ------------------------------------------------------------------ */
+.player-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.player-card {
+  --c: #94a3b8;
+  position: relative;
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  transition: border-color 0.25s ease, background-color 0.25s ease, transform 0.25s var(--ease-out);
+}
+
+.player-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--c);
+  opacity: 0.8;
+}
+
+.player-card.active {
+  border-color: color-mix(in srgb, var(--c) 55%, transparent);
+  background:
+    linear-gradient(100deg, color-mix(in srgb, var(--c) 18%, transparent), transparent 70%),
+    var(--surface-2);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--c) 18%, transparent);
+}
+
+.player-card.bankrupt {
+  opacity: 0.45;
+}
+
+.player-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.player-card-id {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.player-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 650;
+  font-size: 0.92rem;
+  min-width: 0;
+}
+
+.leader-crown {
+  color: var(--gold);
+  flex-shrink: 0;
+}
+
+.player-sub {
+  font-size: 0.75rem;
+  color: var(--text-3);
+}
+
+.playing-label {
+  color: var(--c);
+  font-weight: 650;
+  filter: brightness(1.25);
+}
+
+.player-money {
+  font-family: var(--font-display);
+  font-weight: 750;
+  font-size: 1.12rem;
+  letter-spacing: -0.01em;
+}
+
+.player-card-bottom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  min-height: 20px;
+}
+
+.deed-strip {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  min-width: 0;
+}
+
+.deed-pip {
+  width: 9px;
+  height: 13px;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25) inset;
+}
+
+.deed-pip.mortgaged {
+  opacity: 0.3;
+}
+
+/* ------------------------------------------------------------------ */
+/* Portfolio                                                          */
+/* ------------------------------------------------------------------ */
+.portfolio {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.portfolio-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  min-width: 0;
+}
+
+.stat span {
+  font-size: 0.7rem;
+  color: var(--text-3);
+  font-weight: 600;
+}
+
+.stat strong {
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: 750;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.deed-group ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.deed-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.group-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--g);
+}
+
+.group-count {
+  margin-left: auto;
+  font-weight: 600;
+  color: var(--text-3);
+  letter-spacing: 0;
+}
+
+.deed-group-head .badge {
+  margin-left: auto;
+}
+
+.deed-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+
+.deed-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--g);
+}
+
+.deed-row.here {
+  border-color: rgba(96, 165, 250, 0.5);
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+}
+
+.deed-row.mortgaged {
+  background: repeating-linear-gradient(135deg, var(--surface-2) 0 8px, #1d2531 8px 16px);
+}
+
+.deed-row.mortgaged .deed-name {
+  color: var(--text-3);
+}
+
+.deed-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.deed-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 620;
+  font-size: 0.88rem;
+  min-width: 0;
+}
+
+.deed-lock {
+  color: var(--gold);
+  flex-shrink: 0;
+}
+
+.deed-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.74rem;
+  color: var(--text-3);
+  flex-wrap: wrap;
+}
+
+.deed-rent {
+  color: var(--text-2);
+}
+
+.level-steps {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.level-steps span {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.level-steps span.on {
+  background: var(--success);
+}
+
+.level-steps.landmark span.on {
+  background: var(--gold);
+}
+
+.deed-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.mini-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 9px;
+  border-radius: var(--radius-sm);
+  font-size: 0.74rem;
+  font-weight: 650;
+  color: var(--text-2);
+  background: var(--surface-3);
+  border: 1px solid var(--border-strong);
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.mini-btn:hover:not(:disabled) {
+  color: var(--text);
+  background: #2b3747;
+}
+
+.mini-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.mini-btn:disabled {
+  opacity: 0.4;
+}
+
+.mini-btn.blue {
+  color: #dbe6ff;
+  background: #2f58d6;
+  border-color: rgba(150, 180, 255, 0.5);
+}
+
+.mini-btn.gold {
+  color: var(--gold-ink);
+  background: var(--gold);
+  border-color: rgba(255, 214, 128, 0.6);
+}
+
+/* ------------------------------------------------------------------ */
+/* Activity                                                           */
+/* ------------------------------------------------------------------ */
+.activity-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.activity-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: var(--text-2);
+  animation: fade-in 0.3s ease;
+}
+
+.activity-item:first-child {
+  color: var(--text);
+}
+
+.activity-icon {
+  display: flex;
+  margin-top: 2px;
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+
+.activity-item.success .activity-icon {
+  color: var(--success);
+}
+.activity-item.warning .activity-icon {
+  color: var(--warning);
+}
+.activity-item.danger .activity-icon {
+  color: var(--danger);
+}
+
+.activity-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.activity-time {
+  font-size: 0.7rem;
+  color: var(--text-3);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Chat                                                               */
+/* ------------------------------------------------------------------ */
+.chat-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.chat-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px 2px 12px;
+}
+
+.bubble-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 85%;
+  margin-top: 8px;
+}
+
+.bubble-row.grouped {
+  margin-top: 0;
+}
+
+.bubble-row.mine {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.bubble-sender {
+  font-size: 0.72rem;
+  font-weight: 650;
+  margin: 0 0 3px 10px;
+}
+
+.bubble {
+  padding: 8px 12px;
+  border-radius: 16px;
+  background: var(--surface-3);
+  font-size: 0.88rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.bubble-row.mine .bubble {
+  background: var(--gold);
+  color: var(--gold-ink);
+  font-weight: 520;
+}
+
+.chat-compose {
+  display: flex;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.chat-input {
+  flex: 1;
+  min-width: 0;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elev);
+  outline: none;
+  font-size: 0.92rem;
+}
+
+.chat-input:focus {
+  border-color: rgba(245, 184, 61, 0.6);
+}
+
+.chat-send {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gold);
+  color: var(--gold-ink);
+  flex-shrink: 0;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+
+.chat-send:disabled {
+  opacity: 0.35;
+}
+
+.chat-send:active:not(:disabled) {
+  transform: scale(0.92);
+}

@@ -1,62 +1,64 @@
 import React from 'react';
 import { Seat } from '@monopoly/shared';
-import { Crown } from 'lucide-react';
-import { TOKENS, COLORS } from './lobbyConstants.js';
+import { Crown, UserPlus } from 'lucide-react';
+import { TOKENS } from './lobbyConstants.js';
+import { PlayerAvatar } from './common/PlayerAvatar.js';
 
 interface SeatsProps {
   seats: Seat[];
   myPlayerId: string;
+  maxPlayers?: number;
 }
 
-export const LobbySeats: React.FC<SeatsProps> = ({ seats, myPlayerId }) => {
-  return (
-    <div className="seats-section">
-      <h3>
-        PLAYERS ({seats.length}/6)
-        <span className="player-count-dots">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <span key={i} className={i < seats.length ? 'filled' : ''} />
-          ))}
-        </span>
-      </h3>
-      <div className="seats-grid">
-        {seats.map((seat) => {
-          const tokenObj = TOKENS.find((t) => t.type === seat.tokenType);
-          const colorObj = COLORS.find((c) => c.color === seat.color);
-          const isMe = seat.playerId === myPlayerId;
+export const LobbySeats: React.FC<SeatsProps> = ({ seats, myPlayerId, maxPlayers = 6 }) => {
+  const empty = Math.max(0, maxPlayers - seats.length);
 
-          return (
-            <div
-              key={seat.seatIndex}
-              className={`seat-card ${isMe ? 'my-seat' : ''} ${seat.isReady ? 'ready' : ''} ${!seat.isConnected ? 'offline' : ''}`}
-              style={{ borderLeftColor: colorObj?.hex || '#666' }}
-            >
-              <div className="seat-token" style={{ backgroundColor: `${colorObj?.hex || '#666'}33` }}>
-                {tokenObj ? <tokenObj.icon size={18} color={colorObj?.hex || '#cbd5e1'} /> : null}
-              </div>
-              <div className="seat-info">
-                <div className="seat-name">
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{seat.displayName}</span>
-                  {isMe && <span className="you-pill">YOU</span>}
-                  {seat.isHost && <Crown size={14} color="#f59e0b" />}
-                </div>
-                <div className="seat-token-name">{tokenObj?.label}</div>
-              </div>
-              <div className="seat-status">
-                {!seat.isConnected ? (
-                  <span className="status-pill offline-pill">OFFLINE</span>
-                ) : seat.isHost ? (
-                  <span className="status-pill host">HOST</span>
-                ) : seat.isReady ? (
-                  <span className="status-pill ready">READY</span>
-                ) : (
-                  <span className="status-pill waiting">WAITING</span>
-                )}
-              </div>
+  return (
+    <ul className="seat-list">
+      {seats.map((seat) => {
+        const tokenObj = TOKENS.find((t) => t.type === seat.tokenType);
+        const isMe = seat.playerId === myPlayerId;
+        return (
+          <li key={seat.seatIndex} className={`seat-row ${isMe ? 'me' : ''} ${!seat.isConnected ? 'offline' : ''}`}>
+            <PlayerAvatar token={seat.tokenType} color={seat.color} size={40} online={seat.isConnected} />
+            <div className="seat-info">
+              <span className="seat-name">
+                <span className="truncate">{seat.displayName}</span>
+                {seat.isHost && <Crown size={14} className="host-crown" aria-label="Host" />}
+                {isMe && <span className="badge">You</span>}
+              </span>
+              <span className="seat-sub">{tokenObj?.label}</span>
             </div>
-          );
-        })}
-      </div>
-    </div>
+            {!seat.isConnected ? (
+              <span className="badge red">Offline</span>
+            ) : seat.isHost ? (
+              <span className="badge gold">Host</span>
+            ) : seat.isReady ? (
+              <span className="badge green">Ready</span>
+            ) : (
+              <span className="badge">Not ready</span>
+            )}
+          </li>
+        );
+      })}
+      {Array.from({ length: empty }).map((_, i) => (
+        <li key={`empty-${i}`} className="seat-row empty">
+          <span className="seat-empty-icon">
+            <UserPlus size={18} />
+          </span>
+          <span className="seat-sub">Open seat</span>
+        </li>
+      ))}
+      {empty > 0 && (
+        <li className="seat-row empty-summary">
+          <span className="seat-empty-icon">
+            <UserPlus size={18} />
+          </span>
+          <span className="seat-sub">
+            {empty} open seat{empty > 1 ? 's' : ''}. Share the code to invite friends.
+          </span>
+        </li>
+      )}
+    </ul>
   );
 };

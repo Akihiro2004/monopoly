@@ -1,80 +1,74 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { socket } from '../net/socket.js';
 import { useGameStore } from '../store/gameStore.js';
-import { ShieldAlert, Coins, Banknote, Flag } from 'lucide-react';
+import { Flag, Receipt } from 'lucide-react';
 import { audioManager } from '../sound/audioManager.js';
+import { Modal } from './common/Modal.js';
+import { Portfolio } from './game/Portfolio.js';
+import { money } from './theme.js';
 
+// Only the debtor gets the modal; others see "X owes $Y" in the action panel.
 export const DebtModal: React.FC = () => {
   const gameState = useGameStore((s) => s.gameState);
   const myPlayerId = useGameStore((s) => s.myPlayerId);
+  const [confirming, setConfirming] = useState(false);
+
+  // A new debt always starts unarmed.
+  useEffect(() => setConfirming(false), [gameState?.debt?.amount, gameState?.debt?.reason]);
 
   if (!gameState || gameState.phase !== 'DEBT' || !gameState.debt) return null;
+  const debtor = gameState.players[gameState.currentPlayerIndex];
+  if (!debtor || debtor.playerId !== myPlayerId) return null;
 
   const debt = gameState.debt;
-  const debtor = gameState.players.find((p) => p.playerId === gameState.players[gameState.currentPlayerIndex]?.playerId);
-  const isDebtor = debtor?.playerId === myPlayerId;
-  const creditor = debt.creditorId
-    ? gameState.players.find((p) => p.playerId === debt.creditorId)
-    : null;
+  const creditor = debt.creditorId ? gameState.players.find((p) => p.playerId === debt.creditorId) : null;
+  const shortfall = Math.max(0, debt.amount - debtor.money);
+  const covered = Math.min(1, debtor.money / debt.amount);
 
   const handleBankrupt = () => {
+    if (!confirming) {
+      setConfirming(true);
+      return;
+    }
     audioManager.playClick();
     socket.emit('game:declareBankruptcy');
   };
 
   return (
-    <div className="deed-overlay">
-      <div className="deed-card-modal">
-        <div className="deed-header" style={{ backgroundColor: '#b91c1c' }}>
-          <span className="deed-subtitle">PAYMENT DUE</span>
-          <h2 className="deed-title">
-            {isDebtor ? 'You owe money!' : `${debtor?.name} owes money!`}
-          </h2>
+    <Modal width={460} label="Payment due" className="debt-dialog">
+      <div className="modal-pad">
+        <div className="debt-head">
+          <span className="debt-icon">
+            <Receipt size={22} />
+          </span>
+          <div>
+            <small>Payment due · {debt.reason}</small>
+            <h2 className="tnum">{money(debt.amount)}</h2>
+            <p>to {creditor ? creditor.name : 'the Bank'}</p>
+          </div>
         </div>
 
-        <div className="deed-body">
-          <div className="deed-price-row">
-            <span className="deed-price-label">Amount Due ({debt.reason})</span>
-            <span className="deed-price-value">${debt.amount}</span>
+        <div className="debt-progress">
+          <div className="debt-bar">
+            <span style={{ width: `${covered * 100}%` }} />
           </div>
-
-          <div className="deed-funds-bar">
-            <div className="funds-label">
-              <Coins size={16} />
-              <span>{isDebtor ? 'Your Cash:' : `${debtor?.name}'s Cash:`}</span>
-            </div>
-            <span className="funds-amount negative">${debtor?.money ?? 0}</span>
+          <div className="debt-progress-labels">
+            <span className="tnum">Cash {money(debtor.money)}</span>
+            <span className="tnum neg">Short {money(shortfall)}</span>
           </div>
-
-          <div className="deed-funds-bar">
-            <div className="funds-label">
-              <Banknote size={16} />
-              <span>Pay to:</span>
-            </div>
-            <span className="funds-amount">{creditor ? creditor.name : 'Bank'}</span>
-          </div>
-
-          {isDebtor ? (
-            <>
-              <div className="deed-warning">
-                <ShieldAlert size={16} />
-                <span>Sell buildings from your tray to raise cash. The debt auto-pays once covered.</span>
-              </div>
-              <div className="deed-actions">
-                <button className="btn-3d btn-3d-pass" onClick={handleBankrupt}>
-                  <Flag size={18} />
-                  <span>DECLARE BANKRUPTCY</span>
-                </button>
-              </div>
-            </>
-          ) : (
-            <div className="deed-waiting">
-              <ShieldAlert size={18} />
-              <span>Waiting for {debtor?.name} to pay ${debt.amount}...</span>
-            </div>
-          )}
         </div>
+
+        <p className="debt-help">Sell buildings or mortgage land to raise cash. The debt is paid automatically once you can cover it.</p>
+
+        <div className="debt-assets">
+          <Portfolio hideSummary liquidOnly />
+        </div>
+
+        <button className={`btn btn-lg btn-block ${confirming ? 'btn-danger' : 'btn-danger-soft'}`} onClick={handleBankrupt}>
+          <Flag size={17} />
+          {confirming ? 'Tap again to declare bankruptcy' : 'Declare bankruptcy'}
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 };

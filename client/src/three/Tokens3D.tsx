@@ -5,6 +5,7 @@ import { PlayerState, TokenType } from '@monopoly/shared';
 import { getTileCenter } from './boardCoords.js';
 import { useGameStore } from '../store/gameStore.js';
 import { audioManager } from '../sound/audioManager.js';
+import { playerHex } from '../ui/theme.js';
 
 interface TokensProps {
   players: PlayerState[];
@@ -222,7 +223,7 @@ const AnimatedToken: React.FC<{
         <cylinderGeometry args={[0.42, 0.46, 0.06, 20]} />
         <meshStandardMaterial color="#ffffff" roughness={0.4} />
       </mesh>
-      <TokenGeometry type={player.tokenType} color={player.color} />
+      <TokenGeometry type={player.tokenType} color={playerHex(player.color)} />
       {/* Active player spotlight pointer */}
       {isCurrent && (
         <mesh position={[0, 1.35, 0]}>
