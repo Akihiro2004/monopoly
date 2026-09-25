@@ -39,15 +39,45 @@ describe('Monopoly Game Engine (LINE Get Rich rules)', () => {
     expect(Object.keys(engine.state.properties).length).toBe(40);
   });
 
-  it('auto-buys unowned property when landing on it (LINE Get Rich auto-buy)', () => {
+  it('triggers buy offer when landing on unowned property (no auto-buy)', () => {
     const engine = new MonopolyGameEngine('room123', seats, { specialVictory: true });
     engine.rollDice(1, 2);
 
     expect(engine.state.players[0].position).toBe(3);
+    expect(engine.state.phase).toBe('BUY_OFFER');
+    expect(engine.state.buyOffer).not.toBeNull();
+    expect(engine.state.buyOffer?.tileIndex).toBe(3);
+    expect(engine.state.buyOffer?.price).toBe(60);
+    expect(engine.state.properties[3].ownerId).toBeNull();
+
+    // Player accepts the offer:
+    engine.respondToBuyOffer(true);
     expect(engine.state.properties[3].ownerId).toBe('p1');
     expect(engine.state.players[0].money).toBe(1500 - 60);
     expect(engine.state.properties[3].buildLevel).toBe(0);
     expect(engine.state.phase).toBe('TURN_ENDED');
+  });
+
+  it('allows player to decline buying unowned property', () => {
+    const engine = new MonopolyGameEngine('room123', seats, { specialVictory: true });
+    engine.rollDice(1, 2);
+
+    expect(engine.state.phase).toBe('BUY_OFFER');
+    engine.respondToBuyOffer(false);
+
+    expect(engine.state.properties[3].ownerId).toBeNull();
+    expect(engine.state.players[0].money).toBe(1500);
+    expect(engine.state.phase).toBe('TURN_ENDED');
+  });
+
+  it('does not offer to buy if player has insufficient funds', () => {
+    const engine = new MonopolyGameEngine('room123', seats, { specialVictory: true });
+    engine.state.players[0].money = 10;
+    engine.rollDice(1, 2);
+
+    expect(engine.state.phase).toBe('TURN_ENDED');
+    expect(engine.state.buyOffer).toBeNull();
+    expect(engine.state.properties[3].ownerId).toBeNull();
   });
 
   it('triggers force-buy offer when landing on opponent developed property', () => {

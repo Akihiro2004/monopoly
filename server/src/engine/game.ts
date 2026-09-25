@@ -74,6 +74,7 @@ export class MonopolyGameEngine {
       dice: [1, 1],
       doubles: false,
       doublesCount: 0,
+      buyOffer: null,
       forceBuyOffer: null,
       winnerId: null,
       victoryType: null,
@@ -145,15 +146,18 @@ export class MonopolyGameEngine {
     }
 
     player.position = newPos;
-    (this.state as { phase: string }).phase = 'RESOLVING';
+    (this.state as any).phase = 'RESOLVING';
 
     const res = resolveLanding(this.state, player, this.chanceDeck, this.chestDeck);
     if (res.toast) {
       this.emitToast(res.toast, 'info');
     }
 
-    if (this.state.phase === ('FORCE_BUY_OFFER' as any) && this.state.forceBuyOffer) {
+    const currentPhase = this.state.phase as string;
+    if (currentPhase === 'FORCE_BUY_OFFER' && this.state.forceBuyOffer) {
       this.setupForceBuyTimeout();
+    } else if (currentPhase === 'BUY_OFFER' && this.state.buyOffer) {
+      // Stay in BUY_OFFER phase waiting for player's purchase choice
     } else {
       this.state.phase = 'TURN_ENDED';
     }
@@ -161,6 +165,36 @@ export class MonopolyGameEngine {
     this.checkAndApplyVictory();
     this.notify();
     return { d1, d2, doubles };
+  }
+
+  public respondToBuyOffer(accept: boolean): void {
+    if (this.state.phase !== 'BUY_OFFER' || !this.state.buyOffer) {
+      throw new Error('No active buy offer');
+    }
+
+    const offer = this.state.buyOffer;
+    const player = this.getCurrentPlayer();
+    const tile = BOARD_TILES[offer.tileIndex];
+    const prop = this.state.properties[offer.tileIndex];
+
+    if (accept) {
+      if (player.money < offer.price) {
+        throw new Error('Insufficient funds to buy property');
+      }
+      player.money -= offer.price;
+      prop.ownerId = player.playerId;
+      prop.buildLevel = 0;
+      prop.isMortgaged = false;
+      prop.forceBought = false;
+      this.emitToast(`${player.name} bought ${tile.name} for $${offer.price}.`, 'success');
+    } else {
+      this.emitToast(`${player.name} decided not to buy ${tile.name}.`, 'info');
+    }
+
+    this.state.buyOffer = null;
+    this.state.phase = 'TURN_ENDED';
+    this.checkAndApplyVictory();
+    this.notify();
   }
 
   public respondToForceBuy(accept: boolean): void {

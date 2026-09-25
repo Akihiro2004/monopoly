@@ -30,6 +30,24 @@ export function registerGameHandlers(
     }
   });
 
+  socket.on('game:buyResponse', ({ accept }) => {
+    const info = roomManager.getPlayerBySocket(socket.id);
+    if (!info) return;
+    const room = roomManager.getRoom(info.roomId);
+    if (!room || !room.engine) return;
+
+    const offer = room.engine.state.buyOffer;
+    if (!offer || offer.buyerPlayerId !== info.playerId) {
+      return socket.emit('error', { message: 'Not authorized for this buy offer' });
+    }
+
+    try {
+      room.engine.respondToBuyOffer(accept);
+    } catch (e: any) {
+      socket.emit('error', { message: e.message });
+    }
+  });
+
   socket.on('game:forceBuyResponse', ({ accept }) => {
     const info = roomManager.getPlayerBySocket(socket.id);
     if (!info) return;

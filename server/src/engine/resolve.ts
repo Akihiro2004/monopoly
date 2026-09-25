@@ -103,10 +103,24 @@ export function resolveLanding(
 
   // 4. Purchasable tiles: Property / Railroad / Utility
   if (prop) {
-    // Unowned: AUTO-BUY (LINE Get Rich)
-    if (prop.ownerId === null) {
-      const { text } = executeAutoBuy(gameState, player, tileIndex);
-      return { needsForceBuyChoice: false, toast: text };
+    // Unowned property: offer to buy if player has funds
+    if (prop.ownerId === null && tile.price > 0) {
+      if (player.money >= tile.price) {
+        gameState.phase = 'BUY_OFFER';
+        gameState.buyOffer = {
+          tileIndex,
+          price: tile.price,
+          buyerPlayerId: player.playerId
+        };
+        const msg = `${player.name} landed on unowned ${tile.name}. Purchase offer: $${tile.price}.`;
+        gameState.lastActionText = msg;
+        return { needsForceBuyChoice: false, toast: msg };
+      } else {
+        gameState.buyOffer = null;
+        const msg = `${player.name} cannot afford ${tile.name} ($${tile.price}). It remains unowned.`;
+        gameState.lastActionText = msg;
+        return { needsForceBuyChoice: false, toast: msg };
+      }
     }
 
     // Owned by self
