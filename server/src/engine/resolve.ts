@@ -125,7 +125,7 @@ export function resolveLanding(
     if (fbCheck.eligible) {
       gameState.phase = 'FORCE_BUY_OFFER';
       gameState.forceBuyOffer = createForceBuyOffer(tileIndex, player, prop);
-      const msg = `⚡ ${player.name} landed on ${opponent.name}'s ${tile.name}! Force-buy offer available for $${fbCheck.price}!`;
+      const msg = `⚡ ${player.name} landed on ${opponent.name}'s ${tile.name}. Force-buy offer: $${fbCheck.price}.`;
       gameState.lastActionText = msg;
       return { needsForceBuyChoice: true, toast: msg };
     }

@@ -49,7 +49,7 @@ export function canForceBuy(
 
   // Landmark is untouchable
   if (property.buildLevel >= 4) {
-    return { eligible: false, price: 0, reason: 'Landmarks cannot be bought from opponents!' };
+    return { eligible: false, price: 0, reason: 'Landmarks cannot be bought from opponents' };
   }
 
   const price = calculateForceBuyPrice(tileIndex, property.buildLevel);
@@ -106,7 +106,7 @@ export function executeForceBuy(
   }
 
   if (buyer.money < offer.price) {
-    return { success: false, text: `${buyer.name} cannot afford the force-buy of $${offer.price}!` };
+    return { success: false, text: `${buyer.name} cannot afford the $${offer.price} force-buy` };
   }
 
   // Transaction
@@ -121,7 +121,7 @@ export function executeForceBuy(
   // Clear offer
   gameState.forceBuyOffer = null;
 
-  const msg = `⚡ FORCE BUY! ${buyer.name} forcefully bought ${tile.name} from ${seller.name} for $${offer.price}! (Kept Lv.${prop.buildLevel}, Landmark locked)`;
+  const msg = `⚡ FORCE BUY: ${buyer.name} bought ${tile.name} from ${seller.name} for $${offer.price}. Kept Lv.${prop.buildLevel}, Landmark locked.`;
   gameState.lastActionText = msg;
 
   return { success: true, text: msg };

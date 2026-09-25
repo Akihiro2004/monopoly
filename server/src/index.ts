@@ -32,7 +32,7 @@ app.get('/api/health', (req, res) => {
 app.get('*', (req, res) => {
   res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
     if (err) {
-      res.status(200).send('Monopoly 3D Game Server is running! (Build client to view UI)');
+      res.status(200).send('Monopoly 3D server is running. Build the client to view the UI.');
     }
   });
 });

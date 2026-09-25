@@ -29,7 +29,7 @@ export function checkVictory(gameState: GameState, specialVictoryEnabled: boolea
       hasWinner: true,
       winnerId: activePlayers[0].playerId,
       victoryType: 'bankruptcy',
-      reason: `${activePlayers[0].name} is the last remaining player!`
+      reason: `${activePlayers[0].name} is the last player standing`
     };
   }
 
@@ -58,7 +58,7 @@ export function checkVictory(gameState: GameState, specialVictoryEnabled: boolea
           hasWinner: true,
           winnerId: player.playerId,
           victoryType: 'triple_victory',
-          reason: `${player.name} achieved Triple Victory! Owned 3 complete color sets!`
+          reason: `${player.name} wins with Triple Victory: 3 complete color sets.`
         };
       }
 
@@ -75,7 +75,7 @@ export function checkVictory(gameState: GameState, specialVictoryEnabled: boolea
             hasWinner: true,
             winnerId: player.playerId,
             victoryType: 'line_victory',
-            reason: `${player.name} achieved Line Victory! Owned all properties on Side ${sideIndex + 1}!`
+            reason: `${player.name} wins with Line Victory: every property on Side ${sideIndex + 1}.`
           };
         }
       }

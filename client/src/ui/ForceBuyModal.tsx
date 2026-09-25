@@ -44,7 +44,7 @@ export const ForceBuyModal: React.FC = () => {
       <div className="force-buy-modal">
         <div className="modal-header">
           <Zap className="flash-icon" size={28} />
-          <h2>FORCE BUY OPPORTUNITY!</h2>
+          <h2>FORCE BUY OFFER</h2>
           <div className="timer-badge">
             <span>{timeLeft}s</span>
           </div>
@@ -95,7 +95,7 @@ export const ForceBuyModal: React.FC = () => {
           ) : isVictim ? (
             <div className="waiting-message warning">
               <AlertTriangle size={20} />
-              <span>{buyer?.name} is deciding whether to forcefully purchase your property! (Sale is mandatory if they accept)</span>
+              <span>{buyer?.name} can buy your property for ${forceBuyOffer.price}. The sale is mandatory if they accept.</span>
             </div>
           ) : (
             <div className="waiting-message">

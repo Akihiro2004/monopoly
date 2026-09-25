@@ -83,12 +83,12 @@ export function buildProperty(
   if (prop.buildLevel === 3 && prop.forceBought) {
     return {
       success: false,
-      text: `🔒 Landmark locked! ${tile.name} was acquired via force-buy and cannot be upgraded to a Landmark!`
+      text: `🔒 Landmark locked. ${tile.name} was force-bought and cannot be upgraded to a Landmark.`
     };
   }
 
   if (prop.buildLevel >= 4) {
-    return { success: false, text: `${tile.name} is already at max level (Landmark)!` };
+    return { success: false, text: `${tile.name} is already at max level (Landmark)` };
   }
 
   // Cost check

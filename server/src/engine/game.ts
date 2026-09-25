@@ -77,7 +77,7 @@ export class MonopolyGameEngine {
       forceBuyOffer: null,
       winnerId: null,
       victoryType: null,
-      lastActionText: 'Game started! Waiting for first roll.'
+      lastActionText: 'Game started. Roll to begin.'
     };
   }
 
@@ -126,7 +126,7 @@ export class MonopolyGameEngine {
         player.inJail = true;
         player.jailTurns = 0;
         this.state.doublesCount = 0;
-        this.emitToast(`🚨 3 consecutive doubles! Sent to Jail!`, 'danger');
+        this.emitToast(`🚨 3 consecutive doubles. ${player.name} goes directly to Jail.`, 'danger');
         this.state.phase = 'TURN_ENDED';
         this.notify();
         return { d1, d2, doubles };
@@ -252,7 +252,7 @@ export class MonopolyGameEngine {
     const player = this.getCurrentPlayer();
     if (this.state.doubles && !player.inJail && !player.isBankrupt) {
       this.state.phase = 'ROLLING';
-      this.emitToast(`🎲 Doubles! ${player.name} rolls again!`, 'info');
+      this.emitToast(`🎲 Doubles! ${player.name} rolls again.`, 'info');
       this.notify();
       return;
     }
@@ -289,7 +289,7 @@ export class MonopolyGameEngine {
       this.state.victoryType = result.victoryType;
       this.state.phase = 'GAME_OVER';
       if (result.reason) {
-        this.emitToast(`🏆 GAME OVER! ${result.reason}`, 'success');
+        this.emitToast(`🏆 ${result.reason}`, 'success');
       }
       return true;
     }

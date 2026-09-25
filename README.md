@@ -1,39 +1,35 @@
-# 🎲 3D Multiplayer Monopoly (LINE Get Rich Edition)
+# 3D Multiplayer Monopoly (LINE Get Rich Edition)
 
-A real-time multiplayer 3D Monopoly game website built with **React**, **Three.js (@react-three/fiber)**, **Socket.IO**, and an authoritative pure TypeScript game engine. Plays with **up to 6 players** with special **LINE Get Rich style rules**.
+A real-time multiplayer 3D Monopoly website built with React, Three.js (@react-three/fiber), Socket.IO, and an authoritative pure TypeScript game engine. Plays up to 6 players with LINE Get Rich style rules.
 
 ---
 
-## ⚡ Game Features (LINE Get Rich Inspired)
+## Game Features (LINE Get Rich)
 
 1. **Auto-Buy on Landing**:
-   - Landing on unowned property buys it automatically if you have sufficient funds.
-   - If broke, it stays unowned (no auctions, fast-paced!).
-
+   - Landing on unowned property buys it automatically if you have the cash.
+   - If you're broke, it stays unowned. No auctions, no bidding.
 2. **2× Force-Buy from Opponents**:
-   - Landing on an opponent's **developed property (house/building/hotel)** gives you a **15-second timed offer** to forcefully purchase it for **2× the total cost** (land + buildings).
-   - The sale is **forced** (the owner cannot refuse if the buyer accepts).
-   - If declined or timed out, normal rent is paid.
-
+   - Landing on an opponent's developed property (house, building, or hotel) opens a 15-second offer to buy it for 2× the total cost (land + buildings).
+   - The sale is forced. The owner cannot refuse once the buyer accepts.
+   - Decline or timeout, and you pay rent as normal.
 3. **4 Build Levels & Landmark Protection**:
    - `House (Lv 1) → Building (Lv 2) → Hotel (Lv 3) → LANDMARK (Lv 4)`
-   - **Landmarks** are permanent golden monuments: they **cannot be bought** from opponents!
-   - Properties acquired via **force-buy keep their build level**, can upgrade to Hotel, but are **Landmark-locked** (cannot upgrade to Landmark).
-
+   - Landmarks are permanent. Opponents cannot buy them.
+   - Force-bought properties keep their build level and can be upgraded to Hotel, but never to Landmark.
 4. **Multiple Victory Conditions**:
-   - **Bankruptcy Victory**: Standard last non-bankrupt player standing.
-   - **Triple Victory** (toggleable): Own all properties of any 3 complete color sets!
-   - **Line Victory** (toggleable): Own all purchasable properties on an entire board side!
-
+   - **Bankruptcy**: last non-bankrupt player standing.
+   - **Triple Victory** (toggleable): own all properties of 3 complete color sets.
+   - **Line Victory** (toggleable): own every purchasable property on one board side.
 5. **3D Interactive Visuals**:
-   - Full 3D board rendered via Three.js with OrbitControls (drag to rotate, pinch/scroll to zoom).
-   - 6 custom 3D tokens (Race Car, Top Hat, Dog, Battleship, Thimble, Boot) with active player tracking.
-   - 3D animated dice rolls.
-   - Real-time in-game chat and toast activity feed.
+   - Full 3D board rendered via Three.js with OrbitControls (drag to rotate, pinch or scroll to zoom).
+   - 6 custom 3D tokens (Race Car, Top Hat, Dog, Battleship, Thimble, Boot) that track the active player.
+   - Animated dice with real pips.
+   - Real-time chat and an activity feed.
 
 ---
 
-## 🚀 How to Run Locally
+## How to Run Locally
 
 ### 1. Install & Build
 ```bash
@@ -45,7 +41,7 @@ npm run build
 ```bash
 npm start
 ```
-The server will start on `http://localhost:5000` serving both the game API/WebSockets and the built 3D client. Open multiple browser tabs (or incognito windows) to play multiplayer locally!
+The server will start on `http://localhost:5000` serving both the game API/WebSockets and the built 3D client. Open multiple browser tabs (or incognito windows) to play multiplayer locally.
 
 ### 3. Development Mode (Hot Reload)
 ```bash
@@ -63,7 +59,7 @@ npm test
 
 ---
 
-## 🌐 How to Play with Friends Online (Using Your PC as Host)
+## How to Play with Friends Online (Using Your PC as Host)
 
 Since the backend runs on your machine, you can expose it to friends over the internet using a free **Cloudflare Tunnel**:
 
