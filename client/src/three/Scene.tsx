@@ -6,6 +6,7 @@ import { Board3D } from './Board3D.js';
 import { Tokens3D } from './Tokens3D.js';
 import { Dice3D } from './Dice3D.js';
 import { WoodTable } from './WoodTable.js';
+import { Room3D } from './Room3D.js';
 
 export const MonopolyScene: React.FC = () => {
   const gameState = useGameStore((s) => s.gameState);
@@ -13,6 +14,10 @@ export const MonopolyScene: React.FC = () => {
   return (
     <div className="canvas-container">
       <Canvas shadows>
+        {/* Warm cozy game lounge background color and atmospheric fog */}
+        <color attach="background" args={['#1a0e08']} />
+        <fog attach="fog" args={['#1a0e08', 26, 65]} />
+
         {/* Low, tilted front view like a player sitting at the table */}
         <PerspectiveCamera makeDefault position={[0, 15, 19]} fov={45} />
         <OrbitControls
@@ -24,7 +29,7 @@ export const MonopolyScene: React.FC = () => {
         />
 
         {/* Warm table lighting */}
-        <ambientLight intensity={0.55} />
+        <ambientLight intensity={0.65} />
         <directionalLight
           position={[12, 20, 14]}
           intensity={1.4}
@@ -40,6 +45,9 @@ export const MonopolyScene: React.FC = () => {
           shadow-camera-bottom={-20}
         />
         <pointLight position={[0, 9, 0]} intensity={0.6} color="#ffe9c4" />
+
+        {/* 3D Warm Cozy Game Lounge Room Enclosure (wallpaper, wainscoting, sconces, rug) */}
+        <Room3D />
 
         {/* Wood table surface */}
         <WoodTable />
