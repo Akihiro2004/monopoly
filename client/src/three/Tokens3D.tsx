@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { PlayerState, TokenType } from '@monopoly/shared';
@@ -140,15 +140,33 @@ const AnimatedToken: React.FC<{
 };
 
 export const Tokens3D: React.FC<TokensProps> = ({ players, currentPlayerIndex }) => {
-  // Disperse multiple tokens on same tile slightly
-  const offsets: [number, number, number][] = [
-    [-0.38, 0, -0.34],
-    [0.38, 0, -0.34],
-    [-0.38, 0, 0.34],
-    [0.38, 0, 0.34],
-    [0, 0, 0],
-    [0, 0, 0.44]
-  ];
+  // Group players by current tile position to center solo players and disperse multiple tokens
+  const playersByTile = useMemo(() => {
+    const map = new Map<number, PlayerState[]>();
+    for (const p of players) {
+      if (!map.has(p.position)) map.set(p.position, []);
+      map.get(p.position)!.push(p);
+    }
+    return map;
+  }, [players]);
+
+  const getOffset = (p: PlayerState): [number, number, number] => {
+    const sharing = playersByTile.get(p.position) || [];
+    if (sharing.length <= 1) {
+      return [0, 0, 0]; // Exactly centered on the tile!
+    }
+    const idxOnTile = sharing.findIndex((s) => s.playerId === p.playerId);
+    if (sharing.length === 2) {
+      return idxOnTile === 0 ? [-0.28, 0, 0] : [0.28, 0, 0];
+    }
+    if (sharing.length === 3) {
+      const angles = [-Math.PI / 2, Math.PI / 6, (5 * Math.PI) / 6];
+      const a = angles[idxOnTile] ?? 0;
+      return [Math.cos(a) * 0.32, 0, Math.sin(a) * 0.32];
+    }
+    const angle = (idxOnTile / sharing.length) * Math.PI * 2;
+    return [Math.cos(angle) * 0.34, 0, Math.sin(angle) * 0.34];
+  };
 
   return (
     <group>
@@ -157,7 +175,7 @@ export const Tokens3D: React.FC<TokensProps> = ({ players, currentPlayerIndex })
           key={p.playerId}
           player={p}
           isCurrent={idx === currentPlayerIndex}
-          offset={offsets[idx % offsets.length]}
+          offset={getOffset(p)}
         />
       ))}
     </group>
