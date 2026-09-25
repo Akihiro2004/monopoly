@@ -1,15 +1,23 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { socket } from '../net/socket.js';
 import { useGameStore } from '../store/gameStore.js';
 import { BOARD_TILES } from '@monopoly/shared';
-import { Dices, Check, Hammer, Lock, Castle } from 'lucide-react';
+import { Dices, Check, Hammer, Lock, Castle, Volume2, VolumeX } from 'lucide-react';
 import { PlayersSidebar } from './PlayersSidebar.js';
 import { PipDie } from './PipDie.js';
+import { audioManager } from '../sound/audioManager.js';
 
 export const GameHUD: React.FC = () => {
   const gameState = useGameStore((s) => s.gameState);
   const diceRoll = useGameStore((s) => s.diceRoll);
   const myPlayerId = useGameStore((s) => s.myPlayerId);
+  const isWalking = useGameStore((s) => s.isWalking);
+
+  const [muted, setMuted] = useState(audioManager.isMuted());
+
+  useEffect(() => {
+    return audioManager.subscribe(setMuted);
+  }, []);
 
   if (!gameState) return null;
 
@@ -17,16 +25,42 @@ export const GameHUD: React.FC = () => {
   const isMyTurn = curPlayer.playerId === myPlayerId;
   const myPlayer = gameState.players.find((p) => p.playerId === myPlayerId);
 
+  // Play turn start alert chime when it becomes active player's turn
+  useEffect(() => {
+    if (isMyTurn && gameState.phase === 'ROLLING') {
+      audioManager.playTurnAlert();
+    }
+  }, [gameState.turnNumber, gameState.currentPlayerIndex]);
+
   const d1 = diceRoll?.d1 ?? gameState.dice?.[0] ?? 1;
   const d2 = diceRoll?.d2 ?? gameState.dice?.[1] ?? 1;
   const total = d1 + d2;
   const isDoubles = d1 === d2;
 
-  const handleRoll = () => socket.emit('game:roll');
-  const handleEndTurn = () => socket.emit('game:endTurn');
-  const handlePayJail = () => socket.emit('game:payJail');
-  const handleUseJailCard = () => socket.emit('game:useJailCard');
-  const handleBuild = (tileIndex: number) => socket.emit('game:build', { tileIndex });
+  const handleRoll = () => {
+    audioManager.playClick();
+    socket.emit('game:roll');
+  };
+
+  const handleEndTurn = () => {
+    audioManager.playClick();
+    socket.emit('game:endTurn');
+  };
+
+  const handlePayJail = () => {
+    audioManager.playClick();
+    socket.emit('game:payJail');
+  };
+
+  const handleUseJailCard = () => {
+    audioManager.playClick();
+    socket.emit('game:useJailCard');
+  };
+
+  const handleBuild = (tileIndex: number) => {
+    audioManager.playClick();
+    socket.emit('game:build', { tileIndex });
+  };
 
   return (
     <div className="game-hud">
@@ -45,6 +79,14 @@ export const GameHUD: React.FC = () => {
             <span className="hud-dice-sum">= {total}</span>
             {isDoubles && <span className="hud-doubles-tag">DOUBLES!</span>}
           </div>
+          {/* Audio Mute/Unmute Toggle */}
+          <button
+            className="btn-audio-toggle"
+            title={muted ? 'Unmute Audio & BGM' : 'Mute Audio & BGM'}
+            onClick={() => audioManager.toggleMute()}
+          >
+            {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+          </button>
         </div>
         <div className="action-ticker">{gameState.lastActionText}</div>
       </div>
@@ -58,7 +100,13 @@ export const GameHUD: React.FC = () => {
 
       {/* Action Controls Dock */}
       <div className="hud-controls-dock">
-        {isMyTurn && gameState.phase === 'ROLLING' && (
+        {isWalking && (
+          <div className="control-group">
+            <div className="moving-badge">Moving...</div>
+          </div>
+        )}
+
+        {!isWalking && isMyTurn && gameState.phase === 'ROLLING' && (
           <div className="control-group">
             {myPlayer?.inJail && (
               <div className="jail-actions">
@@ -79,7 +127,7 @@ export const GameHUD: React.FC = () => {
           </div>
         )}
 
-        {isMyTurn && gameState.phase === 'TURN_ENDED' && (
+        {!isWalking && isMyTurn && gameState.phase === 'TURN_ENDED' && (
           <div className="control-group">
             <button className="btn btn-primary btn-end-turn" onClick={handleEndTurn}>
               <Check size={20} />

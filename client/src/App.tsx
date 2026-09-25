@@ -3,6 +3,7 @@ import { useGameStore, initSocketListeners } from './store/gameStore.js';
 import { HomeScreen } from './ui/HomeScreen.js';
 import { LobbyScreen } from './ui/LobbyScreen.js';
 import { GameHUD } from './ui/GameHUD.js';
+import { BuyPropertyModal } from './ui/BuyPropertyModal.js';
 import { ForceBuyModal } from './ui/ForceBuyModal.js';
 import { VictoryOverlay } from './ui/VictoryOverlay.js';
 import { ChatPanel } from './ui/ChatPanel.js';
@@ -33,6 +34,7 @@ export function App() {
       {roomState && roomState.status === 'playing' && (
         <>
           <GameHUD />
+          <BuyPropertyModal />
           <ForceBuyModal />
           <ChatPanel />
         </>

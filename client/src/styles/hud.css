@@ -340,3 +340,43 @@
 .chip-btn-landmark {
   background: #f59e0b;
 }
+
+/* Audio Mute Toggle Button */
+.btn-audio-toggle {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fbbf24;
+  border-radius: 8px;
+  padding: 5px 9px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+  margin-left: 6px;
+}
+
+.btn-audio-toggle:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+}
+
+.btn-audio-toggle:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.moving-badge {
+  padding: 14px 32px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid #38bdf8;
+  color: #38bdf8;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: 0.05em;
+}

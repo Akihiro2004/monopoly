@@ -8,6 +8,7 @@ export const ForceBuyModal: React.FC = () => {
   const forceBuyOffer = useGameStore((s) => s.forceBuyOffer);
   const gameState = useGameStore((s) => s.gameState);
   const myPlayerId = useGameStore((s) => s.myPlayerId);
+  const isWalking = useGameStore((s) => s.isWalking);
 
   const [timeLeft, setTimeLeft] = useState(15);
 
@@ -24,7 +25,7 @@ export const ForceBuyModal: React.FC = () => {
     return () => clearInterval(interval);
   }, [forceBuyOffer]);
 
-  if (!forceBuyOffer || !gameState) return null;
+  if (!forceBuyOffer || !gameState || isWalking) return null;
 
   const isBuyer = forceBuyOffer.buyerPlayerId === myPlayerId;
   const isVictim = forceBuyOffer.targetPlayerId === myPlayerId;
