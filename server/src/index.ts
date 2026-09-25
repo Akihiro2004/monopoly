@@ -63,5 +63,5 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`🎲 Monopoly 3D Server running on http://localhost:${PORT}`);
+  console.log(`Monopoly 3D Server running on http://localhost:${PORT}`);
 });

@@ -110,7 +110,7 @@ export const Dice3D: React.FC = () => {
         anchorX="center"
         anchorY="middle"
       >
-        {isDoubles && rollCount > 0 ? `🎲 ${d1} + ${d2} = ${total} (DOUBLES!)` : `🎲 ${d1} + ${d2} = ${total}`}
+        {isDoubles && rollCount > 0 ? `${d1} + ${d2} = ${total} (DOUBLES!)` : `${d1} + ${d2} = ${total}`}
       </Text>
     </group>
   );

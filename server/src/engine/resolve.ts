@@ -30,7 +30,7 @@ export function resolveLanding(
     player.position = JAIL_TILE_INDEX;
     player.inJail = true;
     player.jailTurns = 0;
-    const msg = `🚨 ${player.name} landed on Go To Jail and is arrested!`;
+    const msg = `${player.name} landed on Go To Jail and is arrested.`;
     gameState.lastActionText = msg;
     return { needsForceBuyChoice: false, toast: msg };
   }
@@ -40,13 +40,13 @@ export function resolveLanding(
     const tax = tile.rentByLevel[0];
     if (player.money >= tax) {
       player.money -= tax;
-      const msg = `💸 ${player.name} paid $${tax} in ${tile.name}.`;
+      const msg = `${player.name} paid $${tax} in ${tile.name}.`;
       gameState.lastActionText = msg;
       return { needsForceBuyChoice: false, toast: msg };
     } else {
       player.money = 0;
       player.isBankrupt = true;
-      const msg = `💀 ${player.name} went bankrupt from ${tile.name}!`;
+      const msg = `${player.name} went bankrupt from ${tile.name}.`;
       gameState.lastActionText = msg;
       return { needsForceBuyChoice: false, toast: msg };
     }
@@ -59,7 +59,7 @@ export function resolveLanding(
     deck.push(card);
 
     const action = card.action;
-    let toast = `🃏 [${tile.name}] ${action.text}`;
+    let toast = `[${tile.name}] ${action.text}`;
 
     if (action.type === 'money') {
       player.money += action.amount;
@@ -111,7 +111,7 @@ export function resolveLanding(
 
     // Owned by self
     if (prop.ownerId === player.playerId) {
-      const msg = `🏡 ${player.name} landed on their own property (${tile.name}).`;
+      const msg = `${player.name} landed on their own property (${tile.name}).`;
       gameState.lastActionText = msg;
       return { needsForceBuyChoice: false, toast: msg };
     }
@@ -125,7 +125,7 @@ export function resolveLanding(
     if (fbCheck.eligible) {
       gameState.phase = 'FORCE_BUY_OFFER';
       gameState.forceBuyOffer = createForceBuyOffer(tileIndex, player, prop);
-      const msg = `⚡ ${player.name} landed on ${opponent.name}'s ${tile.name}. Force-buy offer: $${fbCheck.price}.`;
+      const msg = `${player.name} landed on ${opponent.name}'s ${tile.name}. Force-buy offer: $${fbCheck.price}.`;
       gameState.lastActionText = msg;
       return { needsForceBuyChoice: true, toast: msg };
     }
@@ -135,9 +135,9 @@ export function resolveLanding(
     const rent = calculateRent(gameState, tileIndex, diceTotal);
     const result = payRent(gameState, player, opponent, rent);
 
-    let msg = `💰 ${player.name} paid $${result.paid} rent to ${opponent.name} for ${tile.name}.`;
+    let msg = `${player.name} paid $${result.paid} rent to ${opponent.name} for ${tile.name}.`;
     if (result.bankrupt) {
-      msg = `💀 ${player.name} went BANKRUPT paying $${rent} rent to ${opponent.name}!`;
+      msg = `${player.name} went BANKRUPT paying $${rent} rent to ${opponent.name}.`;
     }
     gameState.lastActionText = msg;
     return { needsForceBuyChoice: false, toast: msg };

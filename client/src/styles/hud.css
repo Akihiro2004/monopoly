@@ -47,6 +47,27 @@
   border-radius: 4px;
   color: #38bdf8;
 }
+.pip-die {
+  display: inline-grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 1px;
+  background: #ffffff;
+  border: 1px solid #94a3b8;
+  border-radius: 3px;
+  padding: 2px;
+  flex-shrink: 0;
+}
+
+.pip-die > span {
+  background: #0f172a;
+  border-radius: 50%;
+  align-self: center;
+  justify-self: center;
+  width: 70%;
+  height: 70%;
+}
+
 .hud-dice-badge {
   display: inline-flex;
   align-items: center;

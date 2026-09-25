@@ -1,12 +1,14 @@
 import { TokenType, PlayerColor } from '@monopoly/shared';
+import type { LucideIcon } from 'lucide-react';
+import { Car, Crown, Dog, Ship, Stamp, Footprints } from 'lucide-react';
 
-export const TOKENS: { type: TokenType; label: string; icon: string }[] = [
-  { type: 'car', label: 'Race Car', icon: '🏎️' },
-  { type: 'hat', label: 'Top Hat', icon: '🎩' },
-  { type: 'dog', label: 'Scottie Dog', icon: '🐕' },
-  { type: 'ship', label: 'Battleship', icon: '🚢' },
-  { type: 'thimble', label: 'Thimble', icon: '🧵' },
-  { type: 'boot', label: 'Old Boot', icon: '🥾' },
+export const TOKENS: { type: TokenType; label: string; icon: LucideIcon }[] = [
+  { type: 'car', label: 'Race Car', icon: Car },
+  { type: 'hat', label: 'Top Hat', icon: Crown },
+  { type: 'dog', label: 'Scottie Dog', icon: Dog },
+  { type: 'ship', label: 'Battleship', icon: Ship },
+  { type: 'thimble', label: 'Thimble', icon: Stamp },
+  { type: 'boot', label: 'Old Boot', icon: Footprints },
 ];
 
 export const COLORS: { color: PlayerColor; hex: string }[] = [

@@ -25,12 +25,12 @@ export const VictoryOverlay: React.FC = () => {
   const getVictoryLabel = () => {
     switch (winner.victoryType) {
       case 'triple_victory':
-        return '🌟 Triple Victory: 3 complete color sets';
+        return 'Triple Victory: 3 complete color sets';
       case 'line_victory':
-        return '🚀 Line Victory: every property on one board side';
+        return 'Line Victory: every property on one board side';
       case 'bankruptcy':
       default:
-        return '👑 Bankruptcy: last player standing';
+        return 'Bankruptcy: last player standing';
     }
   };
 

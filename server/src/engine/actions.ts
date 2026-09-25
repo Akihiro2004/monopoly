@@ -35,11 +35,11 @@ export function executeAutoBuy(
     prop.isMortgaged = false;
     prop.forceBought = false; // bought cleanly from bank, can landmark
 
-    const msg = `🏠 ${buyer.name} auto-bought ${tile.name} for $${tile.price}!`;
+    const msg = `${buyer.name} auto-bought ${tile.name} for $${tile.price}.`;
     gameState.lastActionText = msg;
     return { bought: true, text: msg };
   } else {
-    const msg = `⚠️ ${buyer.name} cannot afford ${tile.name} ($${tile.price}). It remains unowned.`;
+    const msg = `${buyer.name} cannot afford ${tile.name} ($${tile.price}). It remains unowned.`;
     gameState.lastActionText = msg;
     return { bought: false, text: msg };
   }
@@ -83,7 +83,7 @@ export function buildProperty(
   if (prop.buildLevel === 3 && prop.forceBought) {
     return {
       success: false,
-      text: `🔒 Landmark locked. ${tile.name} was force-bought and cannot be upgraded to a Landmark.`
+      text: `Landmark locked. ${tile.name} was force-bought and cannot be upgraded to a Landmark.`
     };
   }
 
@@ -105,7 +105,7 @@ export function buildProperty(
   const levelNames = ['Land', 'House (Lv 1)', 'Building (Lv 2)', 'Hotel (Lv 3)', 'LANDMARK (Lv 4)'];
   const newLevelName = levelNames[prop.buildLevel];
 
-  const msg = `🏗️ ${player.name} upgraded ${tile.name} to ${newLevelName} for $${tile.buildCost}!`;
+  const msg = `${player.name} upgraded ${tile.name} to ${newLevelName} for $${tile.buildCost}.`;
   gameState.lastActionText = msg;
   return { success: true, text: msg };
 }
@@ -136,7 +136,7 @@ export function toggleMortgage(
     const value = Math.floor(tile.price / 2);
     prop.isMortgaged = true;
     player.money += value;
-    const msg = `🏦 ${player.name} mortgaged ${tile.name} for $${value}.`;
+    const msg = `${player.name} mortgaged ${tile.name} for $${value}.`;
     gameState.lastActionText = msg;
     return { success: true, text: msg };
   } else {
@@ -149,7 +149,7 @@ export function toggleMortgage(
     }
     player.money -= cost;
     prop.isMortgaged = false;
-    const msg = `🏦 ${player.name} unmortgaged ${tile.name} for $${cost}.`;
+    const msg = `${player.name} unmortgaged ${tile.name} for $${cost}.`;
     gameState.lastActionText = msg;
     return { success: true, text: msg };
   }

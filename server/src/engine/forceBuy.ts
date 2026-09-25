@@ -121,7 +121,7 @@ export function executeForceBuy(
   // Clear offer
   gameState.forceBuyOffer = null;
 
-  const msg = `⚡ FORCE BUY: ${buyer.name} bought ${tile.name} from ${seller.name} for $${offer.price}. Kept Lv.${prop.buildLevel}, Landmark locked.`;
+  const msg = `FORCE BUY: ${buyer.name} bought ${tile.name} from ${seller.name} for $${offer.price}. Kept Lv.${prop.buildLevel}, Landmark locked.`;
   gameState.lastActionText = msg;
 
   return { success: true, text: msg };

@@ -126,7 +126,7 @@ export class MonopolyGameEngine {
         player.inJail = true;
         player.jailTurns = 0;
         this.state.doublesCount = 0;
-        this.emitToast(`🚨 3 consecutive doubles. ${player.name} goes directly to Jail.`, 'danger');
+        this.emitToast(`3 consecutive doubles. ${player.name} goes directly to Jail.`, 'danger');
         this.state.phase = 'TURN_ENDED';
         this.notify();
         return { d1, d2, doubles };
@@ -141,7 +141,7 @@ export class MonopolyGameEngine {
 
     if (newPos < oldPos) {
       player.money += GO_SALARY;
-      this.emitToast(`🏁 ${player.name} passed GO and collected $${GO_SALARY}!`, 'success');
+      this.emitToast(`${player.name} passed GO and collected $${GO_SALARY}.`, 'success');
     }
 
     player.position = newPos;
@@ -190,7 +190,7 @@ export class MonopolyGameEngine {
       if (opponent) {
         const rent = calculateRent(this.state, offer.tileIndex, this.state.dice[0] + this.state.dice[1]);
         const r = payRent(this.state, player, opponent, rent);
-        this.emitToast(`✋ ${player.name} declined force-buy. Paid $${r.paid} rent to ${opponent.name}.`, 'info');
+        this.emitToast(`${player.name} declined force-buy. Paid $${r.paid} rent to ${opponent.name}.`, 'info');
       }
     }
 
@@ -207,7 +207,7 @@ export class MonopolyGameEngine {
     player.money -= JAIL_FINE;
     player.inJail = false;
     player.jailTurns = 0;
-    this.emitToast(`🔓 ${player.name} paid $${JAIL_FINE} and left Jail.`, 'info');
+    this.emitToast(`${player.name} paid $${JAIL_FINE} and left Jail.`, 'info');
     this.notify();
   }
 
@@ -219,7 +219,7 @@ export class MonopolyGameEngine {
     player.jailCards--;
     player.inJail = false;
     player.jailTurns = 0;
-    this.emitToast(`🎟️ ${player.name} used a Get Out of Jail Free card!`, 'success');
+    this.emitToast(`${player.name} used a Get Out of Jail Free card.`, 'success');
     this.notify();
   }
 
@@ -252,7 +252,7 @@ export class MonopolyGameEngine {
     const player = this.getCurrentPlayer();
     if (this.state.doubles && !player.inJail && !player.isBankrupt) {
       this.state.phase = 'ROLLING';
-      this.emitToast(`🎲 Doubles! ${player.name} rolls again.`, 'info');
+      this.emitToast(`Doubles! ${player.name} rolls again.`, 'info');
       this.notify();
       return;
     }
@@ -277,7 +277,7 @@ export class MonopolyGameEngine {
     this.state.phase = 'ROLLING';
 
     const nextPlayer = this.state.players[nextIdx];
-    this.emitToast(`👉 It is now ${nextPlayer.name}'s turn.`, 'info');
+    this.emitToast(`It is now ${nextPlayer.name}'s turn.`, 'info');
     this.checkAndApplyVictory();
     this.notify();
   }
@@ -289,7 +289,7 @@ export class MonopolyGameEngine {
       this.state.victoryType = result.victoryType;
       this.state.phase = 'GAME_OVER';
       if (result.reason) {
-        this.emitToast(`🏆 ${result.reason}`, 'success');
+        this.emitToast(`GAME OVER. ${result.reason}`, 'success');
       }
       return true;
     }

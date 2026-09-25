@@ -2,9 +2,9 @@ import React from 'react';
 import { socket } from '../net/socket.js';
 import { useGameStore } from '../store/gameStore.js';
 import { BOARD_TILES } from '@monopoly/shared';
-import { Dices, Check, Hammer } from 'lucide-react';
+import { Dices, Check, Hammer, Lock, Castle } from 'lucide-react';
 import { PlayersSidebar } from './PlayersSidebar.js';
-import { DICE_PIP_CHARS } from './diceIcons.js';
+import { PipDie } from './PipDie.js';
 
 export const GameHUD: React.FC = () => {
   const gameState = useGameStore((s) => s.gameState);
@@ -35,14 +35,14 @@ export const GameHUD: React.FC = () => {
         <div className="turn-indicator">
           <span className="turn-label">TURN {gameState.turnNumber}</span>
           <span className="active-player" style={{ color: curPlayer.color }}>
-            {isMyTurn ? "👉 IT'S YOUR TURN!" : `${curPlayer.name}'s turn`}
+            {isMyTurn ? "IT'S YOUR TURN!" : `${curPlayer.name}'s turn`}
           </span>
           <span className="phase-pill">{gameState.phase}</span>
           {/* Live Dice Value Indicator with Pips */}
           <div className="hud-dice-badge">
-            <span className="hud-die-pip">{DICE_PIP_CHARS[d1]}</span>
-            <span className="hud-die-pip">{DICE_PIP_CHARS[d2]}</span>
-            <span className="hud-dice-sum">={total}</span>
+            <PipDie value={d1} />
+            <PipDie value={d2} />
+            <span className="hud-dice-sum">= {total}</span>
             {isDoubles && <span className="hud-doubles-tag">DOUBLES!</span>}
           </div>
         </div>
@@ -102,7 +102,11 @@ export const GameHUD: React.FC = () => {
                 <div key={p.tileIndex} className="prop-chip">
                   <span className="chip-name">{tile.name}</span>
                   <span className="chip-lvl">{p.buildLevel > 0 ? levelNames[p.buildLevel] : 'Land'}</span>
-                  {p.forceBought && <span className="chip-tag" title="Landmark locked">🔒</span>}
+                  {p.forceBought && (
+                    <span className="chip-tag" title="Landmark locked">
+                      <Lock size={10} />
+                    </span>
+                  )}
                   {isMyTurn && !p.isMortgaged && p.buildLevel < 3 && tile.buildCost > 0 && (
                     <button
                       className="chip-btn-build"
@@ -118,7 +122,7 @@ export const GameHUD: React.FC = () => {
                       title={`Build Landmark for $${tile.buildCost}`}
                       onClick={() => handleBuild(p.tileIndex)}
                     >
-                      🏰
+                      <Castle size={14} />
                     </button>
                   )}
                 </div>

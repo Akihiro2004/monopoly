@@ -25,7 +25,7 @@ export const LobbySeats: React.FC<SeatsProps> = ({ seats, myPlayerId }) => {
               style={{ borderColor: colorObj?.hex || '#666' }}
             >
               <div className="seat-token" style={{ backgroundColor: `${colorObj?.hex || '#666'}33` }}>
-                <span>{tokenObj?.icon || '♟️'}</span>
+                {tokenObj ? <tokenObj.icon size={18} color={colorObj?.hex || '#cbd5e1'} /> : null}
               </div>
               <div className="seat-info">
                 <div className="seat-name">

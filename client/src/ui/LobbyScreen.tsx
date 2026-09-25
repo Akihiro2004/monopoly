@@ -88,7 +88,7 @@ export const LobbyScreen: React.FC = () => {
                     className={`token-btn ${mySeat.tokenType === t.type ? 'active' : ''}`}
                     onClick={() => handleSelectToken(t.type)}
                   >
-                    <span>{t.icon}</span>
+                    <t.icon size={20} />
                   </button>
                 ))}
               </div>
