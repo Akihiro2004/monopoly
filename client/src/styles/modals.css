@@ -116,22 +116,22 @@
 
 .btn-force-buy {
   flex: 2;
-  background: #f59e0b;
-  color: white;
 }
 
 .btn-decline {
   flex: 1;
-  background: rgba(255, 255, 255, 0.1);
-  color: #cbd5e1;
 }
 
-/* Chat */
+/* Chat (bottom-right, clear of the corner player banners) */
 .chat-panel {
   position: absolute;
-  top: 16px;
-  right: 16px;
+  bottom: 16px;
+  right: 14px;
+  top: auto;
   z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
 .chat-toggle-btn {
@@ -148,7 +148,8 @@
 }
 
 .chat-body {
-  margin-top: 8px;
+  order: -1;
+  margin: 0 0 8px;
   width: 280px;
   height: 320px;
   background: rgba(15, 23, 42, 0.95);

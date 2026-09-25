@@ -5,6 +5,7 @@ import { useGameStore } from '../store/gameStore.js';
 import { Board3D } from './Board3D.js';
 import { Tokens3D } from './Tokens3D.js';
 import { Dice3D } from './Dice3D.js';
+import { WoodTable } from './WoodTable.js';
 
 export const MonopolyScene: React.FC = () => {
   const gameState = useGameStore((s) => s.gameState);
@@ -12,30 +13,36 @@ export const MonopolyScene: React.FC = () => {
   return (
     <div className="canvas-container">
       <Canvas shadows>
-        <PerspectiveCamera makeDefault position={[0, 22, 18]} fov={50} />
+        {/* Low, tilted front view like a player sitting at the table */}
+        <PerspectiveCamera makeDefault position={[0, 11.5, 15]} fov={45} />
         <OrbitControls
-          maxPolarAngle={Math.PI / 2.1}
-          minDistance={10}
-          maxDistance={35}
-          target={[0, 0, 0]}
+          maxPolarAngle={Math.PI / 2.15}
+          minDistance={8}
+          maxDistance={32}
+          target={[0, 0.5, 0]}
+          enableDamping
         />
 
-        {/* Ambient & Directional Lighting */}
-        <ambientLight intensity={0.7} />
+        {/* Warm table lighting */}
+        <ambientLight intensity={0.55} />
         <directionalLight
-          position={[15, 25, 15]}
-          intensity={1.2}
+          position={[12, 20, 14]}
+          intensity={1.4}
+          color="#fff3e0"
           castShadow
           shadow-mapSize-width={2048}
           shadow-mapSize-height={2048}
           shadow-camera-near={0.5}
-          shadow-camera-far={50}
-          shadow-camera-left={-15}
-          shadow-camera-right={15}
-          shadow-camera-top={15}
-          shadow-camera-bottom={-15}
+          shadow-camera-far={60}
+          shadow-camera-left={-20}
+          shadow-camera-right={20}
+          shadow-camera-top={20}
+          shadow-camera-bottom={-20}
         />
-        <pointLight position={[0, 10, 0]} intensity={0.5} color="#fffbeb" />
+        <pointLight position={[0, 9, 0]} intensity={0.6} color="#ffe9c4" />
+
+        {/* Wood table surface */}
+        <WoodTable />
 
         {/* Monopoly Board Mesh with procedural tiles */}
         <Board3D />

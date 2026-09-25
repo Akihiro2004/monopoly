@@ -176,12 +176,10 @@
 
 .btn-ready {
   flex: 1;
-  background: #3b82f6;
-  color: white;
 }
 
 .btn-active-ready {
-  background: #10b981;
+  filter: brightness(1.12);
 }
 
 .btn-start {

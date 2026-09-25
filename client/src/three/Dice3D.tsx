@@ -52,12 +52,12 @@ const SingleDie: React.FC<DieProps> = ({ position, targetValue, rollTrigger }) =
       } else {
         // Finished rolling: land with the correct pips face on top!
         isRolling.current = false;
-        meshRef.current.position.y = 0.55;
+        meshRef.current.position.y = 0.82;
         const targetRot = ROTATION_FOR_TOP_FACE[targetValue] || [0, 0, 0];
         meshRef.current.rotation.set(targetRot[0], targetRot[1], targetRot[2]);
       }
     } else {
-      meshRef.current.position.y = 0.55;
+      meshRef.current.position.y = 0.82;
       const targetRot = ROTATION_FOR_TOP_FACE[targetValue] || [0, 0, 0];
       meshRef.current.rotation.set(targetRot[0], targetRot[1], targetRot[2]);
     }
@@ -103,7 +103,7 @@ export const Dice3D: React.FC = () => {
 
       {/* 3D Dice Banner */}
       <Text
-        position={[0, 0.15, 1.6]}
+        position={[0, 0.45, 2.2]}
         rotation={[-Math.PI / 2, 0, 0]}
         fontSize={0.55}
         color="#fbbf24"

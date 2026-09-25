@@ -4,6 +4,7 @@ import { BOARD_TILES, TileDef } from '@monopoly/shared';
 import { BOARD_COORDINATES } from './boardCoords.js';
 import { useGameStore } from '../store/gameStore.js';
 import { BuildingMesh } from './BuildingMesh.js';
+import { CenterBoard } from './CenterBoard.js';
 
 const GROUP_COLORS: Record<string, string> = {
   brown: '#8B4513',
@@ -24,28 +25,20 @@ export const Board3D: React.FC = () => {
 
   return (
     <group>
-      {/* Center Table Plane */}
-      <mesh receiveShadow position={[0, -0.05, 0]}>
-        <boxGeometry args={[20.5, 0.2, 20.5]} />
-        <meshStandardMaterial color="#064e3b" roughness={0.8} />
+      {/* Blue board frame (raised border like a real board) */}
+      <mesh receiveShadow castShadow position={[0, 0.05, 0]}>
+        <boxGeometry args={[21.4, 0.3, 21.4]} />
+        <meshStandardMaterial color="#2563eb" roughness={0.55} />
       </mesh>
 
-      {/* Center Board Art/Logo */}
-      <mesh receiveShadow position={[0, 0.08, 0]}>
-        <boxGeometry args={[14.8, 0.1, 14.8]} />
-        <meshStandardMaterial color="#0f766e" roughness={0.6} />
+      {/* White tile-ring base */}
+      <mesh receiveShadow position={[0, 0.18, 0]}>
+        <boxGeometry args={[20.6, 0.16, 20.6]} />
+        <meshStandardMaterial color="#f8fafc" roughness={0.7} />
       </mesh>
 
-      <Text
-        position={[0, 0.16, 0]}
-        rotation={[-Math.PI / 2, 0, -Math.PI / 4]}
-        fontSize={1.4}
-        color="#fbbf24"
-        anchorX="center"
-        anchorY="middle"
-      >
-        MONOPOLY 3D
-      </Text>
+      {/* Center art: logo banner + card decks */}
+      <CenterBoard />
 
       {/* 40 Tiles */}
       {BOARD_COORDINATES.map((coord) => {
