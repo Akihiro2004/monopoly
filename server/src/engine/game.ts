@@ -49,8 +49,7 @@ type RandomEventKind =
   | 'market_crash'
   | 'building_boom'
   | 'bank_bonus'
-  | 'leaders_tax'
-  | 'property_swap';
+  | 'leaders_tax';
 
 export interface GameEngineOptions {
   specialVictory: boolean;
@@ -862,16 +861,12 @@ export class MonopolyGameEngine {
     const unownedTiles = BOARD_TILES.filter(
       (t) => t.price > 0 && this.state.properties[t.index]?.ownerId === null
     ).map((t) => t.index);
-    const owners = active.filter((p) =>
-      Object.values(this.state.properties).some((prop) => prop.ownerId === p.playerId)
-    );
 
     const eligible: RandomEventKind[] = [];
     if (unownedTiles.length > 0) eligible.push('property_lottery');
     if (!this.state.activeEvent) eligible.push('market_crash', 'building_boom');
     if (active.length > 0) eligible.push('bank_bonus');
     if (active.length >= 2) eligible.push('leaders_tax');
-    if (owners.length >= 2) eligible.push('property_swap');
     if (eligible.length === 0) return;
 
     const kind = eligible[Math.floor(Math.random() * eligible.length)];
@@ -890,9 +885,6 @@ export class MonopolyGameEngine {
         break;
       case 'leaders_tax':
         this.eventLeadersTax(active);
-        break;
-      case 'property_swap':
-        this.eventPropertySwap(owners);
         break;
     }
   }
@@ -955,25 +947,6 @@ export class MonopolyGameEngine {
     poorest.money += tax;
     record(this.state, richest.playerId, poorest.playerId, tax, 'Random event: Wealth Tax');
     this.emitRandomEvent(`Random event! Wealth Tax — ${richest.name} pays $${tax} to ${poorest.name}.`, 'warning');
-  }
-
-  // Chaos mechanic: two random property owners each swap a random deed.
-  private eventPropertySwap(owners: PlayerState[]): void {
-    const [a, b] = shuffle([...owners]).slice(0, 2);
-    const tilesOf = (playerId: string) =>
-      Object.entries(this.state.properties)
-        .filter(([, prop]) => prop.ownerId === playerId)
-        .map(([idx]) => Number(idx));
-    const aTiles = tilesOf(a.playerId);
-    const bTiles = tilesOf(b.playerId);
-    const aTile = aTiles[Math.floor(Math.random() * aTiles.length)];
-    const bTile = bTiles[Math.floor(Math.random() * bTiles.length)];
-    this.state.properties[aTile].ownerId = b.playerId;
-    this.state.properties[bTile].ownerId = a.playerId;
-    this.emitRandomEvent(
-      `Random event! Property Swap Storm — ${a.name} and ${b.name} swap ${BOARD_TILES[aTile].name} and ${BOARD_TILES[bTile].name}!`,
-      'warning'
-    );
   }
 
   public checkAndApplyVictory(): boolean {

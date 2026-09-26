@@ -41,6 +41,13 @@ export function canForceBuy(
     return { eligible: false, price: 0, reason: 'Tile is unowned' };
   }
 
+  // Only color-set properties can be force-bought. Railroads/airports and
+  // utilities are never eligible, in any mode.
+  const tile = BOARD_TILES[tileIndex];
+  if (!tile || tile.type !== 'property') {
+    return { eligible: false, price: 0, reason: 'Only properties can be force-bought' };
+  }
+
   if (property.ownerId === buyer.playerId) {
     return { eligible: false, price: 0, reason: 'Already owned by buyer' };
   }
