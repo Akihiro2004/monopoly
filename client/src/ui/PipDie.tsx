@@ -20,13 +20,7 @@ export const PipDie: React.FC<{ value: number; size?: number }> = ({ value, size
       aria-label={`Die showing ${value}`}
     >
       {pips.map(([col, row], i) => (
-        <span
-          key={i}
-          style={{
-            gridColumn: col + 1,
-            gridRow: row + 1,
-          }}
-        />
+        <span key={i} style={{ gridColumn: col + 1, gridRow: row + 1 }} />
       ))}
     </span>
   );

@@ -1,0 +1,383 @@
+/* ------------------------------------------------------------------ */
+/* Bank tab                                                           */
+/* ------------------------------------------------------------------ */
+.bank-view {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.vault {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  border: var(--line);
+  box-shadow: 0 4px 0 var(--ink);
+  background:
+    repeating-linear-gradient(135deg, transparent 0 16px, rgba(34, 164, 84, 0.06) 16px 32px),
+    #effbe9;
+}
+
+.vault-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vault-head h3 {
+  font-size: 1.3rem;
+  line-height: 1.1;
+}
+
+.vault-head small {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ink-2);
+  line-height: 1.3;
+  display: block;
+}
+
+.vault-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--green);
+  color: #fff;
+  border: var(--line);
+  box-shadow: 0 3px 0 var(--ink);
+  flex-shrink: 0;
+}
+
+.vault-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.supply {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  background: #fff;
+  border: var(--line-thin);
+}
+
+.supply-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.supply-head strong {
+  margin-left: auto;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.15rem;
+}
+
+.supply-head small {
+  font-size: 0.75rem;
+  color: var(--ink-3);
+}
+
+.supply-bar {
+  height: 10px;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--ink);
+  background: var(--paper-3);
+  overflow: hidden;
+}
+
+.supply-bar span {
+  display: block;
+  height: 100%;
+  background: var(--green);
+  transition: width 0.4s var(--ease-out);
+}
+
+.supply.hotel .supply-bar span {
+  background: var(--red);
+}
+
+.vault-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.vault-stats div {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.7);
+  border: 2px dashed var(--paper-line);
+}
+
+.vault-stats span {
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
+}
+
+.vault-stats strong {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.15rem;
+  color: var(--green-dark);
+}
+
+.live-auction {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--gold);
+  border: var(--line);
+  box-shadow: 0 3px 0 var(--ink);
+  text-align: left;
+  animation: shake 0.8s ease-in-out infinite;
+}
+
+.live-auction-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.live-auction-text small {
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.statement {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.statement-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.segmented.small {
+  padding: 3px;
+  gap: 3px;
+  border-radius: var(--radius-md);
+  border-width: 2px;
+}
+
+.segmented.small button {
+  height: 30px;
+  padding: 0 12px;
+  font-size: 0.8rem;
+  border-radius: 9px;
+}
+
+.txn-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.txn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: #fff;
+  border: 2px solid var(--paper-line);
+}
+
+.txn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--paper-2);
+  flex-shrink: 0;
+}
+
+.txn.in .txn-icon {
+  color: var(--green-dark);
+}
+
+.txn.out .txn-icon {
+  color: var(--red);
+}
+
+.txn-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.txn-main strong {
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.txn-main small {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--ink-3);
+}
+
+.txn-amount {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  color: var(--ink-2);
+  flex-shrink: 0;
+}
+
+.txn.in .txn-amount {
+  color: var(--green-dark);
+}
+
+.txn.out .txn-amount {
+  color: var(--red);
+}
+
+/* ------------------------------------------------------------------ */
+/* Auction modal                                                      */
+/* ------------------------------------------------------------------ */
+.auction-body {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 14px;
+  align-items: center;
+}
+
+.auction-deed .title-deed {
+  transform: rotate(-2deg) scale(0.92);
+  transform-origin: center;
+}
+
+.auction-deed .title-deed-rows > div {
+  font-size: 0.78rem;
+  padding: 2px 4px;
+}
+
+.auction-deed .title-deed-head h3 {
+  font-size: 1.2rem;
+}
+
+.auction-bid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 10px;
+  border-radius: var(--radius-lg);
+  background: #fff;
+  border: var(--line);
+  box-shadow: 0 4px 0 var(--ink);
+  text-align: center;
+}
+
+.auction-label {
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+}
+
+.auction-amount {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 2.4rem;
+  line-height: 1;
+  color: var(--green-dark);
+  animation: pop-in 0.35s var(--ease-spring);
+}
+
+.auction-leader {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 900;
+  font-size: 0.9rem;
+}
+
+.auction-leader.me {
+  color: var(--green-dark);
+}
+
+.auction-cash {
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: var(--ink-3);
+}
+
+.auction-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.auction-buttons .btn {
+  height: 60px;
+  padding: 0 8px;
+}
+
+.auction-buttons .btn-stack {
+  align-items: center;
+}
+
+.auction-buttons .btn-stack > span {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+}
+
+.action-status.auction-status {
+  background: #fff4c7;
+  padding-right: 8px;
+}
+
+.action-status .btn-sm {
+  margin-left: 4px;
+}
+
+/* Mobile "Table" sheet: chat / game log switch */
+.table-switch {
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.table-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+@media (max-width: 420px) {
+  .auction-body {
+    grid-template-columns: 1fr;
+  }
+  .auction-deed {
+    display: none;
+  }
+}

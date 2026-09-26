@@ -1,17 +1,146 @@
-* {
+/* Design tokens + base. "Fun Monopoly": sticker-style paper cards with ink
+   outlines and hard drop shadows, Monopoly red / money green / gold, on sky. */
+:root {
+  color-scheme: light;
+
+  --ink: #2b1d10;
+  --ink-2: #5b4633;
+  --ink-3: #8f7a62;
+
+  --paper: #fffaf0;
+  --paper-2: #fff2d9;
+  --paper-3: #f5e3bf;
+  --paper-line: #e8d3ab;
+
+  --sky-top: #5ab8f0;
+  --sky-bottom: #bfe6ff;
+  --grass: #7ccf5b;
+  --grass-dark: #4fa33a;
+
+  --red: #e7352c;
+  --red-dark: #a51d17;
+  --green: #22a454;
+  --green-dark: #127033;
+  --gold: #ffc629;
+  --gold-dark: #c98f00;
+  --blue: #2f7de1;
+  --blue-dark: #1a4f9c;
+  --purple: #8b5cf6;
+  --purple-dark: #5b35b3;
+
+  --danger: #e7352c;
+  --success: #22a454;
+  --info: #2f7de1;
+  --warning: #f59e0b;
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 26px;
+  --radius-full: 999px;
+
+  --line: 3px solid var(--ink);
+  --line-thin: 2px solid var(--ink);
+  --pop: 0 4px 0 var(--ink);
+  --pop-lg: 0 6px 0 var(--ink), 0 14px 30px rgba(43, 29, 16, 0.25);
+  --soft: 0 10px 30px rgba(43, 29, 16, 0.18);
+
+  --font-ui: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Lilita One', 'Nunito', system-ui, sans-serif;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   width: 100%;
   height: 100%;
-  margin: 0;
-  padding: 0;
   overflow: hidden;
-  background-color: #090d16;
-  color: #f8fafc;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  overscroll-behavior: none;
+  background: var(--sky-top);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  touch-action: manipulation;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 2px;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--paper-line) transparent;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+.app-root {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

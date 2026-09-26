@@ -1,0 +1,545 @@
+/* ------------------------------------------------------------------ */
+/* Property detail sheet (tap any tile)                               */
+/* ------------------------------------------------------------------ */
+.ps-layer {
+  position: fixed;
+  z-index: 130;
+  left: 16px;
+  top: 84px;
+  bottom: 24px;
+  width: min(390px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  pointer-events: none;
+}
+
+.ps-sheet {
+  pointer-events: auto;
+  max-height: 100%;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  background: var(--paper);
+  border: var(--line);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--pop-lg);
+  animation: ps-in 0.3s var(--ease-out);
+}
+
+@keyframes ps-in {
+  from {
+    transform: translateX(-24px);
+    opacity: 0;
+  }
+}
+
+.ps-layer.mobile {
+  inset: 0;
+  width: auto;
+  justify-content: flex-end;
+}
+
+.ps-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  background: rgba(43, 29, 16, 0.18);
+}
+
+.ps-layer.mobile .ps-sheet {
+  position: relative;
+  max-height: 72dvh;
+  border-radius: 26px 26px 0 0;
+  border-bottom: none;
+  padding-bottom: var(--safe-bottom);
+  animation: sheet-in 0.32s var(--ease-out);
+}
+
+.ps-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.ps-band {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 14px 14px 16px;
+  background: var(--g);
+  border-bottom: var(--line);
+  color: #fff;
+}
+
+.ps-flag {
+  flex-shrink: 0;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  background: #fff;
+}
+
+.ps-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.05;
+  text-shadow: 0 2px 0 rgba(43, 29, 16, 0.55);
+}
+
+.ps-title small {
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ps-title h3 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.6rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ps-close {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+}
+
+.ps-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ps-plain {
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+.ps-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.ps-owner,
+.ps-level {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.1;
+}
+
+.ps-owner > span:last-child,
+.ps-level {
+  display: flex;
+  flex-direction: column;
+}
+
+.ps-status small {
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.ps-status b {
+  font-weight: 900;
+}
+
+.ps-bank-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--paper-3);
+  border: var(--line-thin);
+}
+
+.ps-pay {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: #ffe4df;
+  border: var(--line-thin);
+  font-weight: 800;
+}
+
+.ps-pay strong {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.7rem;
+  color: var(--red-dark);
+}
+
+.ps-pay.mine {
+  background: #dcf5e3;
+}
+
+.ps-pay.mine strong {
+  color: var(--green-dark);
+}
+
+.ps-pay.off {
+  background: var(--paper-2);
+  color: var(--ink-3);
+}
+
+.ps-pay.off strong {
+  color: var(--ink-3);
+}
+
+.ps-ladder {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 3px;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.ps-ladder td {
+  padding: 5px 6px;
+  background: var(--paper-2);
+}
+
+.ps-ladder td:first-child {
+  border-radius: 10px 0 0 10px;
+  width: 26px;
+  color: var(--ink-3);
+}
+
+.ps-ladder td:last-child {
+  border-radius: 0 10px 10px 0;
+}
+
+.ps-val {
+  text-align: right;
+  font-weight: 900;
+}
+
+.ps-note {
+  text-align: right;
+  font-size: 0.72rem;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.ps-ladder tr.current td {
+  background: var(--gold);
+  color: var(--ink);
+}
+
+.ps-here {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--ink);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+
+.ps-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.ps-facts > div {
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  border: 2px dashed var(--paper-line);
+}
+
+.ps-facts dt {
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.ps-facts dd {
+  font-weight: 900;
+}
+
+.ps-set h4,
+.ps-manage h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin-bottom: 6px;
+}
+
+.ps-set-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 6px;
+}
+
+.ps-set-chip {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  border: var(--line-thin);
+  border-left: 6px solid var(--c);
+  background: var(--paper);
+  font-weight: 900;
+  font-size: 0.8rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ps-set-chip .truncate {
+  max-width: 100%;
+}
+
+.ps-set-chip small {
+  font-size: 0.68rem;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.ps-set-chip.active {
+  background: #fff3c4;
+}
+
+.ps-manage {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  background: #eef6ff;
+  border: var(--line-thin);
+}
+
+.ps-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 900;
+  margin-bottom: 6px;
+}
+
+.ps-sell-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 6px;
+}
+
+.ps-sell-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 6px 4px;
+  border-radius: var(--radius-sm);
+  border: var(--line-thin);
+  background: var(--paper);
+  box-shadow: 0 3px 0 var(--ink);
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ps-sell-btn b {
+  color: var(--green-dark);
+  font-size: 0.95rem;
+}
+
+.ps-sell-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--ink);
+}
+
+.ps-row-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.ps-row-actions .btn {
+  min-width: 0;
+  white-space: normal;
+  line-height: 1.1;
+}
+
+.ps-hint {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--ink-3);
+}
+
+/* Trades with mortgaged deeds */
+.trade-fee-note {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: #fff3c4;
+  border: 2px dashed var(--gold-dark);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.deed-chip-m {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--red);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 900;
+}
+
+.deed-chip-lv {
+  flex-shrink: 0;
+  padding: 0 5px;
+  border-radius: var(--radius-full);
+  background: var(--green);
+  color: #fff;
+  border: 1.5px solid var(--ink);
+  font-size: 0.6rem;
+  font-weight: 900;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.deed-chip-lv.landmark {
+  background: var(--purple);
+}
+
+/* Counter-offers */
+.modal-actions.four {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.trade-card.is-counter {
+  border-color: var(--blue);
+}
+
+.counter-badge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.trade-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 8px 0 2px;
+  padding: 7px 10px;
+  border-radius: 12px 12px 12px 4px;
+  background: #eef5ff;
+  border: 2px solid var(--blue);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.trade-message svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--blue);
+}
+
+/* changed since the last round */
+.deed-chip.changed,
+.cash-chip.changed {
+  box-shadow: 0 0 0 3px var(--gold);
+  animation: changed-pulse 1.4s ease-in-out 2;
+}
+
+@keyframes changed-pulse {
+  50% {
+    box-shadow: 0 0 0 5px rgba(255, 198, 41, 0.6);
+  }
+}
+
+.deed-removed {
+  opacity: 0.45;
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+
+.deed-removed .deed-chip {
+  pointer-events: none;
+}
+
+.was-inline {
+  margin-left: 5px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--ink-3);
+  text-decoration: line-through;
+}
+
+.was-note {
+  display: block;
+  margin: -4px 0 4px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--ink-3);
+  text-decoration: line-through;
+}
+
+.trade-note-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 0 12px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: #fff;
+  border: var(--line-thin);
+}
+
+.trade-note-field svg {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+
+.trade-note-field input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  font-size: 16px;
+}

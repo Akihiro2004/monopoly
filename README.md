@@ -1,36 +1,29 @@
-# 3D Multiplayer Monopoly (LINE Get Rich Edition)
+# TMpoly
 
-A real-time multiplayer 3D Monopoly website built with React, Three.js (@react-three/fiber), Socket.IO, and an authoritative pure TypeScript game engine. Plays up to 6 players with LINE Get Rich style rules.
-
----
-
-## Game Features (LINE Get Rich)
-
-1. **Auto-Buy on Landing**:
-   - Landing on unowned property buys it automatically if you have the cash.
-   - If you're broke, it stays unowned. No auctions, no bidding.
-2. **2× Force-Buy from Opponents**:
-   - Landing on an opponent's developed property (house, building, or hotel) opens a 15-second offer to buy it for 2× the total cost (land + buildings).
-   - The sale is forced. The owner cannot refuse once the buyer accepts.
-   - Decline or timeout, and you pay rent as normal.
-3. **4 Build Levels & Landmark Protection**:
-   - `House (Lv 1) → Building (Lv 2) → Hotel (Lv 3) → LANDMARK (Lv 4)`
-   - Landmarks are permanent. Opponents cannot buy them.
-   - Force-bought properties keep their build level and can be upgraded to Hotel, but never to Landmark.
-   - Buildings accumulate on the tile and are tinted in the owner color; upgrades only on the property you stand on.
-4. **Debt & Sell-Back (no instant bankruptcy)**:
-   - Cannot afford rent, tax, or a card payment? The game enters a DEBT phase: sell buildings back for half price and the debt auto-pays once covered, or declare bankruptcy.
-5. **Multiple Victory Conditions**:
-   - **Bankruptcy**: last non-bankrupt player standing.
-   - **Triple Victory** (toggleable): own all properties of 3 complete color sets.
-   - **Line Victory** (toggleable): own every purchasable property on one board side.
-6. **3D Interactive Visuals**:
-   - Full 3D board rendered via Three.js with OrbitControls (drag to rotate, pinch or scroll to zoom).
-   - 6 custom 3D tokens (Race Car, Top Hat, Dog, Battleship, Thimble, Boot) that track the active player.
-   - Animated dice with real pips.
-   - Real-time chat and an activity feed.
+TMpoly is a real-time multiplayer 3D property-trading board game (Monopoly-style, LINE Get Rich rules) built with React, Three.js (@react-three/fiber), Socket.IO, and an authoritative pure TypeScript game engine. Plays up to 6 players with LINE Get Rich style rules.
 
 ---
+
+## Game Features (LINE Get Rich + real Monopoly touches)
+
+**World edition board**: every board side is a region and every color set a country, marked with its flag.
+Southeast Asia (Malaysia: Kuala Lumpur, Penang · Indonesia: Jakarta, Bali, Yogyakarta), East Asia (China: Beijing, Shanghai, Hong Kong · Japan: Osaka, Kyoto, Tokyo), Europe (United Kingdom: Manchester, Edinburgh, London · France: Nice, Lyon, Paris) and the Americas (Brazil: Salvador, Sao Paulo, Rio de Janeiro · United States: Los Angeles, New York). The four railroads are airports (Changi, Haneda, Heathrow, JFK). Line Victory = owning a whole region.
+
+1. **Buying**: landing on an unowned property offers it at list price (Buy / Pass). Pass, or cannot afford it, and the Bank auctions it.
+2. **Building (4 levels)**: `House (Lv 1) → Building (Lv 2) → Hotel (Lv 3) → LANDMARK (Lv 4)`
+   - You can only upgrade the property you are standing on.
+   - You must **pass GO once** before you can start building on land.
+   - A **Landmark** needs the **whole color set** owned and built up to Hotels first.
+3. **2× Force-Buy**: landing on an opponent's developed property opens a 15-second offer to buy it for 2× its value (land + buildings). **Landmarks can never be acquired**, and force-bought properties can never become Landmarks.
+4. **The Bank** (like real Monopoly): pays GO salary, sells deeds, collects taxes and fines, lends on mortgages and buys back buildings. It holds a **limited supply of 32 houses and 12 hotels** (House = 1 house, Building = 2 houses, Hotel/Landmark = 1 hotel; houses return to the Bank when a hotel goes up). Selling a hotel during a housing shortage sells the property down to land. Declined or unaffordable properties go to a **Bank auction** that every player can bid on. The Bank tab shows the supply, any live auction, and a statement of every transaction.
+5. **Trading**: trade cash and/or unbuilt deeds with any player at any time (propose, accept, decline, cancel). A trade can settle your own debt.
+6. **Debt & Bankruptcy**: cannot pay rent, tax or a card? The **debt planner** opens with every property you own: pick exactly which levels to sell and what to mortgage (or let Auto-plan choose what costs you the least rent), see the rent tables and a live cash-vs-debt meter, peek at the board, or offer a trade, then run the plan. The debt auto-pays once covered. Declaring bankruptcy **sells everything back to the bank**: the creditor receives only the owed amount (capped at what the sale raised), and properties return to the bank unowned.
+7. **Passing GO** plays a coin-fountain animation on the GO tile and a +$200 banner.
+   **Chance & Community Chest**: the classic 16 + 16 cards (mapped onto the world board: Advance to New York / London / Beijing / GO, nearest Airport with double rent, nearest Utility at 10x a fresh roll, Go back 3, repairs per house / hotel, pay each player, birthday, bank error...). Decks are shuffled; drawn cards go under the deck, and Get Out of Jail Free is kept until used, then returned to its deck. The card is drawn once your token arrives: the top card lifts off the 3D deck, flies to you and flips over. Card moves resolve the tile you land on.
+8. **Victory**: last player standing, or (toggleable) **Triple Victory** (3 complete color sets) / **Line Victory** (every property on one side).
+9. **3D board in a little town**: hand-painted tiles, animated classic tokens (car, top hat, Scottie dog, battleship, thimble, boot), houses → townhouse → hotel → domed Landmark, rolling dice, and a sunny diorama.
+10. **Desktop & phone**: floating player cards, a collapsible side panel (Assets / Trade / Log / Chat) and a big ROLL button on PC; a portrait-first layout with a tab bar on phones. **Installable** as an app (Add to Home Screen / Install), locked to portrait when installed.
+11. **Runs smoothly anywhere**: the 3D scene only renders while something moves, graphics adapt to the device (Auto / Smooth / Pretty button, automatic step-down when FPS drops), the 3D engine loads in the background while you are in the lobby, and the server gzips and caches everything.
 
 ## How to Run Locally
 
@@ -102,4 +95,44 @@ Since the backend runs on your machine, you can expose it to friends over the in
    - Full WebSockets supported.
    - Make sure your PC stays awake while you play.
 
+---
 
+## Sessions, accounts & leaderboard
+
+- **Your seat is safe.** Every seat has a secret token saved in the browser.
+  Reload, lose the connection or even close the browser: opening the site
+  again puts you straight back into your match. A lobby you left open shows
+  up as "Continue where you left off" on the home screen.
+- **One window per seat.** Opening your seat in a second tab or device moves
+  it there; the old window shows "Playing somewhere else".
+- **Surrender or leave** from the in-game menu (the menu button, top right).
+  Surrender returns your properties to the Bank and lets you keep watching;
+  leaving forfeits the game.
+- **Turn timer** (lobby setting: off / 60 / 90 / 120 s). When time runs out the
+  game plays that step for you. Players who go offline are auto-played after
+  20 s and leave the game after 3 missed turns, so nobody can stall a table.
+- **Restarts are harmless.** Running games are saved to `server/data/rooms`
+  (`ROOMS_DIR`) and restored when the server starts again.
+- **Leaderboard** (home screen and lobby): wins, win rate and best score
+  (highest net worth at the end of a game).
+
+### Firebase (optional)
+
+Copy `.env.example` to `.env` and follow the steps in it. Firebase only
+handles **players**: guest / Google sign-in (so a player and their stats
+follow them to any device) and one small Firestore document per player for
+the leaderboard. The game itself keeps running on this server, and the usage
+fits the free Spark plan (one write per player per finished game, leaderboard
+reads cached for 5 minutes). Deploy `firestore.rules` so browsers cannot read
+or write Firestore directly. Without Firebase everything works as a guest and
+the leaderboard uses the server's local history.
+
+---
+
+## Credits
+
+- Property buildings: [KayKit City Builder Bits](https://github.com/KayKit-Game-Assets/KayKit-City-Builder-Bits-1.0) by Kay Lousberg, CC0 (see `client/public/models/kaykit/LICENSE.txt`).
+- Flags: [circle-flags](https://github.com/HatScripts/circle-flags), MIT (see `client/public/icons/LICENSE.txt`).
+- Town models: [Kenney City Builder kit](https://github.com/KenneyNL/Starter-Kit-City-Builder), CC0 (see `client/public/models/city/LICENSE.txt`).
+- Background music: "Blueprints and Tea" (provided by the project owner, `client/public/audio/`).
+- Fonts: Lilita One and Nunito (SIL Open Font License) via Fontsource.

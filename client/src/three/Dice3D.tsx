@@ -1,10 +1,12 @@
 import React, { useRef, useMemo, useEffect, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { Text } from '@react-three/drei';
 import { useGameStore } from '../store/gameStore.js';
-import { createDiceFaceTexture, ROTATION_FOR_TOP_FACE } from './diceTextures.js';
+import { createDiceFaceTexture, createRoundedDieGeometry, ROTATION_FOR_TOP_FACE } from './diceTextures.js';
 import { audioManager } from '../sound/audioManager.js';
+
+const tmpEuler = new THREE.Euler();
+const tmpYaw = new THREE.Quaternion();
 
 interface DieProps {
   position: [number, number, number];
@@ -30,45 +32,72 @@ const SingleDie: React.FC<DieProps> = ({ position, targetValue, rollTrigger }) =
     });
   }, []);
 
+  const geometry = useMemo(() => createRoundedDieGeometry(1, 0.14, 6), []);
+  useEffect(() => () => {
+    geometry.dispose();
+    materials.forEach((m) => { m.map?.dispose(); m.dispose(); });
+  }, [geometry, materials]);
+
+  // Resting orientation: the rolled value on top, turned by a random yaw so
+  // the dice don't land perfectly square every time.
+  const yaw = useRef(Math.random() * 0.6 - 0.3);
+  const target = useMemo(() => new THREE.Quaternion(), []);
+  const from = useMemo(() => new THREE.Quaternion(), []);
+  const settling = useRef(false);
+
   useEffect(() => {
     if (rollTrigger > 0) {
       isRolling.current = true;
-      animTime.current = 0;
+      // Wall-clock based so the landing time matches the HUD readout
+      // (DICE_ANIM_MS) even when the frame rate is low.
+      animTime.current = performance.now();
+      yaw.current = Math.random() * 1.2 - 0.6;
     }
   }, [rollTrigger]);
 
-  useFrame((_, delta) => {
-    if (!meshRef.current) return;
+  useFrame((_, rawDelta) => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    const delta = Math.min(rawDelta, 0.05);
+    const [rx, ry, rz] = ROTATION_FOR_TOP_FACE[targetValue] || [0, 0, 0];
+    target.setFromEuler(tmpEuler.set(rx, ry, rz));
+    target.premultiply(tmpYaw.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, yaw.current));
 
-    if (isRolling.current) {
-      animTime.current += delta;
-      const duration = 0.9;
-
-      if (animTime.current < duration) {
-        // Tumble and spin mid-air
-        meshRef.current.rotation.x += delta * 18;
-        meshRef.current.rotation.y += delta * 14;
-        meshRef.current.rotation.z += delta * 16;
-        meshRef.current.position.y = 0.74 + Math.sin((animTime.current / duration) * Math.PI) * 1.5;
-      } else {
-        // Finished rolling: land with the correct pips face on top!
-        isRolling.current = false;
-        meshRef.current.position.y = 0.74;
-        const targetRot = ROTATION_FOR_TOP_FACE[targetValue] || [0, 0, 0];
-        meshRef.current.rotation.set(targetRot[0], targetRot[1], targetRot[2]);
+    if (!isRolling.current) {
+      mesh.position.y = 0.74;
+      mesh.quaternion.copy(target);
+      return;
+    }
+    const tumble = 0.75;
+    const settle = 0.25;
+    const t = (performance.now() - animTime.current) / 1000;
+    if (t < tumble) {
+      // Tumble and spin mid-air
+      mesh.rotation.x += delta * 18;
+      mesh.rotation.y += delta * 14;
+      mesh.rotation.z += delta * 16;
+      mesh.position.y = 0.74 + Math.sin((t / tumble) * Math.PI) * 1.5;
+      settling.current = false;
+    } else if (t < tumble + settle) {
+      // Ease into the final face (no visible snap)
+      if (!settling.current) {
+        settling.current = true;
+        from.copy(mesh.quaternion);
       }
+      const k = (t - tumble) / settle;
+      const e = 1 - Math.pow(1 - Math.min(k, 1), 3);
+      mesh.quaternion.slerpQuaternions(from, target, e);
+      mesh.position.y = 0.74 + Math.sin(Math.min(k, 1) * Math.PI) * 0.12;
     } else {
-      meshRef.current.position.y = 0.74;
-      const targetRot = ROTATION_FOR_TOP_FACE[targetValue] || [0, 0, 0];
-      meshRef.current.rotation.set(targetRot[0], targetRot[1], targetRot[2]);
+      isRolling.current = false;
+      mesh.position.y = 0.74;
+      mesh.quaternion.copy(target);
     }
   });
 
   return (
     <group position={position}>
-      <mesh ref={meshRef} material={materials} castShadow receiveShadow>
-        <boxGeometry args={[1.0, 1.0, 1.0]} />
-      </mesh>
+      <mesh ref={meshRef} geometry={geometry} material={materials} castShadow receiveShadow />
     </group>
   );
 };
@@ -87,8 +116,6 @@ export const Dice3D: React.FC = () => {
 
   const d1 = diceRoll?.d1 ?? gameState?.dice?.[0] ?? 1;
   const d2 = diceRoll?.d2 ?? gameState?.dice?.[1] ?? 1;
-  const total = d1 + d2;
-  const isDoubles = d1 === d2;
 
   return (
     // Placed on the open cream area in front of the diagonal logo banner
@@ -104,17 +131,6 @@ export const Dice3D: React.FC = () => {
         rollTrigger={rollCount}
       />
 
-      {/* Roll result label */}
-      <Text
-        position={[0, 0.26, 1.7]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        fontSize={0.55}
-        color="#b45309"
-        anchorX="center"
-        anchorY="middle"
-      >
-        {isDoubles && rollCount > 0 ? `${d1} + ${d2} = ${total} (DOUBLES!)` : `${d1} + ${d2} = ${total}`}
-      </Text>
     </group>
   );
 };

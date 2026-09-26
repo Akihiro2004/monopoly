@@ -1,11 +1,13 @@
 import {
   BOARD_TILES,
   FORCE_BUY_TIMER_MS,
+  ForceBuyMode,
   GameState,
   PlayerState,
   PropertyState,
   ForceBuyOffer
 } from '@monopoly/shared';
+import { record } from './bank.js';
 
 /**
  * Calculates force-buy price for a property:
@@ -28,8 +30,13 @@ export function calculateForceBuyPrice(tileIndex: number, buildLevel: number): n
 export function canForceBuy(
   tileIndex: number,
   buyer: PlayerState,
-  property: PropertyState | undefined
+  property: PropertyState | undefined,
+  mode: ForceBuyMode = 'developed'
 ): { eligible: boolean; price: number; reason?: string } {
+  if (mode === 'off') {
+    return { eligible: false, price: 0, reason: 'Force-buy is turned off in this game' };
+  }
+
   if (!property || !property.ownerId) {
     return { eligible: false, price: 0, reason: 'Tile is unowned' };
   }
@@ -42,8 +49,9 @@ export function canForceBuy(
     return { eligible: false, price: 0, reason: 'Property is mortgaged' };
   }
 
-  // LINE Get Rich rule: only developed properties can be force-bought
-  if (property.buildLevel < 1) {
+  // Classic LINE Get Rich rule: only developed properties can be
+  // force-bought. The "any" house rule also allows raw, unbuilt land.
+  if (mode === 'developed' && property.buildLevel < 1) {
     return { eligible: false, price: 0, reason: 'Tile has no buildings (empty land cannot be force-bought)' };
   }
 
@@ -105,6 +113,12 @@ export function executeForceBuy(
     return { success: false, text: 'Invalid participants or property' };
   }
 
+  // Re-check at execution: a Landmark is never acquirable.
+  if (prop.buildLevel >= 4) {
+    gameState.forceBuyOffer = null;
+    return { success: false, text: `${tile.name} is a Landmark and cannot be acquired` };
+  }
+
   if (buyer.money < offer.price) {
     return { success: false, text: `${buyer.name} cannot afford the $${offer.price} force-buy` };
   }
@@ -112,6 +126,7 @@ export function executeForceBuy(
   // Transaction
   buyer.money -= offer.price;
   seller.money += offer.price;
+  record(gameState, buyer.playerId, seller.playerId, offer.price, `Force-bought ${tile.name}`);
   prop.ownerId = buyer.playerId;
   // KEEP existing build level!
   prop.buildLevel = offer.currentBuildLevel;
