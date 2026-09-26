@@ -59,8 +59,7 @@ class AudioManager {
     }
     this.listeners.forEach((l) => l(this.muted));
     if (this.muted) {
-      this.bgm?.pause();
-      this.bgmPlaying = false;
+      this.stopBGM();
     } else {
       this.startBGM();
     }
@@ -339,46 +338,171 @@ class AudioManager {
     this.tone(1200, { vol: 0.06, dur: 0.05 });
   }
 
-  // Background music: "Blueprints and Tea", streamed from a file and looped.
-  // An <audio> element decodes in the browser's media pipeline (cheap, and it
-  // streams: playback starts before the whole file is downloaded).
-  private bgm: HTMLAudioElement | null = null;
+  // Background music: "Blueprints and Tea", looped seamlessly.
+  //
+  // The track starts with 0.5 s of silence + a short fade-in and ends with a
+  // ~5 s fade-out + 2.4 s of silence, so a plain `loop` leaves ~3 s of dead
+  // air. Two streamed <audio> elements take turns instead: shortly before
+  // the fade-out the next one starts at the first note and they crossfade
+  // (equal-power) through Web Audio gain nodes (element.volume is ignored on
+  // iOS). Streaming keeps memory low: no 57 MB decoded buffer.
   private static readonly BGM_URL = '/audio/blueprints-and-tea.mp3';
-  private static readonly BGM_VOLUME = 0.35;
+  // 96 kbps encode (~1.9 MB vs ~3.9 MB) for phones, weak devices and data-saver.
+  private static readonly BGM_URL_LIGHT = '/audio/blueprints-and-tea-mobile.mp3';
 
-  private ensureBgm(): HTMLAudioElement | null {
-    if (typeof Audio === 'undefined') return null;
-    if (!this.bgm) {
-      const el = new Audio(AudioManager.BGM_URL);
-      el.loop = true;
-      el.preload = 'auto';
-      el.volume = AudioManager.BGM_VOLUME;
-      this.bgm = el;
-      // Pause while the tab / app is in the background (battery, data).
-      document.addEventListener('visibilitychange', () => {
-        if (!this.bgm) return;
-        if (document.hidden) this.bgm.pause();
-        else if (this.bgmPlaying && !this.muted) this.bgm.play().catch(() => {});
-      });
+  private static bgmUrl(): string {
+    try {
+      const nav = navigator as Navigator & {
+        connection?: { saveData?: boolean; effectiveType?: string };
+        deviceMemory?: number;
+      };
+      const light =
+        window.matchMedia?.('(pointer: coarse)').matches ||
+        nav.connection?.saveData === true ||
+        /(^|-)2g$|^3g$/.test(nav.connection?.effectiveType ?? '') ||
+        (nav.deviceMemory !== undefined && nav.deviceMemory <= 4);
+      return light ? AudioManager.BGM_URL_LIGHT : AudioManager.BGM_URL;
+    } catch {
+      return AudioManager.BGM_URL;
     }
-    return this.bgm;
+  }
+  private static readonly BGM_VOLUME = 0.35;
+  private static readonly BGM_START = 0.5; // skip the leading silence
+  private static readonly BGM_TAIL = 5.6; // hand over this long before the end
+  private static readonly BGM_FADE = 3; // crossfade length (s)
+
+  private decks: { el: HTMLAudioElement; gain: GainNode | null }[] = [];
+  private deckIdx = 0;
+  private crossfading = false;
+  private loopTimer: ReturnType<typeof setInterval> | null = null;
+
+  private ensureDecks(): boolean {
+    if (typeof Audio === 'undefined') return false;
+    if (this.decks.length) return true;
+    const url = AudioManager.bgmUrl();
+    for (let i = 0; i < 2; i++) {
+      const el = new Audio(url);
+      el.preload = i === 0 ? 'auto' : 'metadata';
+      let gain: GainNode | null = null;
+      if (this.ctx && this.masterGain) {
+        try {
+          const src = this.ctx.createMediaElementSource(el);
+          gain = this.ctx.createGain();
+          gain.gain.value = 0;
+          src.connect(gain);
+          gain.connect(this.masterGain);
+        } catch {
+          gain = null;
+        }
+      }
+      if (!gain) {
+        // No Web Audio: a single element with a plain loop still works.
+        el.loop = true;
+        el.volume = AudioManager.BGM_VOLUME;
+      }
+      this.decks.push({ el, gain });
+    }
+    // Pause while the tab / app is in the background (battery, data).
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.pauseDecks();
+      else if (this.bgmPlaying && !this.muted) this.resumeCurrent();
+    });
+    return true;
+  }
+
+  private fadeTo(gain: GainNode | null, value: number, seconds: number) {
+    if (!gain || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.setValueAtTime(gain.gain.value, now);
+    // Sine-shaped curve ~ equal power: no dip in loudness mid-crossfade.
+    const steps = 24;
+    const from = gain.gain.value;
+    const curve = new Float32Array(steps);
+    for (let i = 0; i < steps; i++) {
+      const k = i / (steps - 1);
+      curve[i] = value > from ? from + (value - from) * Math.sin((k * Math.PI) / 2) : value + (from - value) * Math.cos((k * Math.PI) / 2);
+    }
+    gain.gain.setValueCurveAtTime(curve, now, Math.max(0.05, seconds));
+  }
+
+  private resumeCurrent() {
+    const deck = this.decks[this.deckIdx];
+    if (!deck) return;
+    this.crossfading = false;
+    this.decks.forEach((d, i) => {
+      if (i !== this.deckIdx) {
+        d.el.pause();
+        if (d.gain) d.gain.gain.value = 0;
+      }
+    });
+    deck.el.play().then(
+      () => this.fadeTo(deck.gain, AudioManager.BGM_VOLUME, 0.6),
+      () => {
+        this.bgmPlaying = false;
+      }
+    );
+  }
+
+  private pauseDecks() {
+    this.decks.forEach((d) => d.el.pause());
+    this.crossfading = false;
+  }
+
+  // Checks (10x a second) whether it is time to hand over to the other deck.
+  private watchLoop() {
+    if (this.loopTimer) return;
+    this.loopTimer = setInterval(() => {
+      if (!this.bgmPlaying || this.crossfading || document.hidden) return;
+      const cur = this.decks[this.deckIdx];
+      if (!cur?.gain) return; // plain-loop fallback
+      const dur = cur.el.duration;
+      if (!isFinite(dur) || cur.el.paused) return;
+      if (cur.el.currentTime < dur - AudioManager.BGM_TAIL) return;
+
+      this.crossfading = true;
+      const nextIdx = 1 - this.deckIdx;
+      const next = this.decks[nextIdx];
+      next.el.currentTime = AudioManager.BGM_START;
+      next.el.play().then(
+        () => {
+          this.fadeTo(next.gain, AudioManager.BGM_VOLUME, AudioManager.BGM_FADE);
+          this.fadeTo(cur.gain, 0, AudioManager.BGM_FADE);
+          this.deckIdx = nextIdx;
+          setTimeout(() => {
+            cur.el.pause();
+            this.crossfading = false;
+          }, AudioManager.BGM_FADE * 1000 + 300);
+        },
+        () => {
+          // Could not start the next deck: fall back to restarting this one.
+          cur.el.currentTime = AudioManager.BGM_START;
+          this.crossfading = false;
+        }
+      );
+    }, 100);
   }
 
   public startBGM() {
-    if (this.muted) return;
-    const el = this.ensureBgm();
-    if (!el) return;
+    if (this.muted || this.bgmPlaying) return;
+    if (!this.ctx) {
+      // Creating the context starts the music itself (see initContext).
+      this.initContext();
+      if (this.ctx) return;
+    }
+    if (!this.ensureDecks()) return;
     this.bgmPlaying = true;
-    // Browsers only allow audio after a user gesture; sounds are triggered
-    // by clicks, so the first click starts the music.
-    el.play().catch(() => {
-      this.bgmPlaying = false;
-    });
+    const deck = this.decks[this.deckIdx];
+    if (deck.el.currentTime < AudioManager.BGM_START) deck.el.currentTime = AudioManager.BGM_START;
+    // Browsers only allow audio after a user gesture; sounds are triggered by
+    // clicks, so the first click starts the music.
+    this.resumeCurrent();
+    this.watchLoop();
   }
 
   public stopBGM() {
     this.bgmPlaying = false;
-    this.bgm?.pause();
+    this.pauseDecks();
   }
 }
 
