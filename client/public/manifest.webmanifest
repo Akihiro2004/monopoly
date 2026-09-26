@@ -1,7 +1,7 @@
 {
-  "name": "Monopoly 3D",
-  "short_name": "Monopoly",
-  "description": "Real-time multiplayer 3D Monopoly for friends.",
+  "name": "TMpoly",
+  "short_name": "TMpoly",
+  "description": "Real-time multiplayer 3D property trading board game for friends.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

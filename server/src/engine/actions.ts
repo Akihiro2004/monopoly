@@ -7,6 +7,7 @@ import {
   PropertyState,
   buildBlockReason
 } from '@monopoly/shared';
+import { movePieces, record } from './bank.js';
 
 /**
  * Auto-buys an unowned purchasable property when player lands on it (LINE Get Rich style)
@@ -31,6 +32,7 @@ export function executeAutoBuy(
 
   if (buyer.money >= tile.price) {
     buyer.money -= tile.price;
+    record(gameState, buyer.playerId, null, tile.price, `Bought ${tile.name}`);
     prop.ownerId = buyer.playerId;
     prop.buildLevel = 0;
     prop.isMortgaged = false;
@@ -71,7 +73,9 @@ export function buildProperty(
   }
 
   player.money -= tile.buildCost;
+  movePieces(gameState, prop.buildLevel, prop.buildLevel + 1);
   prop.buildLevel = (prop.buildLevel + 1) as BuildLevel;
+  record(gameState, player.playerId, null, tile.buildCost, `Built on ${tile.name}`);
 
   const levelNames = ['Land', 'House (Lv 1)', 'Building (Lv 2)', 'Hotel (Lv 3)', 'LANDMARK (Lv 4)'];
   const newLevelName = levelNames[prop.buildLevel];
@@ -110,9 +114,16 @@ export function sellBuilding(
     return { success: false, text: 'This property has nothing to sell' };
   }
 
-  const refund = Math.floor(tile.buildCost / 2);
-  prop.buildLevel = (prop.buildLevel - 1) as BuildLevel;
+  const perLevel = Math.floor(tile.buildCost / 2);
+  // Selling a hotel back to 2 houses needs the Bank to have 2 houses; during
+  // a housing shortage the whole property is sold down to land (real rule).
+  const shortage = prop.buildLevel === 3 && gameState.bank.houses < 2;
+  const targetLevel = shortage ? 0 : prop.buildLevel - 1;
+  const refund = perLevel * (prop.buildLevel - targetLevel);
+  movePieces(gameState, prop.buildLevel, targetLevel);
+  prop.buildLevel = targetLevel as BuildLevel;
   player.money += refund;
+  record(gameState, null, player.playerId, refund, `Sold buildings on ${tile.name}`);
 
   const levelNames = ['Land', 'House (Lv 1)', 'Building (Lv 2)', 'Hotel (Lv 3)', 'LANDMARK (Lv 4)'];
   const msg = `${player.name} sold a building on ${tile.name} for $${refund} (now ${levelNames[prop.buildLevel]}).`;
@@ -146,6 +157,7 @@ export function toggleMortgage(
     const value = Math.floor(tile.price / 2);
     prop.isMortgaged = true;
     player.money += value;
+    record(gameState, null, player.playerId, value, `Mortgaged ${tile.name}`);
     const msg = `${player.name} mortgaged ${tile.name} for $${value}.`;
     gameState.lastActionText = msg;
     return { success: true, text: msg };
@@ -159,6 +171,7 @@ export function toggleMortgage(
     }
     player.money -= cost;
     prop.isMortgaged = false;
+    record(gameState, player.playerId, null, cost, `Paid off mortgage on ${tile.name}`);
     const msg = `${player.name} unmortgaged ${tile.name} for $${cost}.`;
     gameState.lastActionText = msg;
     return { success: true, text: msg };

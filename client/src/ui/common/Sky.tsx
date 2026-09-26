@@ -15,7 +15,6 @@ export const Sky: React.FC = () => (
 
 export const Logo: React.FC<{ size?: 'lg' | 'sm' }> = ({ size = 'lg' }) => (
   <div className={`logo logo-${size}`}>
-    <span className="logo-plate">MONOPOLY</span>
-    <span className="logo-3d">3D</span>
+    <span className="logo-plate">TMpoly</span>
   </div>
 );

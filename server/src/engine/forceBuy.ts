@@ -6,6 +6,7 @@ import {
   PropertyState,
   ForceBuyOffer
 } from '@monopoly/shared';
+import { record } from './bank.js';
 
 /**
  * Calculates force-buy price for a property:
@@ -118,6 +119,7 @@ export function executeForceBuy(
   // Transaction
   buyer.money -= offer.price;
   seller.money += offer.price;
+  record(gameState, buyer.playerId, seller.playerId, offer.price, `Force-bought ${tile.name}`);
   prop.ownerId = buyer.playerId;
   // KEEP existing build level!
   prop.buildLevel = offer.currentBuildLevel;

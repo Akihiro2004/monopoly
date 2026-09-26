@@ -82,7 +82,7 @@ export const HomeScreen: React.FC = () => {
       <div className="home-layout">
         <section className="home-hero">
           <Logo />
-          <p className="hero-sub">Real-time 3D Monopoly for up to 6 friends. Roll, buy, build, trade and get rich!</p>
+          <p className="hero-sub">Real-time 3D property trading for up to 6 friends. Roll, buy, build, trade and get rich!</p>
 
           <div className="hero-art">
             <MiniBoard />

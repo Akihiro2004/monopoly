@@ -41,7 +41,7 @@ export const MiniBoard: React.FC<{ className?: string }> = ({ className = '' }) 
       );
     })}
     <div className="mb-center">
-      <span className="mb-logo">MONOPOLY</span>
+      <span className="mb-logo">TMpoly</span>
       <span className="mb-deck chance" />
       <span className="mb-deck chest" />
     </div>

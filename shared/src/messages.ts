@@ -38,6 +38,7 @@ export interface ClientToServerEvents {
   'game:declareBankruptcy': () => void;
   'game:mortgage': (payload: { tileIndex: number; mortgage: boolean }) => void;
   'game:endTurn': () => void;
+  'auction:bid': (payload: { amount: number }) => void;
   'trade:propose': (payload: TradeProposal) => void;
   'trade:respond': (payload: { tradeId: string; accept: boolean }) => void;
   'trade:cancel': (payload: { tradeId: string }) => void;

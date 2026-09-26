@@ -105,6 +105,7 @@ export type GamePhase =
   | 'BUY_OFFER'
   | 'FORCE_BUY_OFFER'
   | 'DEBT'
+  | 'AUCTION'
   | 'TURN_ENDED'
   | 'GAME_OVER';
 
@@ -153,6 +154,35 @@ export interface CardDraw {
   text: string;
 }
 
+// ---------------------------------------------------------------- Bank
+// Every money movement, for the bank statement. null = the Bank.
+export interface BankTxn {
+  id: number;
+  ts: number;
+  fromId: string | null;
+  toId: string | null;
+  amount: number;
+  reason: string;
+}
+
+// The Bank owns the limited building supply (real Monopoly: 32 houses,
+// 12 hotels) and keeps a ledger of the latest transactions.
+export interface BankState {
+  houses: number;
+  hotels: number;
+  ledger: BankTxn[];
+  nextTxnId: number;
+}
+
+// Bank auction of a property the landing player declined / could not afford.
+export interface AuctionState {
+  tileIndex: number;
+  highBid: number;
+  highBidderId: string | null;
+  endsAt: number; // timestamp ms
+  bidders: string[]; // players who placed at least one bid
+}
+
 // The last dice move, so clients can animate walk -> landing -> follow-up
 // (e.g. walk onto Chance, show the card, then travel to the card target).
 export interface MoveRecord {
@@ -178,6 +208,8 @@ export interface GameState {
   debt: DebtOffer | null;
   trades: TradeOffer[];
   lastMove: MoveRecord | null;
+  bank: BankState;
+  auction: AuctionState | null;
   winnerId: string | null;
   victoryType: VictoryType | null;
   lastActionText: string;

@@ -190,6 +190,10 @@ export function registerGameHandlers(
     }
   };
 
+  socket.on('auction:bid', ({ amount }) => {
+    withEngine((engine, playerId) => engine.placeBid(playerId, amount));
+  });
+
   socket.on('trade:propose', (proposal) => {
     withEngine((engine, playerId) => engine.proposeTrade(playerId, proposal));
   });

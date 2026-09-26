@@ -456,7 +456,7 @@ function centerArt(): HTMLCanvasElement {
   spot(S / 2 - 3.6 * 70, S / 2 - 3.4 * 70, '#f58a1f', 'CHANCE');
   spot(S / 2 + 3.6 * 70, S / 2 + 3.2 * 70, '#2f7de1', 'CHEST');
 
-  // Diagonal red MONOPOLY plate
+  // Diagonal red TMpoly plate
   ctx.save();
   ctx.translate(S / 2, S / 2);
   ctx.rotate(-Math.PI / 5);
@@ -470,14 +470,14 @@ function centerArt(): HTMLCanvasElement {
   ctx.lineWidth = 8;
   roundRect(ctx, -362, -64, 724, 128, 10);
   ctx.stroke();
-  ctx.font = `128px ${DISPLAY}`;
+  ctx.font = `150px ${DISPLAY}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.lineWidth = 16;
   ctx.strokeStyle = INK;
-  ctx.strokeText('MONOPOLY', 0, 8);
+  ctx.strokeText('TMpoly', 0, 8);
   ctx.fillStyle = '#fff';
-  ctx.fillText('MONOPOLY', 0, 8);
+  ctx.fillText('TMpoly', 0, 8);
   ctx.restore();
   return c;
 }

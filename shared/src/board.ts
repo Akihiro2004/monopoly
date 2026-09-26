@@ -52,3 +52,11 @@ export const JAIL_FINE = 50;
 export const JAIL_TILE_INDEX = 10;
 export const GO_TO_JAIL_TILE_INDEX = 30;
 export const FORCE_BUY_TIMER_MS = 15000;
+
+// Bank
+export const BANK_HOUSES = 32;
+export const BANK_HOTELS = 12;
+export const AUCTION_MS = 15000; // opening countdown
+export const AUCTION_EXTEND_MS = 6000; // every bid keeps at least this much time
+export const AUCTION_MIN_INCREMENT = 10;
+export const LEDGER_SIZE = 80;

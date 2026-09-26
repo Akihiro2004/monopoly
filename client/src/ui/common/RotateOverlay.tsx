@@ -8,7 +8,7 @@ export const RotateOverlay: React.FC = () => (
     <div className="rotate-card paper">
       <Smartphone size={44} className="rotate-icon" />
       <strong className="display">Turn your phone upright</strong>
-      <span>Monopoly 3D plays best in portrait.</span>
+      <span>TMpoly plays best in portrait.</span>
     </div>
   </div>
 );

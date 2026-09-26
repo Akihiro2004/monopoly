@@ -34,8 +34,31 @@ export function buildBlockReason(state: GameState, player: PlayerState, tileInde
       return 'A Landmark needs the whole color set owned and built up to Hotels first';
     }
   }
+  const supply = supplyBlockReason(state, prop.buildLevel);
+  if (supply) return supply;
   if (player.money < tile.buildCost) {
     return `Upgrade costs $${tile.buildCost}, you have $${player.money}`;
+  }
+  return null;
+}
+
+// Building pieces a level holds: Lv1 = 1 house, Lv2 = 2 houses,
+// Lv3 (Hotel) and Lv4 (Landmark on top of the hotel) = 1 hotel.
+export function piecesAt(level: number): { houses: number; hotels: number } {
+  if (level <= 0) return { houses: 0, hotels: 0 };
+  if (level <= 2) return { houses: level, hotels: 0 };
+  return { houses: 0, hotels: 1 };
+}
+
+/** Bank supply check for upgrading from `level` (null = pieces available). */
+export function supplyBlockReason(state: GameState, level: number): string | null {
+  const bank = state.bank;
+  if (!bank) return null;
+  if ((level === 0 || level === 1) && bank.houses < 1) {
+    return 'Housing shortage: the Bank has no houses left';
+  }
+  if (level === 2 && bank.hotels < 1) {
+    return 'The Bank has no hotels left';
   }
   return null;
 }

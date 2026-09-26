@@ -98,7 +98,8 @@ export const Board3D: React.FC = () => {
               <BuildingMesh
                 level={prop.buildLevel}
                 mortgaged={prop.isMortgaged}
-                position={[0, h / 2, -d * 0.33]}
+                tileIndex={coord.index}
+                position={[0, h / 2, -d * 0.36]}
                 color={ownerHex}
               />
             )}

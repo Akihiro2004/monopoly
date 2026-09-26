@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ChevronRight, Handshake, Home, MessageSquare, PanelRightOpen, ScrollText } from 'lucide-react';
+import { ChevronRight, Handshake, Home, Landmark, MessageSquare, PanelRightOpen, ScrollText } from 'lucide-react';
+import { BankView } from '../bank/BankView.js';
 import { useGameStore } from '../../store/gameStore.js';
 import { ActivityLog } from './ActivityLog.js';
 import { ChatView } from './ChatView.js';
@@ -9,11 +10,12 @@ import { useUnreadChat } from './useUnread.js';
 import { useHudBadges } from './useHudBadges.js';
 import { money } from '../theme.js';
 
-type Tab = 'assets' | 'trade' | 'log' | 'chat';
+type Tab = 'assets' | 'trade' | 'bank' | 'log' | 'chat';
 
 const TABS: { id: Tab; label: string; icon: typeof Home }[] = [
   { id: 'assets', label: 'Assets', icon: Home },
   { id: 'trade', label: 'Trade', icon: Handshake },
+  { id: 'bank', label: 'Bank', icon: Landmark },
   { id: 'log', label: 'Log', icon: ScrollText },
   { id: 'chat', label: 'Chat', icon: MessageSquare }
 ];
@@ -25,11 +27,11 @@ export const SidePanel: React.FC = () => {
   const setCollapsed = useGameStore((s) => s.setPanelCollapsed);
   const [tab, setTab] = useState<Tab>('assets');
   const unread = useUnreadChat(!collapsed && tab === 'chat');
-  const { deeds, incomingTrades, myCash } = useHudBadges();
+  const { deeds, incomingTrades, auctionLive, myCash } = useHudBadges();
 
   const badge = (id: Tab) =>
-    id === 'assets' ? deeds : id === 'trade' ? incomingTrades : id === 'chat' ? unread : 0;
-  const alert = (id: Tab) => id === 'trade' || id === 'chat';
+    id === 'assets' ? deeds : id === 'trade' ? incomingTrades : id === 'bank' ? auctionLive : id === 'chat' ? unread : 0;
+  const alert = (id: Tab) => id === 'trade' || id === 'bank' || id === 'chat';
 
   const open = (id: Tab) => {
     setTab(id);
@@ -75,6 +77,7 @@ export const SidePanel: React.FC = () => {
       <div className={`side-body ${tab === 'chat' ? 'no-scroll' : ''}`}>
         {tab === 'assets' && <Portfolio />}
         {tab === 'trade' && <TradeView />}
+        {tab === 'bank' && <BankView />}
         {tab === 'log' && <ActivityLog />}
         {tab === 'chat' && <ChatView autoFocus />}
       </div>

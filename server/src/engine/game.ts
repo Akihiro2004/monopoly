@@ -6,6 +6,9 @@ import {
   JAIL_FINE,
   JAIL_TILE_INDEX,
   STARTING_MONEY,
+  AUCTION_EXTEND_MS,
+  AUCTION_MIN_INCREMENT,
+  AUCTION_MS,
   CardDef,
   CardDraw,
   DebtOffer,
@@ -21,6 +24,7 @@ import { executeForceBuy } from './forceBuy.js';
 import { buildProperty, sellBuilding, toggleMortgage } from './actions.js';
 import { applyBankruptcy, calculateRent, payRent } from './rent.js';
 import { resolveLanding } from './resolve.js';
+import { createBank, record } from './bank.js';
 import { checkVictory } from './victory.js';
 
 export interface GameEngineOptions {
@@ -36,6 +40,7 @@ export class MonopolyGameEngine {
   private chanceDeck: CardDef[];
   private chestDeck: CardDef[];
   private forceBuyTimer: NodeJS.Timeout | null = null;
+  private auctionTimer: NodeJS.Timeout | null = null;
 
   constructor(roomId: string, seats: Seat[], options: GameEngineOptions) {
     this.options = options;
@@ -86,6 +91,8 @@ export class MonopolyGameEngine {
       debt: null,
       trades: [],
       lastMove: null,
+      bank: createBank(),
+      auction: null,
       winnerId: null,
       victoryType: null,
       lastActionText: 'Game started. Roll to begin.'
@@ -127,7 +134,9 @@ export class MonopolyGameEngine {
       } else {
         player.jailTurns++;
         if (player.jailTurns >= 3) {
-          player.money = Math.max(0, player.money - JAIL_FINE);
+          const fine = Math.min(player.money, JAIL_FINE);
+          player.money -= fine;
+          record(this.state, player.playerId, null, fine, 'Jail fine');
           player.inJail = false;
           player.jailTurns = 0;
           this.emitToast(`${player.name} paid $${JAIL_FINE} after 3 turns in Jail.`, 'info');
@@ -164,6 +173,7 @@ export class MonopolyGameEngine {
     if (newPos < oldPos) {
       player.money += GO_SALARY;
       player.lapsCompleted++;
+      record(this.state, null, player.playerId, GO_SALARY, 'GO salary');
       this.emitToast(`${player.name} passed GO and collected $${GO_SALARY}.`, 'success');
     }
 
@@ -185,6 +195,8 @@ export class MonopolyGameEngine {
     const currentPhase = this.state.phase as string;
     if (this.state.debt) {
       this.state.phase = 'DEBT';
+    } else if (res.auctionTile !== undefined) {
+      this.startAuction(res.auctionTile);
     } else if (currentPhase === 'FORCE_BUY_OFFER' && this.state.forceBuyOffer) {
       this.setupForceBuyTimeout();
     } else if (currentPhase === 'BUY_OFFER' && this.state.buyOffer) {
@@ -213,16 +225,100 @@ export class MonopolyGameEngine {
         throw new Error('Insufficient funds to buy property');
       }
       player.money -= offer.price;
+      record(this.state, player.playerId, null, offer.price, `Bought ${tile.name}`);
       prop.ownerId = player.playerId;
       prop.buildLevel = 0;
       prop.isMortgaged = false;
       prop.forceBought = false;
       this.emitToast(`${player.name} bought ${tile.name} for $${offer.price}.`, 'success');
-    } else {
-      this.emitToast(`${player.name} decided not to buy ${tile.name}.`, 'info');
+      this.state.buyOffer = null;
+      this.state.phase = 'TURN_ENDED';
+      this.checkAndApplyVictory();
+      this.notify();
+      return;
     }
 
+    // Real Monopoly: a declined property goes to auction by the Bank.
+    this.emitToast(`${player.name} passed on ${tile.name}. The Bank opens an auction!`, 'info');
     this.state.buyOffer = null;
+    this.startAuction(offer.tileIndex);
+    this.notify();
+  }
+
+  // ------------------------------------------------------------------
+  // Bank auctions
+  // ------------------------------------------------------------------
+
+  private startAuction(tileIndex: number): void {
+    this.state.phase = 'AUCTION';
+    this.state.auction = {
+      tileIndex,
+      highBid: 0,
+      highBidderId: null,
+      endsAt: Date.now() + AUCTION_MS,
+      bidders: []
+    };
+    this.scheduleAuctionEnd();
+  }
+
+  private scheduleAuctionEnd(): void {
+    this.clearAuctionTimer();
+    const auction = this.state.auction;
+    if (!auction) return;
+    this.auctionTimer = setTimeout(() => this.finishAuction(), Math.max(0, auction.endsAt - Date.now()));
+  }
+
+  private clearAuctionTimer(): void {
+    if (this.auctionTimer) {
+      clearTimeout(this.auctionTimer);
+      this.auctionTimer = null;
+    }
+  }
+
+  public placeBid(playerId: string, amount: number): void {
+    const auction = this.state.auction;
+    if (this.state.phase !== 'AUCTION' || !auction) throw new Error('There is no auction running');
+    const bidder = this.state.players.find((p) => p.playerId === playerId);
+    if (!bidder || bidder.isBankrupt) throw new Error('You cannot bid in this auction');
+    const bid = Math.floor(Number(amount));
+    const minimum = auction.highBid + AUCTION_MIN_INCREMENT;
+    if (!Number.isFinite(bid) || bid < minimum) throw new Error(`Bid at least $${minimum}`);
+    if (bid > bidder.money) throw new Error(`You only have $${bidder.money}`);
+    if (Date.now() > auction.endsAt) throw new Error('The auction has closed');
+
+    auction.highBid = bid;
+    auction.highBidderId = playerId;
+    if (!auction.bidders.includes(playerId)) auction.bidders.push(playerId);
+    auction.endsAt = Math.max(auction.endsAt, Date.now() + AUCTION_EXTEND_MS);
+    this.scheduleAuctionEnd();
+    this.emitToast(`${bidder.name} bids $${bid} for ${BOARD_TILES[auction.tileIndex].name}.`, 'info');
+    this.notify();
+  }
+
+  /** Closes the auction: the highest bidder pays the Bank and takes the deed. */
+  public finishAuction(): void {
+    const auction = this.state.auction;
+    if (this.state.phase !== 'AUCTION' || !auction) return;
+    this.clearAuctionTimer();
+    const tile = BOARD_TILES[auction.tileIndex];
+    const winner = auction.highBidderId
+      ? this.state.players.find((p) => p.playerId === auction.highBidderId)
+      : undefined;
+
+    if (winner && !winner.isBankrupt && winner.money >= auction.highBid) {
+      const prop = this.state.properties[auction.tileIndex];
+      winner.money -= auction.highBid;
+      record(this.state, winner.playerId, null, auction.highBid, `Won auction: ${tile.name}`);
+      prop.ownerId = winner.playerId;
+      prop.buildLevel = 0;
+      prop.isMortgaged = false;
+      prop.forceBought = false;
+      this.emitToast(`SOLD! ${winner.name} wins ${tile.name} at auction for $${auction.highBid}.`, 'success');
+    } else {
+      this.emitToast(`No bids for ${tile.name}. It stays with the Bank.`, 'info');
+    }
+
+    this.state.auction = null;
     this.state.phase = 'TURN_ENDED';
     this.checkAndApplyVictory();
     this.notify();
@@ -254,7 +350,7 @@ export class MonopolyGameEngine {
       this.state.forceBuyOffer = null;
       if (opponent) {
         const rent = calculateRent(this.state, offer.tileIndex, this.state.dice[0] + this.state.dice[1]);
-        const result = payRent(this.state, player, opponent, rent);
+        const result = payRent(this.state, player, opponent, rent, `Rent for ${BOARD_TILES[offer.tileIndex].name}`);
         if (result.debt !== undefined) {
           this.enterDebt(player, result.debt, opponent.playerId, `rent for ${BOARD_TILES[offer.tileIndex].name}`);
         } else {
@@ -276,6 +372,7 @@ export class MonopolyGameEngine {
       throw new Error('Cannot pay jail fine');
     }
     player.money -= JAIL_FINE;
+    record(this.state, player.playerId, null, JAIL_FINE, 'Jail fine');
     player.inJail = false;
     player.jailTurns = 0;
     this.emitToast(`${player.name} paid $${JAIL_FINE} and left Jail.`, 'info');
@@ -330,8 +427,10 @@ export class MonopolyGameEngine {
     const player = this.getCurrentPlayer();
     const debt = this.state.debt;
     this.clearForceBuyTimeout();
+    this.clearAuctionTimer();
     this.state.buyOffer = null;
     this.state.forceBuyOffer = null;
+    this.state.auction = null;
     this.state.debt = null;
 
     const { raised, paid } = applyBankruptcy(this.state, player, debt.creditorId, debt.amount);
@@ -430,6 +529,8 @@ export class MonopolyGameEngine {
 
     from.money += trade.getMoney - trade.giveMoney;
     to.money += trade.giveMoney - trade.getMoney;
+    record(this.state, from.playerId, to.playerId, trade.giveMoney, 'Trade');
+    record(this.state, to.playerId, from.playerId, trade.getMoney, 'Trade');
     for (const i of trade.giveProps) this.state.properties[i].ownerId = to.playerId;
     for (const i of trade.getProps) this.state.properties[i].ownerId = from.playerId;
 
@@ -460,7 +561,7 @@ export class MonopolyGameEngine {
     amount: number,
     reason: string
   ): void {
-    const result = payRent(this.state, debtor, creditor, amount);
+    const result = payRent(this.state, debtor, creditor, amount, reason.charAt(0).toUpperCase() + reason.slice(1));
     if (result.debt !== undefined) {
       this.enterDebt(debtor, result.debt, creditor.playerId, reason);
     } else {
@@ -503,6 +604,9 @@ export class MonopolyGameEngine {
       : null;
     if (creditor && !creditor.isBankrupt) {
       creditor.money += debt.amount;
+      record(this.state, debtor.playerId, creditor.playerId, debt.amount, `Debt: ${debt.reason}`);
+    } else {
+      record(this.state, debtor.playerId, null, debt.amount, `Debt: ${debt.reason}`);
     }
     this.state.debt = null;
     this.state.phase = 'TURN_ENDED';
@@ -571,6 +675,9 @@ export class MonopolyGameEngine {
       this.state.winnerId = result.winnerId;
       this.state.victoryType = result.victoryType;
       this.state.phase = 'GAME_OVER';
+      this.clearForceBuyTimeout();
+      this.clearAuctionTimer();
+      this.state.auction = null;
       if (result.reason) {
         this.emitToast(`GAME OVER. ${result.reason}`, 'success');
       }

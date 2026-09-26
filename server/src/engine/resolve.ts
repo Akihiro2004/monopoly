@@ -7,6 +7,7 @@ import {
   GameState,
   PlayerState
 } from '@monopoly/shared';
+import { record } from './bank.js';
 import { executeAutoBuy } from './actions.js';
 import { canForceBuy, createForceBuyOffer } from './forceBuy.js';
 import { calculateRent, payRent } from './rent.js';
@@ -14,6 +15,8 @@ import { calculateRent, payRent } from './rent.js';
 export interface ResolveResult {
   needsForceBuyChoice: boolean;
   toast: string;
+  // Unowned property the player cannot afford: the Bank auctions it.
+  auctionTile?: number;
 }
 
 export function resolveLanding(
@@ -43,6 +46,7 @@ export function resolveLanding(
     const tax = tile.rentByLevel[0];
     if (player.money >= tax) {
       player.money -= tax;
+      record(gameState, player.playerId, null, tax, tile.name);
       const msg = `${player.name} paid $${tax} in ${tile.name}.`;
       gameState.lastActionText = msg;
       return { needsForceBuyChoice: false, toast: msg };
@@ -71,6 +75,9 @@ export function resolveLanding(
     if (action.type === 'money') {
       if (player.money + action.amount >= 0) {
         player.money += action.amount;
+        const cardName = tile.type === 'chance' ? 'Chance' : 'Community Chest';
+        if (action.amount > 0) record(gameState, null, player.playerId, action.amount, cardName);
+        else record(gameState, player.playerId, null, -action.amount, cardName);
       } else {
         gameState.debt = {
           amount: -action.amount,
@@ -85,6 +92,7 @@ export function resolveLanding(
       if (action.passGoCheck && player.position >= action.tileIndex) {
         player.money += 200; // Passed or landed on GO
         player.lapsCompleted++;
+        record(gameState, null, player.playerId, 200, 'GO salary');
       }
       player.position = action.tileIndex;
       // Real Monopoly: the destination tile is resolved as a normal landing
@@ -93,7 +101,7 @@ export function resolveLanding(
         const landed = resolveLanding(gameState, player, chanceDeck, chestDeck, onCard, depth + 1);
         const combined = landed.toast ? `${toast} ${landed.toast}` : toast;
         gameState.lastActionText = combined;
-        return { needsForceBuyChoice: landed.needsForceBuyChoice, toast: combined };
+        return { needsForceBuyChoice: landed.needsForceBuyChoice, toast: combined, auctionTile: landed.auctionTile };
       }
     } else if (action.type === 'jail') {
       player.position = JAIL_TILE_INDEX;
@@ -107,6 +115,7 @@ export function resolveLanding(
           const amt = Math.min(other.money, action.amount);
           other.money -= amt;
           player.money += amt;
+          record(gameState, other.playerId, player.playerId, amt, tile.type === 'chance' ? 'Chance' : 'Community Chest');
         }
       });
     } else if (action.type === 'payToAll') {
@@ -115,6 +124,7 @@ export function resolveLanding(
           if (player.money >= action.amount) {
             player.money -= action.amount;
             other.money += action.amount;
+            record(gameState, player.playerId, other.playerId, action.amount, tile.type === 'chance' ? 'Chance' : 'Community Chest');
           }
         }
       });
@@ -140,9 +150,9 @@ export function resolveLanding(
         return { needsForceBuyChoice: false, toast: msg };
       } else {
         gameState.buyOffer = null;
-        const msg = `${player.name} cannot afford ${tile.name} ($${tile.price}). It remains unowned.`;
+        const msg = `${player.name} cannot afford ${tile.name} ($${tile.price}). The Bank puts it up for auction.`;
         gameState.lastActionText = msg;
-        return { needsForceBuyChoice: false, toast: msg };
+        return { needsForceBuyChoice: false, toast: msg, auctionTile: tileIndex };
       }
     }
 
@@ -170,7 +180,7 @@ export function resolveLanding(
     // Not eligible for force-buy: pay rent
     const diceTotal = gameState.dice[0] + gameState.dice[1];
     const rent = calculateRent(gameState, tileIndex, diceTotal);
-    const result = payRent(gameState, player, opponent, rent);
+    const result = payRent(gameState, player, opponent, rent, `Rent for ${tile.name}`);
 
     if (result.debt !== undefined) {
       gameState.debt = {

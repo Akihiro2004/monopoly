@@ -73,6 +73,7 @@ export const PHASE_LABEL: Record<GameState['phase'], string> = {
   BUY_OFFER: 'Buying',
   FORCE_BUY_OFFER: 'Force buy',
   DEBT: 'Debt',
+  AUCTION: 'Auction',
   TURN_ENDED: 'End turn',
   GAME_OVER: 'Game over'
 };
@@ -152,4 +153,9 @@ export function rentSchedule(tileIndex: number): { label: string; value: string 
     { label: 'With hotel', value: money(tile.rentByLevel[3]) },
     { label: 'With landmark', value: money(tile.rentByLevel[4]) }
   ];
+}
+
+// Identifies one auction (same tile can be auctioned again on a later turn).
+export function auctionKey(game: GameState): string | null {
+  return game.auction ? `${game.turnNumber}:${game.auction.tileIndex}` : null;
 }

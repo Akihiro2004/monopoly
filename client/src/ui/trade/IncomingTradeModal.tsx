@@ -14,6 +14,7 @@ export const IncomingTradeModal: React.FC = () => {
   const busy = useGameStore(
     (s) =>
       s.cardDraw !== null ||
+      s.gameState?.phase === 'AUCTION' ||
       s.gameState?.buyOffer?.buyerPlayerId === s.myPlayerId ||
       s.gameState?.forceBuyOffer?.buyerPlayerId === s.myPlayerId ||
       (s.gameState?.phase === 'DEBT' && s.gameState.players[s.gameState.currentPlayerIndex]?.playerId === s.myPlayerId)

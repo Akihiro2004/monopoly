@@ -6,6 +6,7 @@ import {
   PropertyState,
   liquidationValue
 } from '@monopoly/shared';
+import { record, returnPieces } from './bank.js';
 
 /**
  * Calculates rent for a given property:
@@ -70,11 +71,13 @@ export function payRent(
   gameState: GameState,
   tenant: PlayerState,
   landlord: PlayerState,
-  amount: number
+  amount: number,
+  reason = 'Rent'
 ): { paid: number; bankrupt: boolean; debt?: number } {
   if (tenant.money >= amount) {
     tenant.money -= amount;
     landlord.money += amount;
+    record(gameState, tenant.playerId, landlord.playerId, amount, reason);
     return { paid: amount, bankrupt: false };
   }
   return { paid: 0, bankrupt: false, debt: amount };
@@ -96,7 +99,10 @@ export function applyBankruptcy(
   const raised = tenant.money + liquidationValue(gameState, tenant.playerId);
   const creditor = creditorId ? gameState.players.find((p) => p.playerId === creditorId) : null;
   const paid = creditor && !creditor.isBankrupt ? Math.min(debtAmount, raised) : 0;
-  if (creditor) creditor.money += paid;
+  if (creditor) {
+    creditor.money += paid;
+    record(gameState, null, creditor.playerId, paid, `Bankruptcy payout from ${tenant.name}`);
+  }
 
   tenant.money = 0;
   tenant.isBankrupt = true;
@@ -104,6 +110,7 @@ export function applyBankruptcy(
 
   Object.values(gameState.properties).forEach((p) => {
     if (p.ownerId === tenant.playerId) {
+      returnPieces(gameState, p.buildLevel);
       p.ownerId = null;
       p.buildLevel = 0;
       p.isMortgaged = false;

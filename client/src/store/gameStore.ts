@@ -41,6 +41,8 @@ interface GameStore {
   snoozedTrades: string[];
   // Desktop: right panel collapsed into the compact dock.
   panelCollapsed: boolean;
+  // Auction the player closed with "Not interested" (see auctionKey).
+  dismissedAuction: string | null;
   chatMessages: ChatMessage[];
   toasts: ToastMessage[];
   winner: { winnerId: string; victoryType: VictoryType } | null;
@@ -58,6 +60,7 @@ interface GameStore {
   setWalkPaused: (paused: boolean) => void;
   snoozeTrade: (id: string) => void;
   setPanelCollapsed: (collapsed: boolean) => void;
+  setDismissedAuction: (key: string | null) => void;
   addChatMessage: (msg: ChatMessage) => void;
   addToast: (text: string, type?: 'info' | 'success' | 'warning' | 'danger') => void;
   removeToast: (id: string) => void;
@@ -95,6 +98,7 @@ export const useGameStore = create<GameStore>((set) => ({
   ticker: null,
   snoozedTrades: [],
   panelCollapsed: readPref('ui.panelCollapsed') === '1',
+  dismissedAuction: null,
   chatMessages: [],
   toasts: [],
   winner: null,
@@ -124,6 +128,7 @@ export const useGameStore = create<GameStore>((set) => ({
     writePref('ui.panelCollapsed', panelCollapsed ? '1' : '0');
     set({ panelCollapsed });
   },
+  setDismissedAuction: (dismissedAuction) => set({ dismissedAuction }),
   snoozeTrade: (id) => set((s) => ({ snoozedTrades: [...s.snoozedTrades, id] })),
   addChatMessage: (msg) =>
     set((s) => ({ chatMessages: [...s.chatMessages.slice(-50), msg] })),
@@ -235,6 +240,11 @@ export function initSocketListeners() {
     }
     if (!prevGame.forceBuyOffer && game.forceBuyOffer && wasMine(game.forceBuyOffer.buyerPlayerId)) {
       audioManager.playForceBuyAlarm();
+    }
+
+    // The Bank opened an auction
+    if (prevGame.phase !== 'AUCTION' && game.phase === 'AUCTION') {
+      audioManager.playModal();
     }
 
     // Debt entered and I am the debtor

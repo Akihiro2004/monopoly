@@ -120,7 +120,7 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Logo: the red Monopoly plate                                       */
+/* Logo: the red TMpoly plate                                         */
 /* ------------------------------------------------------------------ */
 .logo {
   position: relative;
@@ -149,25 +149,6 @@
   text-shadow: 0 4px 0 var(--ink);
 }
 
-.logo-3d {
-  position: absolute;
-  right: -0.6em;
-  top: -0.55em;
-  font-family: var(--font-display);
-  font-size: clamp(1.3rem, 2.6vw, 2rem);
-  color: var(--ink);
-  background: var(--gold);
-  border: 3px solid var(--ink);
-  border-radius: 50%;
-  width: 2.1em;
-  height: 2.1em;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transform: rotate(12deg);
-  box-shadow: 0 4px 0 var(--ink);
-}
-
 .logo-sm .logo-plate {
   font-size: 1.35rem;
   border-width: 3px;
@@ -180,13 +161,7 @@
   text-shadow: 0 2px 0 var(--ink);
 }
 
-.logo-sm .logo-3d {
-  font-size: 0.8rem;
-  border-width: 2px;
-  box-shadow: 0 2px 0 var(--ink);
-}
-
-/* ------------------------------------------------------------------ */
+.logo-sm /* ------------------------------------------------------------------ */
 /* Decorative mini board                                              */
 /* ------------------------------------------------------------------ */
 .mini-board {

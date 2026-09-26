@@ -8,6 +8,7 @@ export function useHudBadges() {
   return {
     deeds: game ? ownedBy(game, myPlayerId).length : 0,
     incomingTrades: game ? game.trades.filter((t) => t.toId === myPlayerId).length : 0,
+    auctionLive: game?.phase === 'AUCTION' ? 1 : 0,
     myCash: game?.players.find((p) => p.playerId === myPlayerId)?.money ?? 0
   };
 }

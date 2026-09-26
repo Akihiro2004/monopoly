@@ -1,7 +1,7 @@
-// Monopoly 3D service worker: makes the app installable and keeps the shell
+// TMpoly service worker: makes the app installable and keeps the shell
 // available on flaky connections. Network first (the game is live), falling
 // back to the cache for the app shell and hashed build assets.
-const CACHE = 'monopoly-3d-v1';
+const CACHE = 'tmpoly-v1';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(['/', '/manifest.webmanifest', '/icon.svg'])));

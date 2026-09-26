@@ -38,8 +38,8 @@ export const LobbyScreen: React.FC = () => {
   const handleShare = () => {
     navigator
       .share({
-        title: 'Monopoly 3D',
-        text: `Join my Monopoly 3D game. Room code: ${roomState.roomId}`,
+        title: 'TMpoly',
+        text: `Join my TMpoly game. Room code: ${roomState.roomId}`,
         url: window.location.origin
       })
       .catch(() => {});

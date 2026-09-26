@@ -14,6 +14,7 @@ import { MonopolyScene } from './three/Scene.js';
 import { useIsMobile } from './hooks/useIsMobile.js';
 import { Logo, Sky } from './ui/common/Sky.js';
 import { IncomingTradeModal } from './ui/trade/IncomingTradeModal.js';
+import { AuctionModal } from './ui/bank/AuctionModal.js';
 import { RotateOverlay } from './ui/common/RotateOverlay.js';
 
 export function App() {
@@ -117,6 +118,7 @@ export function App() {
           <CardModal />
           <DebtModal />
           <IncomingTradeModal />
+          <AuctionModal />
         </>
       )}
 

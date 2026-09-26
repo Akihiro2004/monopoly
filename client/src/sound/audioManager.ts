@@ -1,4 +1,4 @@
-// Procedural Web Audio API sound synthesizer for 3D Monopoly
+// Procedural Web Audio API sound synthesizer for TMpoly
 // Zero external asset dependencies, zero network latency, 100% offline reliable.
 
 class AudioManager {

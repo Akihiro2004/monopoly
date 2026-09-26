@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Box, Handshake, Home, MessageSquare, ScrollText, X } from 'lucide-react';
+import { Box, Handshake, Home, Landmark, MessageSquare, ScrollText, X } from 'lucide-react';
+import { BankView } from '../bank/BankView.js';
 import { useGameStore } from '../../store/gameStore.js';
 import { ActionPanel } from './ActionPanel.js';
 import { ActivityLog } from './ActivityLog.js';
@@ -13,13 +14,13 @@ import { useTurn } from './useTurn.js';
 import { useUnreadChat } from './useUnread.js';
 import { useHudBadges } from './useHudBadges.js';
 
-type Tab = 'board' | 'assets' | 'trade' | 'log' | 'chat';
+type Tab = 'board' | 'assets' | 'trade' | 'bank' | 'chat';
 
 const SHEET_TITLE: Record<Exclude<Tab, 'board'>, string> = {
   assets: 'My properties',
   trade: 'Trades',
-  log: 'Activity',
-  chat: 'Table chat'
+  bank: 'Bank',
+  chat: 'Table'
 };
 
 // Mobile (portrait): full-bleed board, a slim status bar, one event line,
@@ -28,8 +29,10 @@ export const MobileHUD: React.FC = () => {
   const turn = useTurn();
   const myPlayerId = useGameStore((s) => s.myPlayerId);
   const [tab, setTab] = useState<Tab>('board');
-  const unread = useUnreadChat(tab === 'chat');
-  const { deeds, incomingTrades } = useHudBadges();
+  // The Table sheet holds chat and the game log side by side.
+  const [tableView, setTableView] = useState<'chat' | 'log'>('chat');
+  const unread = useUnreadChat(tab === 'chat' && tableView === 'chat');
+  const { deeds, incomingTrades, auctionLive } = useHudBadges();
 
   if (!turn) return null;
 
@@ -37,7 +40,7 @@ export const MobileHUD: React.FC = () => {
     { id: 'board', label: 'Board', icon: Box },
     { id: 'assets', label: 'Assets', icon: Home, badge: deeds },
     { id: 'trade', label: 'Trade', icon: Handshake, badge: incomingTrades, alert: true },
-    { id: 'log', label: 'Log', icon: ScrollText },
+    { id: 'bank', label: 'Bank', icon: Landmark, badge: auctionLive, alert: true },
     { id: 'chat', label: 'Chat', icon: MessageSquare, badge: unread, alert: true }
   ];
 
@@ -54,7 +57,12 @@ export const MobileHUD: React.FC = () => {
 
       {tab === 'board' && (
         <div className="m-ticker-slot">
-          <Ticker onOpenLog={() => setTab('log')} />
+          <Ticker
+            onOpenLog={() => {
+              setTableView('log');
+              setTab('chat');
+            }}
+          />
         </div>
       )}
 
@@ -72,8 +80,20 @@ export const MobileHUD: React.FC = () => {
             <div className={`m-sheet-body ${tab === 'chat' ? 'no-scroll' : ''}`}>
               {tab === 'assets' && <Portfolio />}
               {tab === 'trade' && <TradeView />}
-              {tab === 'log' && <ActivityLog />}
-              {tab === 'chat' && <ChatView />}
+              {tab === 'bank' && <BankView />}
+              {tab === 'chat' && (
+                <>
+                  <div className="segmented small table-switch" role="tablist">
+                    <button role="tab" className={tableView === 'chat' ? 'active' : ''} onClick={() => setTableView('chat')}>
+                      <MessageSquare size={15} /> Chat
+                    </button>
+                    <button role="tab" className={tableView === 'log' ? 'active' : ''} onClick={() => setTableView('log')}>
+                      <ScrollText size={15} /> Game log
+                    </button>
+                  </div>
+                  {tableView === 'chat' ? <ChatView /> : <div className="table-log"><ActivityLog /></div>}
+                </>
+              )}
             </div>
           </section>
         </>

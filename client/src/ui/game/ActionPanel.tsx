@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { BOARD_TILES, JAIL_FINE } from '@monopoly/shared';
-import { ArrowUpCircle, Castle, Check, Dices, Footprints, Info, KeyRound, Lock, RotateCcw, Zap } from 'lucide-react';
+import { ArrowUpCircle, Castle, Check, Dices, Footprints, Gavel, Info, KeyRound, Lock, RotateCcw, Zap } from 'lucide-react';
 import { socket } from '../../net/socket.js';
 import { audioManager } from '../../sound/audioManager.js';
 import { useGameStore } from '../../store/gameStore.js';
@@ -27,6 +27,8 @@ export const ActionPanel: React.FC<{ variant: 'desktop' | 'mobile' }> = ({ varia
   const cardOpen = useGameStore((s) => s.cardDraw !== null);
   const myPlayerId = useGameStore((s) => s.myPlayerId);
   const forceLeft = useCountdown(turn?.game.forceBuyOffer?.expiresAt);
+  const auctionLeft = useCountdown(turn?.game.auction?.endsAt);
+  const setDismissedAuction = useGameStore((s) => s.setDismissedAuction);
   const desktop = variant === 'desktop';
 
   const phase = turn?.game.phase;
@@ -136,6 +138,27 @@ export const ActionPanel: React.FC<{ variant: 'desktop' | 'mobile' }> = ({ varia
   let tone: 'neutral' | 'danger' = 'neutral';
   let text = `${current.name} is rolling…`;
   let icon: React.ReactNode = <PlayerAvatar token={current.tokenType} color={current.color} size={28} />;
+
+  if (phase === 'AUCTION' && game.auction) {
+    const a = game.auction;
+    const leader = game.players.find((p) => p.playerId === a.highBidderId);
+    return (
+      <div className={`action-panel ${variant}`}>
+        <div className="action-status auction-status">
+          <Gavel size={18} className="status-icon" />
+          <span>
+            Auction · {BOARD_TILES[a.tileIndex].name} · {a.highBid > 0 ? `${money(a.highBid)} (${leader?.playerId === myPlayerId ? 'you' : leader?.name})` : 'no bids'} ·{' '}
+            {auctionLeft}s
+          </span>
+          {!me?.isBankrupt && (
+            <button className="btn btn-gold btn-sm" onClick={() => setDismissedAuction(null)}>
+              Bid
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (isMyTurn) {
     text = phase === 'DEBT' ? 'Raise cash to cover your debt' : 'Make your choice…';
