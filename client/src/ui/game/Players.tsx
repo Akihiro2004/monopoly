@@ -1,8 +1,9 @@
 import React from 'react';
-import { BOARD_TILES, GameState, PlayerState } from '@monopoly/shared';
-import { KeyRound, Lock, WifiOff } from 'lucide-react';
+import { BOARD_TILES, COLOR_GROUPS, GameState, PlayerState, TileGroup } from '@monopoly/shared';
+import { KeyRound, Lightbulb, Lock, Plane, WifiOff } from 'lucide-react';
 import { PlayerAvatar } from '../common/PlayerAvatar.js';
-import { GROUP_HEX, money, netWorth, ownedBy, playerHex } from '../theme.js';
+import { GROUP_HEX, GROUP_LABEL, GROUP_ORDER, money, netWorth, ownedBy, playerHex } from '../theme.js';
+import { LowCashAlert, cashTier } from './LowCashAlert.js';
 import { useMoneyDelta } from './useMoneyDelta.js';
 
 interface PlayersProps {
@@ -40,7 +41,8 @@ const PlayerCard: React.FC<{ game: GameState; player: PlayerState; active: boole
   isMe,
   rank
 }) => {
-  const deeds = ownedBy(game, p.playerId).sort((a, b) => a.tileIndex - b.tileIndex);
+  const deeds = ownedBy(game, p.playerId);
+  const tier = p.isBankrupt ? 0 : cashTier(p.money);
   return (
     <li
       className={`pcard ${active ? 'active' : ''} ${p.isBankrupt ? 'bankrupt' : ''} ${isMe ? 'me' : ''}`}
@@ -54,23 +56,14 @@ const PlayerCard: React.FC<{ game: GameState; player: PlayerState; active: boole
             <span className="truncate">{p.name}</span>
             {isMe && <span className="badge">You</span>}
           </span>
-          <span className="pcard-money money tnum">{p.isBankrupt ? 'Bankrupt' : money(p.money)}</span>
+          <span className={`pcard-money money tnum cash-t${tier}`}>{p.isBankrupt ? 'Bankrupt' : money(p.money)}</span>
           <Deltas value={p.money} />
         </div>
         {rank !== undefined && !p.isBankrupt && <span className={`pcard-rank r${rank}`}>{ORDINAL[rank]}</span>}
       </div>
       {(deeds.length > 0 || p.inJail || !p.isConnected || p.jailCards > 0) && (
         <div className="pcard-bottom">
-          <span className="deed-strip">
-            {deeds.map((d) => (
-              <span
-                key={d.tileIndex}
-                className={`deed-pip ${d.isMortgaged ? 'mortgaged' : ''} ${d.buildLevel === 4 ? 'landmark' : ''}`}
-                style={{ background: GROUP_HEX[BOARD_TILES[d.tileIndex].group] }}
-                title={BOARD_TILES[d.tileIndex].name}
-              />
-            ))}
-          </span>
+          <GroupChips game={game} playerId={p.playerId} />
           {p.inJail && (
             <span className="badge red">
               <Lock size={10} /> Jail
@@ -88,15 +81,48 @@ const PlayerCard: React.FC<{ game: GameState; player: PlayerState; active: boole
           )}
         </div>
       )}
+      {isMe && !p.isBankrupt && <LowCashAlert amount={p.money} className="beside-card" />}
     </li>
+  );
+};
+
+// One chip per country / airports / utilities owned, with the count (a gold
+// ring marks a full set). Stays one short line even with 20+ deeds.
+const GroupChips: React.FC<{ game: GameState; playerId: string }> = ({ game, playerId }) => {
+  const counts = new Map<TileGroup, number>();
+  for (const d of ownedBy(game, playerId)) {
+    const g = BOARD_TILES[d.tileIndex].group;
+    counts.set(g, (counts.get(g) ?? 0) + 1);
+  }
+  const setSize = (g: TileGroup) => COLOR_GROUPS[g]?.length ?? (g === 'railroad' ? 4 : g === 'utility' ? 2 : 0);
+  return (
+    <span className="gchips">
+      {GROUP_ORDER.filter((g) => counts.has(g)).map((g) => {
+        const n = counts.get(g)!;
+        const full = n === setSize(g);
+        return (
+          <span
+            key={g}
+            className={`gchip ${full ? 'full' : ''} ${g === 'railroad' || g === 'utility' ? 'neutral' : ''}`}
+            style={{ '--g': GROUP_HEX[g] } as React.CSSProperties}
+            title={`${GROUP_LABEL[g]}: ${n}/${setSize(g)}${full ? ' (full set)' : ''}`}
+          >
+            {g === 'railroad' && <Plane size={9} />}
+            {g === 'utility' && <Lightbulb size={9} />}
+            {n}
+          </span>
+        );
+      })}
+    </span>
   );
 };
 
 // Desktop: floating player cards (no panel behind them).
 export const PlayerList: React.FC<PlayersProps> = ({ game, myPlayerId }) => {
   const r = ranks(game);
+  const n = game.players.length;
   return (
-    <ul className="pcard-list">
+    <ul className={`pcard-list ${n >= 5 ? 'dense' : n === 4 ? 'compact' : ''}`}>
       {game.players.map((p, idx) => (
         <PlayerCard
           key={p.playerId}
@@ -119,7 +145,7 @@ const StripChip: React.FC<{ p: PlayerState; active: boolean; isMe: boolean }> = 
     <PlayerAvatar token={p.tokenType} color={p.color} size={24} dim={p.isBankrupt} />
     <span className="strip-text">
       <span className="strip-name truncate">{isMe ? 'You' : p.name}</span>
-      <span className="strip-money tnum">{p.isBankrupt ? 'Out' : money(p.money)}</span>
+      <span className={`strip-money tnum cash-t${p.isBankrupt ? 0 : cashTier(p.money)}`}>{p.isBankrupt ? 'Out' : money(p.money)}</span>
     </span>
     {p.inJail && <Lock size={11} className="strip-jail" />}
     <Deltas value={p.money} />
@@ -128,7 +154,7 @@ const StripChip: React.FC<{ p: PlayerState; active: boolean; isMe: boolean }> = 
 
 // Mobile: compact horizontal strip.
 export const PlayerStrip: React.FC<PlayersProps> = ({ game, myPlayerId }) => (
-  <div className="player-strip">
+  <div className={`player-strip n${game.players.length}`}>
     {game.players.map((p, idx) => (
       <StripChip key={p.playerId} p={p} active={idx === game.currentPlayerIndex} isMe={p.playerId === myPlayerId} />
     ))}

@@ -8,6 +8,7 @@ import { BuyPropertyModal } from './ui/BuyPropertyModal.js';
 import { ForceBuyModal } from './ui/ForceBuyModal.js';
 import { CardModal } from './ui/CardModal.js';
 import { DebtPlanner } from './ui/debt/DebtPlanner.js';
+import { PropertySheet } from './ui/property/PropertySheet.js';
 import { VictoryOverlay } from './ui/VictoryOverlay.js';
 import { ToastContainer } from './ui/ToastContainer.js';
 // The 3D engine (three.js + scene) is its own chunk: menus load fast, and the
@@ -130,6 +131,7 @@ export function App() {
           <BuyPropertyModal />
           <ForceBuyModal />
           <CardModal />
+          <PropertySheet />
           <DebtPlanner />
           <IncomingTradeModal />
           <AuctionModal />

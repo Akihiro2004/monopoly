@@ -5,7 +5,12 @@ import {
   GameState,
   PlayerState,
   PropertyState,
-  buildBlockReason
+  buildBlockReason,
+  buildingRefund,
+  mortgageBlockReason,
+  mortgageValue,
+  sellToBankValue,
+  unmortgageCost
 } from '@monopoly/shared';
 import { movePieces, record } from './bank.js';
 
@@ -86,14 +91,15 @@ export function buildProperty(
 }
 
 /**
- * Sells one building level back (Hotel -> Building -> House -> Land).
- * Refunds half of the tile's build cost per level.
- * Use this to raise cash when you cannot afford rent, tax, or card payments.
+ * Sells buildings back to the Bank at half the build cost per level
+ * (Landmark -> Hotel -> Building -> House -> Land). By default one level;
+ * `toLevel` sells straight down to that level.
  */
 export function sellBuilding(
   gameState: GameState,
   player: PlayerState,
-  tileIndex: number
+  tileIndex: number,
+  toLevel?: number
 ): { success: boolean; text: string; refund?: number } {
   const tile = BOARD_TILES[tileIndex];
   const prop = gameState.properties[tileIndex];
@@ -106,27 +112,56 @@ export function sellBuilding(
     return { success: false, text: 'You do not own this property' };
   }
 
-  if (prop.buildLevel <= 0) {
+  if (prop.buildLevel <= 0 || tile.buildCost <= 0) {
     return { success: false, text: `${tile.name} has no buildings to sell` };
   }
 
-  if (tile.buildCost <= 0) {
-    return { success: false, text: 'This property has nothing to sell' };
+  let targetLevel = toLevel === undefined ? prop.buildLevel - 1 : Math.floor(toLevel);
+  if (!Number.isInteger(targetLevel) || targetLevel < 0 || targetLevel >= prop.buildLevel) {
+    return { success: false, text: 'Pick a lower level to sell down to' };
   }
-
-  const perLevel = Math.floor(tile.buildCost / 2);
-  // Selling a hotel back to 2 houses needs the Bank to have 2 houses; during
-  // a housing shortage the whole property is sold down to land (real rule).
-  const shortage = prop.buildLevel === 3 && gameState.bank.houses < 2;
-  const targetLevel = shortage ? 0 : prop.buildLevel - 1;
-  const refund = perLevel * (prop.buildLevel - targetLevel);
+  // Breaking a hotel back into houses needs the Bank to have them; during a
+  // housing shortage the property is sold down to land instead (real rule).
+  if (prop.buildLevel >= 3 && targetLevel > 0 && targetLevel < 3 && gameState.bank.houses < targetLevel) {
+    targetLevel = 0;
+  }
+  const refund = buildingRefund(tileIndex, prop.buildLevel - targetLevel);
   movePieces(gameState, prop.buildLevel, targetLevel);
   prop.buildLevel = targetLevel as BuildLevel;
   player.money += refund;
   record(gameState, null, player.playerId, refund, `Sold buildings on ${tile.name}`);
 
   const levelNames = ['Land', 'House (Lv 1)', 'Building (Lv 2)', 'Hotel (Lv 3)', 'LANDMARK (Lv 4)'];
-  const msg = `${player.name} sold a building on ${tile.name} for $${refund} (now ${levelNames[prop.buildLevel]}).`;
+  const msg = `${player.name} sold buildings on ${tile.name} for $${refund} (now ${levelNames[prop.buildLevel]}).`;
+  gameState.lastActionText = msg;
+  return { success: true, text: msg, refund };
+}
+
+/**
+ * Sells a whole deed back to the Bank: buildings at half the build cost plus
+ * the land at its mortgage value (a mortgaged deed just cancels the loan).
+ * The property becomes unowned and can be bought again.
+ */
+export function sellPropertyToBank(
+  gameState: GameState,
+  player: PlayerState,
+  tileIndex: number
+): { success: boolean; text: string; refund?: number } {
+  const tile = BOARD_TILES[tileIndex];
+  const prop = gameState.properties[tileIndex];
+  if (!tile || !prop || tile.price <= 0) return { success: false, text: 'Invalid property' };
+  if (prop.ownerId !== player.playerId) return { success: false, text: 'You do not own this property' };
+
+  const refund = sellToBankValue(prop);
+  movePieces(gameState, prop.buildLevel, 0);
+  prop.ownerId = null;
+  prop.buildLevel = 0;
+  prop.isMortgaged = false;
+  prop.forceBought = false;
+  player.money += refund;
+  if (refund > 0) record(gameState, null, player.playerId, refund, `Sold ${tile.name} to the Bank`);
+
+  const msg = `${player.name} sold ${tile.name} back to the Bank for $${refund}.`;
   gameState.lastActionText = msg;
   return { success: true, text: msg, refund };
 }
@@ -148,13 +183,9 @@ export function toggleMortgage(
   }
 
   if (mortgage) {
-    if (prop.isMortgaged) {
-      return { success: false, text: 'Property already mortgaged' };
-    }
-    if (prop.buildLevel > 0) {
-      return { success: false, text: 'Must sell all buildings before mortgaging' };
-    }
-    const value = Math.floor(tile.price / 2);
+    const blocked = mortgageBlockReason(gameState, player.playerId, tileIndex);
+    if (blocked) return { success: false, text: blocked };
+    const value = mortgageValue(tileIndex);
     prop.isMortgaged = true;
     player.money += value;
     record(gameState, null, player.playerId, value, `Mortgaged ${tile.name}`);
@@ -165,14 +196,14 @@ export function toggleMortgage(
     if (!prop.isMortgaged) {
       return { success: false, text: 'Property is not mortgaged' };
     }
-    const cost = Math.floor((tile.price / 2) * 1.1); // 10% interest
+    const cost = unmortgageCost(tileIndex); // mortgage value + 10% interest
     if (player.money < cost) {
-      return { success: false, text: `Need $${cost} to unmortgage ${tile.name}` };
+      return { success: false, text: `Need $${cost} to lift the mortgage on ${tile.name}` };
     }
     player.money -= cost;
     prop.isMortgaged = false;
     record(gameState, player.playerId, null, cost, `Paid off mortgage on ${tile.name}`);
-    const msg = `${player.name} unmortgaged ${tile.name} for $${cost}.`;
+    const msg = `${player.name} lifted the mortgage on ${tile.name} for $${cost}.`;
     gameState.lastActionText = msg;
     return { success: true, text: msg };
   }

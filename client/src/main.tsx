@@ -15,6 +15,7 @@ import './styles/game-mobile.css';
 import './styles/modals.css';
 import './styles/bank.css';
 import './styles/planner.css';
+import './styles/property.css';
 import App from './App.tsx';
 import { registerPwa } from './pwa.js';
 

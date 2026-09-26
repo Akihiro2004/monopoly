@@ -10,11 +10,14 @@ interface ModalProps {
   width?: number;
   className?: string;
   label?: string;
+  // Extra class on the backdrop (e.g. 'over-planner' to stack above the
+  // docked debt planner).
+  layer?: string;
 }
 
 // One modal primitive for the whole app: a centered dialog with a scale-in on
 // desktop, a bottom sheet with a grab handle on phones.
-export const Modal: React.FC<ModalProps> = ({ children, onClose, width = 420, className = '', label }) => {
+export const Modal: React.FC<ModalProps> = ({ children, onClose, width = 420, className = '', label, layer = '' }) => {
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -28,7 +31,7 @@ export const Modal: React.FC<ModalProps> = ({ children, onClose, width = 420, cl
 
   return (
     <div
-      className={`modal-backdrop ${isMobile ? 'sheet-mode' : ''}`}
+      className={`modal-backdrop ${isMobile ? 'sheet-mode' : ''} ${layer}`}
       onClick={onClose}
       role="presentation"
     >

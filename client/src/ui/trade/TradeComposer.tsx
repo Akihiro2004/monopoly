@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Handshake, Minus, Plus, Send } from 'lucide-react';
-import { tradeBlockReason } from '@monopoly/shared';
+import { tradeBlockReason, tradeMortgageFees } from '@monopoly/shared';
 import { socket } from '../../net/socket.js';
 import { useGameStore } from '../../store/gameStore.js';
 import { audioManager } from '../../sound/audioManager.js';
@@ -33,7 +33,7 @@ const MoneyStepper: React.FC<{ value: number; max: number; onChange: (v: number)
   );
 };
 
-export const TradeComposer: React.FC<{ onClose: () => void; partnerId?: string }> = ({ onClose, partnerId }) => {
+export const TradeComposer: React.FC<{ onClose: () => void; partnerId?: string; layer?: string }> = ({ onClose, partnerId, layer }) => {
   const game = useGameStore((s) => s.gameState);
   const myPlayerId = useGameStore((s) => s.myPlayerId);
   const partners = useMemo(
@@ -82,6 +82,7 @@ export const TradeComposer: React.FC<{ onClose: () => void; partnerId?: string }
               selected={selected.includes(p.tileIndex)}
               disabled={!!reason}
               mortgaged={p.isMortgaged}
+              level={p.buildLevel}
               title={reason ?? undefined}
               onClick={() => toggle(selected, set, p.tileIndex)}
             />
@@ -92,7 +93,7 @@ export const TradeComposer: React.FC<{ onClose: () => void; partnerId?: string }
   };
 
   return (
-    <Modal width={640} onClose={onClose} label="New trade">
+    <Modal width={640} onClose={onClose} label="New trade" layer={layer}>
       <div className="modal-pad trade-composer">
         <div className="modal-title">
           <span className="modal-title-icon">
@@ -100,7 +101,7 @@ export const TradeComposer: React.FC<{ onClose: () => void; partnerId?: string }
           </span>
           <div>
             <h2 className="display">Make a trade</h2>
-            <p>Offer cash and deeds. Built properties must be sold down first.</p>
+            <p>Offer cash and deeds. Cities keep their buildings when traded; mortgaged deeds can be traded too.</p>
           </div>
         </div>
 
@@ -142,6 +143,12 @@ export const TradeComposer: React.FC<{ onClose: () => void; partnerId?: string }
               </section>
             </div>
 
+            <MortgageFeeNote
+              myFee={tradeMortgageFees(game, getProps)}
+              theirFee={tradeMortgageFees(game, giveProps)}
+              partnerName={partner?.name ?? 'They'}
+            />
+
             <div className="modal-actions">
               <button type="button" className="btn btn-secondary btn-lg" onClick={onClose}>
                 Cancel
@@ -154,5 +161,22 @@ export const TradeComposer: React.FC<{ onClose: () => void; partnerId?: string }
         )}
       </div>
     </Modal>
+  );
+};
+
+// Classic rule: whoever receives a mortgaged deed pays the Bank 10% interest.
+const MortgageFeeNote: React.FC<{ myFee: number; theirFee: number; partnerName: string }> = ({ myFee, theirFee, partnerName }) => {
+  if (!myFee && !theirFee) return null;
+  return (
+    <p className="trade-fee-note">
+      Mortgaged deeds stay mortgaged; the new owner pays 10% interest to the Bank.
+      {myFee > 0 && <> You pay <b className="tnum">{money(myFee)}</b>.</>}
+      {theirFee > 0 && (
+        <>
+          {' '}
+          {partnerName} pays <b className="tnum">{money(theirFee)}</b>.
+        </>
+      )}
+    </p>
   );
 };

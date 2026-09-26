@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { BOARD_TILES, JAIL_FINE } from '@monopoly/shared';
 import { ArrowUpCircle, Castle, Check, Dices, Footprints, Gavel, Info, KeyRound, Lock, RotateCcw, Zap } from 'lucide-react';
 import { socket } from '../../net/socket.js';
@@ -14,7 +14,57 @@ const click = (fn: () => void) => () => {
   fn();
 };
 
-const roll = click(() => socket.emit('game:roll'));
+const emitRoll = click(() => socket.emit('game:roll'));
+
+// The visible ROLL button plays its press animation first, then rolls; the
+// Space key goes through the same path so it looks the same.
+let pressVisibleRoll: (() => void) | null = null;
+const roll = () => (pressVisibleRoll ? pressVisibleRoll() : emitRoll());
+
+const RollButton: React.FC<{ desktop: boolean; label: string }> = ({ desktop, label }) => {
+  const [fx, setFx] = useState(0); // bumps per press: restarts the burst
+  const busy = useRef(false);
+  const press = useCallback(() => {
+    if (busy.current) return;
+    busy.current = true;
+    setFx((n) => n + 1);
+    audioManager.playClick();
+    // Let the squash-and-spring play before the dice (and this button) go.
+    setTimeout(() => {
+      socket.emit('game:roll');
+      busy.current = false;
+    }, 230);
+  }, []);
+  useEffect(() => {
+    pressVisibleRoll = press;
+    return () => {
+      if (pressVisibleRoll === press) pressVisibleRoll = null;
+    };
+  }, [press]);
+
+  const burst =
+    fx > 0 ? (
+      <span key={fx} className="roll-burst" aria-hidden="true">
+        {Array.from({ length: 10 }, (_, i) => (
+          <i key={i} style={{ '--a': `${i * 36}deg` } as React.CSSProperties} />
+        ))}
+      </span>
+    ) : null;
+
+  return desktop ? (
+    <button key={fx} className={`roll-btn btn-roll ${fx ? 'pressed' : ''}`} onClick={press} aria-label="Roll dice">
+      {burst}
+      <Dices size={34} strokeWidth={2.4} className="roll-dice-icon" />
+      <span>ROLL</span>
+    </button>
+  ) : (
+    <button key={fx} className={`btn btn-primary btn-xl btn-main btn-roll ${fx ? 'pressed' : ''}`} onClick={press}>
+      {burst}
+      <Dices size={26} className="roll-dice-icon" />
+      <span>{label}</span>
+    </button>
+  );
+};
 const endTurn = click(() => socket.emit('game:endTurn'));
 const payJail = click(() => socket.emit('game:payJail'));
 const applyJailCard = click(() => socket.emit('game:useJailCard'));
@@ -84,17 +134,7 @@ export const ActionPanel: React.FC<{ variant: 'desktop' | 'mobile' }> = ({ varia
             </div>
           </div>
         )}
-        {desktop ? (
-          <button className="roll-btn btn-roll" onClick={roll} aria-label="Roll dice">
-            <Dices size={34} strokeWidth={2.4} />
-            <span>ROLL</span>
-          </button>
-        ) : (
-          <button className="btn btn-primary btn-xl btn-main btn-roll" onClick={roll}>
-            <Dices size={26} />
-            <span>{me?.inJail ? 'Roll for doubles' : 'Roll dice'}</span>
-          </button>
-        )}
+        <RollButton desktop={desktop} label={me?.inJail ? 'Roll for doubles' : 'Roll dice'} />
         {desktop && kbd}
       </div>
     );

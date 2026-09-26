@@ -684,11 +684,153 @@
   align-items: center;
   justify-content: center;
   padding: calc(20px + var(--safe-top)) 16px calc(20px + var(--safe-bottom));
-  background:
-    repeating-conic-gradient(from 0deg at 50% 40%, rgba(255, 198, 41, 0.35) 0 10deg, rgba(255, 198, 41, 0) 10deg 20deg),
-    rgba(43, 29, 16, 0.6);
-  overflow-y: auto;
+  background: rgba(43, 29, 16, 0.6);
+  overflow: hidden auto;
   animation: fade-in 0.4s ease;
+}
+
+/* Sun rays: one big layer rotated on the GPU (smooth, cheap), softly
+   faded toward the edges. */
+.victory-rays {
+  position: fixed;
+  left: 50%;
+  top: 42%;
+  width: 220vmax;
+  height: 220vmax;
+  margin: -110vmax 0 0 -110vmax;
+  pointer-events: none;
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgba(255, 214, 92, 0.34) 0deg 7deg,
+    rgba(255, 214, 92, 0.1) 9deg 13deg,
+    rgba(255, 214, 92, 0) 15deg 20deg
+  );
+  -webkit-mask-image: radial-gradient(circle, #000 0%, rgba(0, 0, 0, 0.85) 18%, transparent 46%);
+  mask-image: radial-gradient(circle, #000 0%, rgba(0, 0, 0, 0.85) 18%, transparent 46%);
+  animation: rays-spin 40s linear infinite;
+  will-change: transform;
+}
+
+@keyframes rays-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.victory-floaters {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.floater {
+  position: absolute;
+  bottom: -40px;
+  display: grid;
+  place-items: center;
+  width: calc(34px * var(--s));
+  height: calc(34px * var(--s));
+  border-radius: 50%;
+  font-family: var(--font-display);
+  font-size: calc(1.1rem * var(--s));
+  animation: float-up linear infinite;
+  will-change: transform;
+}
+
+.floater.coin {
+  color: var(--gold-dark);
+  background: radial-gradient(circle at 35% 30%, #fff3b0, var(--gold) 60%, var(--gold-dark));
+  border: 2px solid var(--ink);
+}
+
+.floater.star {
+  color: #fff3b0;
+  filter: drop-shadow(0 2px 0 var(--ink));
+}
+
+@keyframes float-up {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.9;
+  }
+  50% {
+    transform: translate(18px, -55vh) rotate(180deg);
+  }
+  90% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(-10px, -115vh) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+.trophy-wrap {
+  position: relative;
+  margin-top: -64px;
+}
+
+.trophy-glow {
+  position: absolute;
+  inset: -26px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 214, 92, 0.75), transparent 68%);
+  animation: glow-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+}
+
+.trophy-spark {
+  position: absolute;
+  color: var(--gold);
+  filter: drop-shadow(0 1px 0 var(--ink));
+  animation: twinkle 1.6s ease-in-out infinite;
+}
+
+.trophy-spark.s0 {
+  left: -22px;
+  top: 6px;
+}
+.trophy-spark.s1 {
+  right: -24px;
+  top: 0;
+  animation-delay: 0.4s;
+}
+.trophy-spark.s2 {
+  left: -14px;
+  bottom: -2px;
+  animation-delay: 0.8s;
+}
+.trophy-spark.s3 {
+  right: -16px;
+  bottom: 4px;
+  animation-delay: 1.2s;
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    transform: scale(0.4) rotate(0deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1) rotate(90deg);
+    opacity: 1;
+  }
 }
 
 .victory-card {
@@ -712,15 +854,40 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
   width: 96px;
   height: 96px;
-  margin-top: -64px;
   border-radius: 50%;
   color: var(--ink);
   background: radial-gradient(circle at 35% 30%, #fff3b0, var(--gold) 60%, var(--gold-dark));
   border: var(--line);
   box-shadow: 0 5px 0 var(--ink), 0 0 0 8px var(--paper), 0 0 0 11px var(--ink);
-  animation: wiggle 1.2s ease-in-out infinite;
+  animation:
+    trophy-drop 0.8s var(--ease-spring) both,
+    trophy-bounce 2.2s ease-in-out 0.8s infinite;
+}
+
+@keyframes trophy-drop {
+  from {
+    transform: translateY(-80px) scale(0.3) rotate(-30deg);
+    opacity: 0;
+  }
+}
+
+@keyframes trophy-bounce {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-8px) rotate(-6deg);
+  }
+  50% {
+    transform: translateY(0) rotate(0deg) scale(1.04, 0.96);
+  }
+  75% {
+    transform: translateY(-5px) rotate(5deg);
+  }
 }
 
 .victory-kicker {
@@ -758,6 +925,7 @@
 }
 
 .standings li {
+  animation: standing-in 0.45s var(--ease-spring) both;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -770,7 +938,49 @@
 }
 
 .standings li.winner {
+  position: relative;
+  overflow: hidden;
   background: var(--gold);
+}
+
+/* a shine sweeping across the winner's row */
+.standings li.winner::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  left: -50%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+  animation: shine 2.8s ease-in-out 1.2s infinite;
+}
+
+@keyframes shine {
+  0% {
+    left: -50%;
+  }
+  60%,
+  100% {
+    left: 120%;
+  }
+}
+
+@keyframes standing-in {
+  from {
+    opacity: 0;
+    transform: translateX(-24px) scale(0.95);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .victory-rays,
+  .floater,
+  .trophy-ring,
+  .trophy-glow,
+  .trophy-spark,
+  .standings li.winner::after {
+    animation: none;
+  }
 }
 
 .rank {

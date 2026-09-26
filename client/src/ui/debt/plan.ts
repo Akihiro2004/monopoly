@@ -1,4 +1,4 @@
-import { BOARD_TILES, GameState, PropertyState } from '@monopoly/shared';
+import { BOARD_TILES, COLOR_GROUPS, GameState, PropertyState, TileGroup } from '@monopoly/shared';
 
 // A plan says, per property, which level to sell down to and whether to
 // mortgage it (only possible once it is back to land).
@@ -7,6 +7,37 @@ export interface PlanItem {
   mortgage: boolean;
 }
 export type Plan = Record<number, PlanItem>;
+
+// Color sets where another player still has buildings (they block mortgages
+// in that set, like the player's own buildings do).
+export function othersBuiltGroups(game: GameState, playerId: string): Set<TileGroup> {
+  const out = new Set<TileGroup>();
+  for (const p of Object.values(game.properties)) {
+    if (p.ownerId && p.ownerId !== playerId && p.buildLevel > 0) out.add(BOARD_TILES[p.tileIndex].group);
+  }
+  return out;
+}
+
+// Classic rule: land can only be mortgaged once the whole color set has no
+// buildings, i.e. after the plan's sales every deed of the set is bare land.
+export function mortgageAllowed(p: PropertyState, plan: Plan, props: PropertyState[], blocked: Set<TileGroup>): boolean {
+  const group = BOARD_TILES[p.tileIndex].group;
+  if (blocked.has(group)) return false;
+  const set = COLOR_GROUPS[group] ?? [p.tileIndex];
+  return props.every((q) => !set.includes(q.tileIndex) || (plan[q.tileIndex]?.level ?? q.buildLevel) === 0);
+}
+
+// Drops mortgage choices the rest of the plan no longer allows.
+export function normalizePlan(props: PropertyState[], plan: Plan, blocked: Set<TileGroup>): Plan {
+  const next: Plan = { ...plan };
+  for (const p of props) {
+    const item = next[p.tileIndex];
+    if (item?.mortgage && (item.level !== 0 || !mortgageAllowed(p, next, props, blocked))) {
+      next[p.tileIndex] = { ...item, mortgage: false };
+    }
+  }
+  return next;
+}
 
 export function initialPlan(props: PropertyState[]): Plan {
   return Object.fromEntries(props.map((p) => [p.tileIndex, { level: p.buildLevel, mortgage: false }]));
@@ -36,7 +67,7 @@ export function rentAt(p: PropertyState, level: number, mortgaged: boolean): num
  * possible per dollar raised: each step either sells the top building level
  * of a property or (once it is land) mortgages it.
  */
-export function autoPlan(props: PropertyState[], needed: number): Plan {
+export function autoPlan(props: PropertyState[], needed: number, blocked: Set<TileGroup> = new Set()): Plan {
   const plan = initialPlan(props);
   let raised = 0;
   const liquid = props.filter((p) => !p.isMortgaged);
@@ -50,7 +81,7 @@ export function autoPlan(props: PropertyState[], needed: number): Plan {
         const loss = rentAt(p, item.level, false) - rentAt(p, item.level - 1, false);
         const score = loss / gain;
         if (!best || score < best.score) best = { idx: p.tileIndex, gain, mortgage: false, score };
-      } else if (item.level === 0 && !item.mortgage) {
+      } else if (item.level === 0 && !item.mortgage && mortgageAllowed(p, plan, props, blocked)) {
         const gain = Math.floor(tile.price / 2);
         const score = rentAt(p, 0, false) / gain + 0.05; // prefer selling buildings on ties
         if (!best || score < best.score) best = { idx: p.tileIndex, gain, mortgage: true, score };

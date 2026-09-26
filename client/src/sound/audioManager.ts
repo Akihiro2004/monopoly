@@ -4,14 +4,61 @@ class AudioManager {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private sfxGain: GainNode | null = null;
+  private musicGain: GainNode | null = null;
   private muted: boolean = false;
+  // User volume sliders (0..1), saved per device.
+  private musicVolume = 0.5;
+  private sfxVolume = 0.8;
+  private volumeListeners: Array<() => void> = [];
   private bgmPlaying: boolean = false;
   private listeners: Array<(muted: boolean) => void> = [];
 
   constructor() {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('monopoly_muted');
-      this.muted = saved === 'true';
+      try {
+        this.muted = localStorage.getItem('monopoly_muted') === 'true';
+        const music = parseFloat(localStorage.getItem('tmpoly_music_volume') ?? '');
+        const sfx = parseFloat(localStorage.getItem('tmpoly_sfx_volume') ?? '');
+        if (Number.isFinite(music)) this.musicVolume = Math.min(1, Math.max(0, music));
+        if (Number.isFinite(sfx)) this.sfxVolume = Math.min(1, Math.max(0, sfx));
+      } catch {
+        // storage unavailable: defaults
+      }
+    }
+  }
+
+  public getVolumes(): { music: number; sfx: number } {
+    return { music: this.musicVolume, sfx: this.sfxVolume };
+  }
+
+  public subscribeVolume(cb: () => void): () => void {
+    this.volumeListeners.push(cb);
+    return () => {
+      this.volumeListeners = this.volumeListeners.filter((l) => l !== cb);
+    };
+  }
+
+  public setMusicVolume(v: number) {
+    this.musicVolume = Math.min(1, Math.max(0, v));
+    this.saveVolume('tmpoly_music_volume', this.musicVolume);
+    if (this.musicGain && this.ctx) this.musicGain.gain.setTargetAtTime(this.musicVolume, this.ctx.currentTime, 0.05);
+    // No Web Audio: the element volume carries it.
+    for (const d of this.decks) if (!d.gain) d.el.volume = AudioManager.BGM_VOLUME * this.musicVolume;
+    this.volumeListeners.forEach((l) => l());
+  }
+
+  public setSfxVolume(v: number) {
+    this.sfxVolume = Math.min(1, Math.max(0, v));
+    this.saveVolume('tmpoly_sfx_volume', this.sfxVolume);
+    if (this.sfxGain && this.ctx) this.sfxGain.gain.setTargetAtTime(0.7 * this.sfxVolume, this.ctx.currentTime, 0.05);
+    this.volumeListeners.forEach((l) => l());
+  }
+
+  private saveVolume(key: string, v: number) {
+    try {
+      localStorage.setItem(key, v.toFixed(2));
+    } catch {
+      // ignore
     }
   }
 
@@ -31,8 +78,12 @@ class AudioManager {
     this.masterGain.connect(this.ctx.destination);
 
     this.sfxGain = this.ctx.createGain();
-    this.sfxGain.gain.value = 0.7;
+    this.sfxGain.gain.value = 0.7 * this.sfxVolume;
     this.sfxGain.connect(this.masterGain);
+
+    this.musicGain = this.ctx.createGain();
+    this.musicGain.gain.value = this.musicVolume;
+    this.musicGain.connect(this.masterGain);
 
     if (!this.muted && !this.bgmPlaying) {
       this.startBGM();
@@ -53,7 +104,11 @@ class AudioManager {
   public toggleMute(): boolean {
     this.initContext();
     this.muted = !this.muted;
-    localStorage.setItem('monopoly_muted', String(this.muted));
+    try {
+      localStorage.setItem('monopoly_muted', String(this.muted));
+    } catch {
+      // ignore
+    }
     if (this.masterGain && this.ctx) {
       this.masterGain.gain.setTargetAtTime(this.muted ? 0 : 1, this.ctx.currentTime, 0.05);
     }
@@ -384,13 +439,13 @@ class AudioManager {
       const el = new Audio(url);
       el.preload = i === 0 ? 'auto' : 'metadata';
       let gain: GainNode | null = null;
-      if (this.ctx && this.masterGain) {
+      if (this.ctx && this.musicGain) {
         try {
           const src = this.ctx.createMediaElementSource(el);
           gain = this.ctx.createGain();
           gain.gain.value = 0;
           src.connect(gain);
-          gain.connect(this.masterGain);
+          gain.connect(this.musicGain);
         } catch {
           gain = null;
         }
@@ -398,7 +453,7 @@ class AudioManager {
       if (!gain) {
         // No Web Audio: a single element with a plain loop still works.
         el.loop = true;
-        el.volume = AudioManager.BGM_VOLUME;
+        el.volume = AudioManager.BGM_VOLUME * this.musicVolume;
       }
       this.decks.push({ el, gain });
     }

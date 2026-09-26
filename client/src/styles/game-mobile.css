@@ -140,11 +140,11 @@
 /* One-line event ticker */
 .m-ticker-slot {
   position: absolute;
-  top: calc(104px + var(--safe-top));
+  bottom: calc(158px + var(--safe-bottom));
   left: 12px;
-  right: 12px;
+  right: 84px;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   pointer-events: none;
 }
 
@@ -363,4 +363,45 @@
 
 .layout-mobile .toast-stack {
   top: calc(16px + var(--safe-top));
+}
+
+/* 5-6 players: the strip shares the width evenly instead of scrolling */
+.player-strip.n5,
+.player-strip.n6 {
+  display: grid;
+  grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+  gap: 4px;
+  overflow: visible;
+}
+
+.player-strip.n5 {
+  --n: 5;
+}
+
+.player-strip.n6 {
+  --n: 6;
+}
+
+.player-strip.n5 .strip-chip,
+.player-strip.n6 .strip-chip {
+  min-width: 0;
+  height: 32px;
+  gap: 3px;
+  padding: 0 4px 0 2px;
+}
+
+.player-strip.n5 .strip-name,
+.player-strip.n6 .strip-name {
+  max-width: 100%;
+  font-size: 0.56rem;
+}
+
+.player-strip.n5 .strip-money,
+.player-strip.n6 .strip-money {
+  font-size: 0.74rem;
+}
+
+.player-strip.n6 .strip-chip .avatar {
+  width: 20px !important;
+  height: 20px !important;
 }

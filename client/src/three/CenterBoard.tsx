@@ -41,6 +41,7 @@ const CardDeck: React.FC<{
   const lifted = useGameStore((s) => s.cardDraw?.deck === mark);
   const top = useRef<THREE.Group>(null);
   const t = useRef(0);
+  const baseY = (cardCount - 1) * cardH;
   useFrame((_, dt) => {
     const g = top.current;
     if (!g) return;
@@ -48,7 +49,8 @@ const CardDeck: React.FC<{
     if (t.current === target) return;
     t.current = lifted ? Math.min(1, t.current + Math.min(dt, 0.05) * 4) : 0;
     const k = t.current;
-    g.position.y = k * 1.4;
+    // Offset from the card's resting height (not 0, which sinks it into the stack).
+    g.position.y = baseY + k * 1.4;
     g.rotation.x = -k * 0.9;
     g.scale.setScalar(1 - k * 0.6);
     g.visible = k < 0.98;
@@ -63,7 +65,7 @@ const CardDeck: React.FC<{
         </mesh>
       ))}
       {/* the drawable top card */}
-      <group ref={top} position={[0, (cardCount - 1) * cardH, 0]}>
+      <group ref={top} position={[0, baseY, 0]}>
         <mesh castShadow receiveShadow>
           <boxGeometry args={[1.7, cardH, 2.3]} />
           <meshStandardMaterial color={color} roughness={0.7} />

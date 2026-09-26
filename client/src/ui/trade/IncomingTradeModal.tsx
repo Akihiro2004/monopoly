@@ -16,9 +16,10 @@ export const IncomingTradeModal: React.FC = () => {
       s.cardDraw !== null ||
       s.gameState?.phase === 'AUCTION' ||
       s.gameState?.buyOffer?.buyerPlayerId === s.myPlayerId ||
-      s.gameState?.forceBuyOffer?.buyerPlayerId === s.myPlayerId ||
-      (s.gameState?.phase === 'DEBT' && s.gameState.players[s.gameState.currentPlayerIndex]?.playerId === s.myPlayerId)
+      s.gameState?.forceBuyOffer?.buyerPlayerId === s.myPlayerId
   );
+  // A player in debt may still take an offer (it can save them), so it is
+  // shown above the debt planner.
 
   if (!game || busy) return null;
   const trade = game.trades.find((t) => t.toId === myPlayerId && !snoozed.includes(t.id));
@@ -26,7 +27,7 @@ export const IncomingTradeModal: React.FC = () => {
   const from = game.players.find((p) => p.playerId === trade.fromId);
 
   return (
-    <Modal width={440} label="Trade offer">
+    <Modal width={440} label="Trade offer" layer="over-planner">
       <div className="modal-pad">
         <div className="modal-title">
           <span className="modal-title-icon">

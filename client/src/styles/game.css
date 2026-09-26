@@ -64,6 +64,27 @@
   justify-content: center;
 }
 
+.dice-readout.idle .pip-die {
+  opacity: 0.45;
+}
+
+.dice-readout.rolling .pip-die {
+  animation: dice-jiggle 0.22s ease-in-out infinite alternate;
+}
+
+.dice-readout.rolling .pip-die:nth-child(2) {
+  animation-delay: -0.11s;
+}
+
+@keyframes dice-jiggle {
+  from {
+    transform: rotate(-12deg) translateY(1px);
+  }
+  to {
+    transform: rotate(12deg) translateY(-2px);
+  }
+}
+
 .dice-readout .dbl {
   animation: wiggle 0.8s ease-in-out infinite;
 }
@@ -542,6 +563,28 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.deed-main:hover .deed-name {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+}
+
+.deed-more {
+  color: var(--ink-3);
+  flex-shrink: 0;
+}
+
+/* Mortgaged: the title deed is "turned face down" */
+.deed-row.mortgaged {
+  background: repeating-linear-gradient(135deg, var(--paper-2) 0 8px, var(--paper-3) 8px 16px);
 }
 
 .deed-name {
@@ -1315,4 +1358,499 @@ button.deed-chip:active:not(:disabled) {
 
 .gfx-high .gfx-tag {
   background: var(--gold);
+}
+
+/* Sound settings popover (top right) */
+.sound-wrap {
+  position: relative;
+}
+
+.btn-audio-toggle.active {
+  background: var(--gold);
+}
+
+.sound-pop {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 250px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  background: var(--paper);
+  border: var(--line);
+  box-shadow: var(--pop-lg);
+  animation: pop-in 0.22s var(--ease-spring);
+  transform-origin: top right;
+}
+
+@keyframes pop-in {
+  from {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+}
+
+.vol-row {
+  display: grid;
+  grid-template-columns: 78px 1fr 28px;
+  align-items: center;
+  gap: 8px;
+  font-weight: 900;
+  font-size: 0.84rem;
+}
+
+.vol-row.disabled {
+  opacity: 0.45;
+}
+
+.vol-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vol-val {
+  text-align: right;
+  font-size: 0.78rem;
+  color: var(--ink-2);
+}
+
+.vol-row input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 12px;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--ink);
+  background: linear-gradient(90deg, var(--green) var(--p), var(--paper-3) var(--p));
+  cursor: pointer;
+}
+
+.vol-row input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--ink);
+  box-shadow: 0 2px 0 var(--ink);
+}
+
+.vol-row input[type='range']::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--ink);
+}
+
+.sound-mute {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: var(--radius-full);
+  border: var(--line-thin);
+  background: var(--paper-2);
+  font-weight: 900;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.sound-mute.on {
+  background: var(--red);
+  color: #fff;
+}
+
+/* Chat preview bubbles next to the chat button */
+.dock-slot {
+  position: relative;
+}
+
+.side-tabs,
+.m-tabbar {
+  position: relative;
+}
+
+.chat-bubble {
+  position: absolute;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  max-width: 240px;
+  min-width: 120px;
+  padding: 8px 12px 9px;
+  border-radius: 18px;
+  background: #fff;
+  border: var(--line);
+  border-left: 7px solid var(--c);
+  box-shadow: 0 4px 0 var(--ink), 0 12px 24px rgba(43, 29, 16, 0.2);
+  text-align: left;
+  cursor: pointer;
+  animation: bubble-in 0.34s var(--ease-spring);
+}
+
+.chat-bubble b {
+  max-width: 100%;
+  font-size: 0.72rem;
+  font-weight: 900;
+  color: var(--c);
+  filter: brightness(0.75);
+}
+
+.chat-bubble-text {
+  font-size: 0.86rem;
+  font-weight: 800;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.chat-bubble-more {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--red);
+  color: #fff;
+  border: 2px solid var(--ink);
+  font-size: 0.66rem;
+  font-weight: 900;
+}
+
+/* tail */
+.chat-bubble::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border: var(--line);
+  border-top: none;
+  border-left: none;
+}
+
+.chat-bubble.left {
+  right: calc(100% + 16px);
+  top: 50%;
+  translate: 0 -50%;
+  transform-origin: right center;
+}
+
+.chat-bubble.left::after {
+  right: -9px;
+  top: 50%;
+  transform: translateY(-50%) rotate(-45deg);
+}
+
+.chat-bubble.below {
+  top: calc(100% + 14px);
+  right: 0;
+  transform-origin: top right;
+}
+
+.chat-bubble.below::after {
+  top: -9px;
+  right: 18px;
+  transform: rotate(-135deg);
+}
+
+.chat-bubble.above {
+  bottom: calc(100% + 14px);
+  right: 8px;
+  transform-origin: bottom right;
+}
+
+.chat-bubble.above::after {
+  bottom: -9px;
+  right: 22px;
+  transform: rotate(45deg);
+}
+
+@keyframes bubble-in {
+  0% {
+    opacity: 0;
+    scale: 0.6;
+  }
+  70% {
+    scale: 1.05;
+  }
+  100% {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+/* Country chips on player cards: one per set, count inside */
+.gchips {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  min-width: 0;
+}
+
+.gchip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 20px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 6px;
+  background: var(--g);
+  border: 1.5px solid var(--ink);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
+}
+
+.gchip.neutral {
+  background: var(--paper-3);
+  color: var(--ink);
+  text-shadow: none;
+}
+
+.gchip.full {
+  box-shadow: 0 0 0 2px var(--gold);
+}
+
+/* 4 players: tighter cards; 5-6 players: dense single-row cards */
+.pcard-list.compact {
+  gap: 9px;
+}
+
+.pcard-list.compact .pcard {
+  padding: 8px 10px 8px 9px;
+}
+
+.pcard-list.compact .pcard-money {
+  font-size: 1.25rem;
+}
+
+.pcard-list.compact .pcard-bottom,
+.pcard-list.dense .pcard-bottom {
+  margin-top: 6px;
+  padding-top: 6px;
+}
+
+.pcard-list.dense {
+  gap: 7px;
+}
+
+.pcard-list.dense .pcard {
+  width: 214px;
+  padding: 6px 9px 6px 8px;
+  border-radius: var(--radius-md);
+}
+
+.pcard-list.dense .pcard-top {
+  gap: 8px;
+}
+
+.pcard-list.dense .pcard-top .avatar {
+  width: 34px !important;
+  height: 34px !important;
+}
+
+.pcard-list.dense .pcard-name {
+  font-size: 0.84rem;
+}
+
+.pcard-list.dense .pcard-money {
+  font-size: 1.1rem;
+}
+
+.pcard-list.dense .pcard-rank {
+  font-size: 0.7rem;
+  padding: 0 5px;
+}
+
+.pcard-list.dense .pcard.active {
+  transform: translateX(8px) scale(1.02);
+}
+
+.pcard-list.dense .pcard-ribbon {
+  top: -10px;
+  font-size: 0.62rem;
+}
+
+/* Cash color by warning tier */
+.money.cash-t1,
+.strip-money.cash-t1 {
+  color: #b7791f;
+}
+
+.money.cash-t2,
+.strip-money.cash-t2 {
+  color: #dd6b20;
+}
+
+.money.cash-t3,
+.strip-money.cash-t3 {
+  color: var(--red);
+}
+
+/* Low cash note beside my card (desktop) / under the top bar (mobile) */
+.low-cash {
+  z-index: 40;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  width: 250px;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  background: #fff8dc;
+  border: var(--line);
+  box-shadow: 0 4px 0 var(--ink), 0 12px 24px rgba(43, 29, 16, 0.2);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.25;
+  cursor: pointer;
+  animation: toast-in 0.32s var(--ease-out);
+}
+
+.low-cash.t2 {
+  background: #ffe8d1;
+}
+
+.low-cash.t3 {
+  background: #ffe0da;
+}
+
+.low-cash-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: var(--gold);
+}
+
+.low-cash.t2 .low-cash-icon {
+  background: #fb923c;
+  color: #fff;
+}
+
+.low-cash.t3 .low-cash-icon {
+  background: var(--red);
+  color: #fff;
+  animation: wiggle 0.8s ease-in-out 3;
+}
+
+.low-cash-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.low-cash-text b {
+  font-weight: 900;
+  font-size: 0.86rem;
+}
+
+.low-cash.beside-card {
+  position: absolute;
+  left: calc(100% + 14px);
+  top: 0;
+}
+
+.low-cash.m-low-cash {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  width: auto;
+  top: calc(112px + var(--safe-top));
+}
+
+/* ROLL press effects (desktop round button + mobile bar button) */
+.btn-roll.pressed .roll-dice-icon {
+  animation: dice-spin 0.45s var(--ease-out);
+}
+
+@keyframes dice-spin {
+  from {
+    transform: rotate(-200deg) scale(0.6);
+  }
+  to {
+    transform: rotate(0) scale(1);
+  }
+}
+
+.btn-main.btn-roll.pressed {
+  animation: bar-press 0.38s var(--ease-spring);
+}
+
+@keyframes bar-press {
+  0% {
+    transform: scale(0.92, 0.86);
+  }
+  50% {
+    transform: scale(1.04, 1.08);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+.btn-roll {
+  position: relative;
+  overflow: visible;
+}
+
+.roll-burst {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.roll-burst i {
+  position: absolute;
+  left: -5px;
+  top: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: var(--gold);
+  transform: rotate(var(--a)) translateY(0);
+  animation: burst 0.5s var(--ease-out) forwards;
+}
+
+.roll-burst i:nth-child(3n) {
+  background: #fff;
+}
+
+.roll-burst i:nth-child(3n + 1) {
+  background: var(--blue);
+}
+
+@keyframes burst {
+  0% {
+    opacity: 1;
+    transform: rotate(var(--a)) translateY(-30px) scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--a)) translateY(-100px) scale(1);
+  }
 }

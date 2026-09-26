@@ -390,11 +390,16 @@ describe('Monopoly Game Engine (LINE Get Rich rules)', () => {
     expect(engine.state.trades).toHaveLength(0);
   });
 
-  it('rejects trading built properties, unaffordable cash, and supports decline / cancel', () => {
+  it('trades built properties with their buildings; rejects unaffordable cash; supports decline / cancel', () => {
     const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
     engine.state.properties[1].ownerId = 'p1';
-    engine.state.properties[1].buildLevel = 1;
-    expect(() => engine.proposeTrade('p1', { toId: 'p2', giveMoney: 0, giveProps: [1], getMoney: 0, getProps: [] })).toThrow(/Sell the buildings/);
+    engine.state.properties[1].buildLevel = 2;
+    const built = engine.proposeTrade('p1', { toId: 'p2', giveMoney: 0, giveProps: [1], getMoney: 50, getProps: [] });
+    engine.respondToTrade(built.id, 'p2', true);
+    expect(engine.state.properties[1].ownerId).toBe('p2');
+    expect(engine.state.properties[1].buildLevel).toBe(2);
+    engine.state.players[0].money = 1500;
+    engine.state.players[1].money = 1500;
     expect(() => engine.proposeTrade('p1', { toId: 'p2', giveMoney: 99999, giveProps: [], getMoney: 0, getProps: [] })).toThrow(/does not have/);
 
     const t1 = engine.proposeTrade('p1', { toId: 'p2', giveMoney: 10, giveProps: [], getMoney: 0, getProps: [] });
@@ -499,6 +504,92 @@ describe('Monopoly Game Engine (LINE Get Rich rules)', () => {
     engine.declareBankruptcy();
     expect(engine.state.bank.houses).toBe(32);
     expect(engine.state.bank.hotels).toBe(12);
+  });
+
+  describe('selling and mortgages (classic rules)', () => {
+    it('any player can sell buildings at any time, straight down to a chosen level', () => {
+      const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+      // Bob (not the current player) owns Baltic (buildCost 50) with a Hotel.
+      engine.state.properties[3].ownerId = 'p2';
+      engine.state.properties[3].buildLevel = 3;
+      engine.sell(3, 'p2', 1);
+      expect(engine.state.properties[3].buildLevel).toBe(1);
+      expect(engine.state.players[1].money).toBe(1500 + 25 * 2);
+      expect(() => engine.sell(3, 'p1')).toThrow(/do not own/i);
+    });
+
+    it('sells a whole deed back to the Bank (buildings half + land at mortgage value)', () => {
+      const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+      engine.state.properties[3].ownerId = 'p1';
+      engine.state.properties[3].buildLevel = 2;
+      engine.state.bank.houses = 30;
+      engine.sellProperty(3, 'p1');
+      expect(engine.state.properties[3].ownerId).toBeNull();
+      expect(engine.state.properties[3].buildLevel).toBe(0);
+      expect(engine.state.players[0].money).toBe(1500 + 50 + 30);
+      expect(engine.state.bank.houses).toBe(32);
+
+      // A mortgaged deed just cancels the loan.
+      engine.state.properties[1].ownerId = 'p1';
+      engine.state.properties[1].isMortgaged = true;
+      engine.sellProperty(1, 'p1');
+      expect(engine.state.properties[1].ownerId).toBeNull();
+      expect(engine.state.properties[1].isMortgaged).toBe(false);
+      expect(engine.state.players[0].money).toBe(1580);
+    });
+
+    it('mortgages only bare land: no buildings anywhere in the color set', () => {
+      const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+      engine.state.properties[1].ownerId = 'p1';
+      engine.state.properties[3].ownerId = 'p1';
+      engine.state.properties[3].buildLevel = 1;
+      expect(() => engine.mortgage(1, true, 'p1')).toThrow(/Sell the buildings in this color set/);
+      engine.sell(3, 'p1');
+      engine.mortgage(1, true, 'p1');
+      expect(engine.state.properties[1].isMortgaged).toBe(true);
+      expect(engine.state.players[0].money).toBe(1500 + 25 + 30);
+    });
+
+    it('lifting a mortgage costs the value plus 10% interest', () => {
+      const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+      engine.state.properties[39].ownerId = 'p1'; // price 400 -> mortgage 200
+      engine.mortgage(39, true, 'p1');
+      expect(engine.state.players[0].money).toBe(1700);
+      engine.mortgage(39, false, 'p1');
+      expect(engine.state.players[0].money).toBe(1700 - 220);
+      expect(engine.state.properties[39].isMortgaged).toBe(false);
+    });
+
+    it('no rent on a mortgaged deed; the rest of a full set still pays double', () => {
+      const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+      engine.state.properties[1].ownerId = 'p2';
+      engine.state.properties[3].ownerId = 'p2';
+      engine.state.properties[1].isMortgaged = true;
+      engine.rollDice(1, 2); // Alice lands on 3
+      expect(engine.state.players[0].money).toBe(1500 - 4 * 2);
+    });
+
+    it('cannot build in a color set while any of its deeds is mortgaged', () => {
+      const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+      engine.state.properties[1].ownerId = 'p1';
+      engine.state.properties[3].ownerId = 'p1';
+      engine.state.properties[1].isMortgaged = true;
+      engine.state.players[0].position = 3;
+      engine.state.players[0].lapsCompleted = 1;
+      expect(() => engine.build(3)).toThrow(/Lift the mortgage on/);
+    });
+
+    it('mortgaged deeds can be traded; the receiver pays 10% interest and it stays mortgaged', () => {
+      const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+      engine.state.properties[39].ownerId = 'p1';
+      engine.state.properties[39].isMortgaged = true;
+      const t = engine.proposeTrade('p1', { toId: 'p2', giveMoney: 0, giveProps: [39], getMoney: 100, getProps: [] });
+      engine.respondToTrade(t.id, 'p2', true);
+      expect(engine.state.properties[39].ownerId).toBe('p2');
+      expect(engine.state.properties[39].isMortgaged).toBe(true);
+      expect(engine.state.players[1].money).toBe(1500 - 100 - 20);
+      expect(engine.state.players[0].money).toBe(1600);
+    });
   });
 
   describe('original Chance / Community Chest cards', () => {

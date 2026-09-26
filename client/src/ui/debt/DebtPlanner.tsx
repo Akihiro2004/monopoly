@@ -21,7 +21,20 @@ import { useIsMobile } from '../../hooks/useIsMobile.js';
 import { Flag } from '../common/Flag.js';
 import { TradeComposer } from '../trade/TradeComposer.js';
 import { GROUP_HEX, GROUP_LABEL, GROUP_ORDER, money } from '../theme.js';
-import { Plan, PlanItem, autoPlan, initialPlan, ownedProps, planSteps, planTotal, refundFor, rentAt } from './plan.js';
+import {
+  Plan,
+  PlanItem,
+  autoPlan,
+  initialPlan,
+  mortgageAllowed,
+  normalizePlan,
+  othersBuiltGroups,
+  ownedProps,
+  planSteps,
+  planTotal,
+  refundFor,
+  rentAt
+} from './plan.js';
 
 // Sends each step and waits for the server to apply it before the next one.
 async function runSteps(steps: ReturnType<typeof planSteps>) {
@@ -78,7 +91,9 @@ const PropertyCard: React.FC<{
   open: boolean;
   onToggle: () => void;
   onChange: (item: PlanItem) => void;
-}> = ({ prop, item, open, onToggle, onChange }) => {
+  // Whole color set is (planned to be) free of buildings.
+  setClear: boolean;
+}> = ({ prop, item, open, onToggle, onChange, setClear }) => {
   const tile = BOARD_TILES[prop.tileIndex];
   const refund = refundFor(prop, item);
   const perLevel = Math.floor(tile.buildCost / 2);
@@ -86,7 +101,7 @@ const PropertyCard: React.FC<{
   const nowRent = rentAt(prop, prop.buildLevel, prop.isMortgaged);
   const planRent = rentAt(prop, item.level, prop.isMortgaged || item.mortgage);
   const changed = refund > 0;
-  const canMortgage = !prop.isMortgaged && item.level === 0;
+  const canMortgage = !prop.isMortgaged && item.level === 0 && setClear;
 
   return (
     <li className={`plan-card ${changed ? 'changed' : ''} ${prop.isMortgaged ? 'mortgaged' : ''} ${open ? 'open' : ''}`} style={{ '--g': GROUP_HEX[tile.group] } as React.CSSProperties}>
@@ -123,7 +138,7 @@ const PropertyCard: React.FC<{
               />
               <span>
                 Mortgage <strong className="tnum">+{money(mortgageValue)}</strong>
-                {!canMortgage && <small> (sell buildings first)</small>}
+                {!canMortgage && <small> ({item.level > 0 ? 'sell buildings first' : 'sell every building in this set first'})</small>}
               </span>
             </label>
           </>
@@ -182,6 +197,9 @@ export const DebtPlanner: React.FC = () => {
   const myPlayerId = useGameStore((s) => s.myPlayerId);
   const minimized = useGameStore((s) => s.debtMinimized);
   const setMinimized = useGameStore((s) => s.setDebtMinimized);
+  const setFocusTile = useGameStore((s) => s.setFocusTile);
+  // Wait for the token to finish walking before asking for money.
+  const walking = useGameStore((s) => s.isWalking || s.moneyHold !== null);
   const isMobile = useIsMobile();
   const [plan, setPlan] = useState<Plan>({});
   const [openCard, setOpenCard] = useState<number | null>(null);
@@ -191,7 +209,7 @@ export const DebtPlanner: React.FC = () => {
   const [trading, setTrading] = useState(false);
 
   const debtor = game ? game.players[game.currentPlayerIndex] : undefined;
-  const active = !!game && game.phase === 'DEBT' && !!game.debt && debtor?.playerId === myPlayerId;
+  const active = !!game && game.phase === 'DEBT' && !!game.debt && debtor?.playerId === myPlayerId && !walking;
   const debtKey = active ? `${game!.turnNumber}:${game!.debt!.amount}:${game!.debt!.reason}` : null;
   const props = useMemo(() => (active && game ? ownedProps(game, myPlayerId) : []), [active, game, myPlayerId]);
 
@@ -203,6 +221,14 @@ export const DebtPlanner: React.FC = () => {
     setOpenCard(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debtKey]);
+
+  // Peeking at the board: the property last opened in the planner lights up.
+  const peeking = active && minimized;
+  useEffect(() => {
+    if (!peeking) return;
+    setFocusTile(openCard);
+    return () => setFocusTile(null);
+  }, [peeking, openCard, setFocusTile]);
 
   // Keep the plan in sync with the real properties (after each executed step).
   useEffect(() => {
@@ -234,7 +260,8 @@ export const DebtPlanner: React.FC = () => {
   const cashPct = Math.min(100, (debtor.money / debt.amount) * 100);
   const planPct = Math.min(100 - cashPct, (planned / debt.amount) * 100);
 
-  const setItem = (idx: number, item: PlanItem) => setPlan((p) => ({ ...p, [idx]: item }));
+  const blocked = othersBuiltGroups(game, myPlayerId);
+  const setItem = (idx: number, item: PlanItem) => setPlan((p) => normalizePlan(props, { ...p, [idx]: item }, blocked));
 
   const visible = props.filter((p) =>
     filter === 'all' ? true : filter === 'buildings' ? p.buildLevel > 0 : p.buildLevel === 0
@@ -318,7 +345,7 @@ export const DebtPlanner: React.FC = () => {
 
   const tools = (
       <div className="planner-tools">
-        <button className="btn btn-blue btn-sm" onClick={() => setPlan(autoPlan(props, shortfall))} disabled={running}>
+        <button className="btn btn-blue btn-sm" onClick={() => setPlan(autoPlan(props, shortfall, blocked))} disabled={running}>
           <Wand2 size={15} /> Auto-plan
         </button>
         <button className="btn btn-secondary btn-sm" onClick={() => setPlan(initialPlan(props))} disabled={running || planned === 0}>
@@ -391,6 +418,7 @@ export const DebtPlanner: React.FC = () => {
                     open={openCard === p.tileIndex}
                     onToggle={() => setOpenCard((o) => (o === p.tileIndex ? null : p.tileIndex))}
                     onChange={(item) => setItem(p.tileIndex, item)}
+                    setClear={mortgageAllowed(p, plan, props, blocked)}
                   />
                 ))}
               </ul>
@@ -402,6 +430,7 @@ export const DebtPlanner: React.FC = () => {
   );
 
   return (
+    <>
     <div className={`modal-backdrop planner-backdrop ${isMobile ? 'sheet-mode' : ''}`} role="presentation">
       <div className="dialog planner" role="dialog" aria-modal="true" aria-label="Debt planner">
         {isMobile && <div className="sheet-handle" />}
@@ -433,7 +462,9 @@ export const DebtPlanner: React.FC = () => {
           </div>
         )}
       </div>
-      {trading && <TradeComposer onClose={() => setTrading(false)} partnerId={creditor?.playerId} />}
     </div>
+    {/* Rendered beside the planner and stacked above it. */}
+    {trading && <TradeComposer onClose={() => setTrading(false)} partnerId={creditor?.playerId} layer="over-planner" />}
+    </>
   );
 };

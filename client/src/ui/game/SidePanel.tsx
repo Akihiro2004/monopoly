@@ -8,6 +8,7 @@ import { Portfolio } from './Portfolio.js';
 import { TradeView } from '../trade/TradeView.js';
 import { useUnreadChat } from './useUnread.js';
 import { useHudBadges } from './useHudBadges.js';
+import { ChatBubbles } from './ChatBubbles.js';
 import { money } from '../theme.js';
 
 type Tab = 'assets' | 'trade' | 'bank' | 'log' | 'chat';
@@ -46,10 +47,13 @@ export const SidePanel: React.FC = () => {
           <span className="money tnum">{money(myCash)}</span>
         </button>
         {TABS.map((t) => (
-          <button key={t.id} className={`dock-btn dock-${t.id}`} onClick={() => open(t.id)} title={t.label} aria-label={t.label}>
-            <t.icon size={21} />
-            {badge(t.id) > 0 && <span className={`dot-badge ${alert(t.id) ? 'alert' : ''}`}>{badge(t.id)}</span>}
-          </button>
+          <div key={t.id} className="dock-slot">
+            <button className={`dock-btn dock-${t.id}`} onClick={() => open(t.id)} title={t.label} aria-label={t.label}>
+              <t.icon size={21} />
+              {badge(t.id) > 0 && <span className={`dot-badge ${alert(t.id) ? 'alert' : ''}`}>{badge(t.id)}</span>}
+            </button>
+            {t.id === 'chat' && <ChatBubbles hidden={false} placement="left" onOpen={() => open('chat')} />}
+          </div>
         ))}
         <button className="dock-btn dock-expand" onClick={() => setCollapsed(false)} title="Expand panel" aria-label="Expand panel">
           <PanelRightOpen size={20} />
@@ -69,6 +73,7 @@ export const SidePanel: React.FC = () => {
               {badge(t.id) > 0 && <span className={`dot-badge ${alert(t.id) ? 'alert' : ''}`}>{badge(t.id)}</span>}
             </button>
           ))}
+          <ChatBubbles hidden={tab === 'chat'} placement="below" onOpen={() => setTab('chat')} />
         </nav>
         <button className="icon-btn side-collapse" onClick={() => setCollapsed(true)} title="Collapse panel" aria-label="Collapse panel">
           <ChevronRight size={20} strokeWidth={3} />

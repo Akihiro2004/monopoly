@@ -18,10 +18,11 @@ import {
   Seat,
   TradeOffer,
   TradeProposal,
-  tradeBlockReason
+  tradeBlockReason,
+  tradeMortgageFees
 } from '@monopoly/shared';
 import { executeForceBuy } from './forceBuy.js';
-import { buildProperty, sellBuilding, toggleMortgage } from './actions.js';
+import { buildProperty, sellBuilding, sellPropertyToBank, toggleMortgage } from './actions.js';
 import { applyBankruptcy, calculateRent, payRent } from './rent.js';
 import { resolveLanding } from './resolve.js';
 import { createBank, record } from './bank.js';
@@ -427,19 +428,41 @@ export class MonopolyGameEngine {
     this.notify();
   }
 
-  public sell(tileIndex: number): void {
-    if (this.state.phase !== 'ROLLING' && this.state.phase !== 'TURN_ENDED' && this.state.phase !== 'DEBT') {
-      throw new Error(`Cannot sell in phase ${this.state.phase}`);
-    }
-    const player = this.getCurrentPlayer();
-    const res = sellBuilding(this.state, player, tileIndex);
+  // Selling and mortgaging are allowed at any time (real Monopoly), not
+  // only on your own turn, e.g. to raise cash for an auction bid or a trade.
+  private manager(playerId: string): PlayerState {
+    if (this.state.phase === 'GAME_OVER') throw new Error('The game is over');
+    const player = this.state.players.find((p) => p.playerId === playerId);
+    if (!player || player.isBankrupt) throw new Error('Only active players can manage property');
+    return player;
+  }
+
+  private afterPropertyChange(): void {
+    // Offers that referenced changed deeds may now be invalid.
+    this.state.trades = this.state.trades.filter((t) => this.validateTrade(t) === null);
+    this.tryPayDebt();
+    this.checkAndApplyVictory();
+    this.notify();
+  }
+
+  public sell(tileIndex: number, playerId: string = this.getCurrentPlayer().playerId, toLevel?: number): void {
+    const player = this.manager(playerId);
+    const res = sellBuilding(this.state, player, tileIndex, toLevel);
     if (!res.success) {
       throw new Error(res.text);
     }
     this.emitToast(res.text, 'info');
-    this.tryPayDebt();
-    this.checkAndApplyVictory();
-    this.notify();
+    this.afterPropertyChange();
+  }
+
+  public sellProperty(tileIndex: number, playerId: string = this.getCurrentPlayer().playerId): void {
+    const player = this.manager(playerId);
+    const res = sellPropertyToBank(this.state, player, tileIndex);
+    if (!res.success) {
+      throw new Error(res.text);
+    }
+    this.emitToast(res.text, 'info');
+    this.afterPropertyChange();
   }
 
   public declareBankruptcy(): void {
@@ -494,6 +517,15 @@ export class MonopolyGameEngine {
     }
     if (from.money < t.giveMoney) return `${from.name} does not have $${t.giveMoney}`;
     if (to.money < t.getMoney) return `${to.name} does not have $${t.getMoney}`;
+    // Taking over a mortgaged deed costs 10% interest to the Bank right away.
+    const fromFees = tradeMortgageFees(this.state, t.getProps);
+    const toFees = tradeMortgageFees(this.state, t.giveProps);
+    if (from.money - t.giveMoney + t.getMoney < fromFees) {
+      return `${from.name} cannot cover the $${fromFees} mortgage interest on the deeds they receive`;
+    }
+    if (to.money - t.getMoney + t.giveMoney < toFees) {
+      return `${to.name} cannot cover the $${toFees} mortgage interest on the deeds they receive`;
+    }
     for (const i of t.giveProps) {
       const reason = tradeBlockReason(this.state.properties[i], from.playerId);
       if (reason) return reason;
@@ -554,8 +586,19 @@ export class MonopolyGameEngine {
     to.money += trade.giveMoney - trade.getMoney;
     record(this.state, from.playerId, to.playerId, trade.giveMoney, 'Trade');
     record(this.state, to.playerId, from.playerId, trade.getMoney, 'Trade');
+    const fromFees = tradeMortgageFees(this.state, trade.getProps);
+    const toFees = tradeMortgageFees(this.state, trade.giveProps);
     for (const i of trade.giveProps) this.state.properties[i].ownerId = to.playerId;
     for (const i of trade.getProps) this.state.properties[i].ownerId = from.playerId;
+    // Mortgaged deeds stay mortgaged; the new owner pays the 10% interest.
+    if (fromFees > 0) {
+      from.money -= fromFees;
+      record(this.state, from.playerId, null, fromFees, 'Mortgage interest (trade)');
+    }
+    if (toFees > 0) {
+      to.money -= toFees;
+      record(this.state, to.playerId, null, toFees, 'Mortgage interest (trade)');
+    }
 
     // Offers that referenced these deeds or this cash may now be stale.
     this.state.trades = this.state.trades.filter((t) => this.validateTrade(t) === null);
@@ -652,18 +695,14 @@ export class MonopolyGameEngine {
     this.emitToast(msg, 'success');
   }
 
-  public mortgage(tileIndex: number, isMortgage: boolean): void {
-    if (this.state.phase !== 'ROLLING' && this.state.phase !== 'TURN_ENDED' && this.state.phase !== 'DEBT') {
-      throw new Error(`Cannot mortgage in phase ${this.state.phase}`);
-    }
-    const player = this.getCurrentPlayer();
+  public mortgage(tileIndex: number, isMortgage: boolean, playerId: string = this.getCurrentPlayer().playerId): void {
+    const player = this.manager(playerId);
     const res = toggleMortgage(this.state, player, tileIndex, isMortgage);
     if (!res.success) {
       throw new Error(res.text);
     }
     this.emitToast(res.text, 'info');
-    this.tryPayDebt();
-    this.notify();
+    this.afterPropertyChange();
   }
 
   public endTurn(): void {

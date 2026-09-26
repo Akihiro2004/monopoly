@@ -82,3 +82,29 @@ export const ROTATION_FOR_TOP_FACE: Record<number, [number, number, number]> = {
   5: [-Math.PI / 2, 0, 0],
   2: [Math.PI / 2, 0, 0],
 };
+
+// A rounded cube that keeps BoxGeometry's 6 face groups and planar UVs, so a
+// material array maps one pip texture per face (drei's RoundedBox is an
+// extrusion with only 2 groups, which scrambles the faces).
+export function createRoundedDieGeometry(size = 1, radius = 0.14, segments = 6): THREE.BufferGeometry {
+  const geo = new THREE.BoxGeometry(size, size, size, segments, segments, segments);
+  const pos = geo.attributes.position as THREE.BufferAttribute;
+  const half = size / 2;
+  const inner = half - radius;
+  const p = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    p.fromBufferAttribute(pos, i);
+    c.set(
+      THREE.MathUtils.clamp(p.x, -inner, inner),
+      THREE.MathUtils.clamp(p.y, -inner, inner),
+      THREE.MathUtils.clamp(p.z, -inner, inner)
+    );
+    p.sub(c);
+    if (p.lengthSq() > 0) p.setLength(radius);
+    p.add(c);
+    pos.setXYZ(i, p.x, p.y, p.z);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}

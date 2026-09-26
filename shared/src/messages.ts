@@ -34,7 +34,8 @@ export interface ClientToServerEvents {
   'game:buyResponse': (payload: { accept: boolean }) => void;
   'game:forceBuyResponse': (payload: { accept: boolean }) => void;
   'game:build': (payload: { tileIndex: number }) => void;
-  'game:sell': (payload: { tileIndex: number }) => void;
+  'game:sell': (payload: { tileIndex: number; toLevel?: number }) => void;
+  'game:sellProperty': (payload: { tileIndex: number }) => void;
   'game:declareBankruptcy': () => void;
   'game:mortgage': (payload: { tileIndex: number; mortgage: boolean }) => void;
   'game:endTurn': () => void;

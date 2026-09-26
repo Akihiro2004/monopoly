@@ -13,6 +13,8 @@ import { Ticker } from './Ticker.js';
 import { useTurn } from './useTurn.js';
 import { useUnreadChat } from './useUnread.js';
 import { useHudBadges } from './useHudBadges.js';
+import { ChatBubbles } from './ChatBubbles.js';
+import { LowCashAlert } from './LowCashAlert.js';
 
 type Tab = 'board' | 'assets' | 'trade' | 'bank' | 'chat';
 
@@ -55,6 +57,8 @@ export const MobileHUD: React.FC = () => {
         </div>
         <PlayerStrip game={turn.game} myPlayerId={myPlayerId} />
       </header>
+
+      {turn.me && !turn.me.isBankrupt && <LowCashAlert amount={turn.me.money} className="m-low-cash" />}
 
       {tab === 'board' && (
         <div className="m-ticker-slot">
@@ -107,6 +111,14 @@ export const MobileHUD: React.FC = () => {
           </div>
         )}
         <nav className="m-tabbar" role="tablist">
+          <ChatBubbles
+            hidden={tab === 'chat'}
+            placement="above"
+            onOpen={() => {
+              setTableView('chat');
+              setTab('chat');
+            }}
+          />
           {tabs.map((t) => (
             <button
               key={t.id}
