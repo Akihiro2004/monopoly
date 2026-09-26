@@ -98,6 +98,10 @@ export interface PropertyState {
   buildLevel: BuildLevel;
   isMortgaged: boolean;
   forceBought: boolean; // true if acquired via force-buy -> landmark LOCKED (cannot upgrade to 4)
+  // The owner's lapsCompleted at the moment this was mortgaged. Once the
+  // owner has gone another FORECLOSURE_ROUNDS laps without lifting it, the
+  // Bank forecloses and auctions it off. Unset while not mortgaged.
+  mortgagedAtLap?: number;
 }
 
 export interface PlayerState {
@@ -118,6 +122,10 @@ export interface PlayerState {
   consecutiveDoubles: number;
   // Times this player has passed / landed on GO. Building on land needs >= 1.
   lapsCompleted: number;
+  // Voluntary mortgages taken this round (since the last time they passed
+  // GO). Capped at MAX_MORTGAGES_PER_ROUND; resets to 0 when lapsCompleted
+  // increments. Mortgages forced by an active debt don't count against it.
+  mortgagesThisRound: number;
   // Left the game by surrendering (also counted as bankrupt).
   surrendered?: boolean;
   // Turns in a row the server had to play for this player (turn timer).

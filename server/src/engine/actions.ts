@@ -42,6 +42,7 @@ export function executeAutoBuy(
     prop.ownerId = buyer.playerId;
     prop.buildLevel = 0;
     prop.isMortgaged = false;
+    prop.mortgagedAtLap = undefined;
     prop.forceBought = false; // bought cleanly from bank, can landmark
 
     const msg = `${buyer.name} auto-bought ${tile.name} for $${tile.price}.`;
@@ -159,6 +160,7 @@ export function sellPropertyToBank(
   prop.ownerId = null;
   prop.buildLevel = 0;
   prop.isMortgaged = false;
+  prop.mortgagedAtLap = undefined;
   prop.forceBought = false;
   player.money += refund;
   if (refund > 0) record(gameState, null, player.playerId, refund, `Sold ${tile.name} to the Bank`);
@@ -189,6 +191,7 @@ export function toggleMortgage(
     if (blocked) return { success: false, text: blocked };
     const value = mortgageValue(tileIndex);
     prop.isMortgaged = true;
+    prop.mortgagedAtLap = player.lapsCompleted;
     player.money += value;
     record(gameState, null, player.playerId, value, `Mortgaged ${tile.name}`);
     const msg = `${player.name} mortgaged ${tile.name} for $${value}.`;
@@ -204,6 +207,7 @@ export function toggleMortgage(
     }
     player.money -= cost;
     prop.isMortgaged = false;
+    prop.mortgagedAtLap = undefined;
     record(gameState, player.playerId, null, cost, `Paid off mortgage on ${tile.name}`);
     const msg = `${player.name} lifted the mortgage on ${tile.name} for $${cost}.`;
     gameState.lastActionText = msg;

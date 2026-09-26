@@ -288,6 +288,74 @@ describe('Monopoly Game Engine (LINE Get Rich rules)', () => {
     expect(engine.state.properties[1].buildLevel).toBe(1);
   });
 
+  it('caps voluntary mortgages at one per round, resetting when the player passes GO', () => {
+    const engine = new MonopolyGameEngine('room123', seats, { specialVictory: true });
+    engine.state.properties[1].ownerId = 'p1';
+    engine.state.properties[3].ownerId = 'p1';
+
+    engine.mortgage(1, true);
+    expect(engine.state.properties[1].isMortgaged).toBe(true);
+    expect(() => engine.mortgage(3, true)).toThrow(/one? property per round|1 property per round/i);
+    expect(engine.state.properties[3].isMortgaged).toBe(false);
+
+    // Passing GO resets the quota.
+    engine.state.players[0].position = 35;
+    engine.rollDice(2, 3); // 35 + 5 = 40 % 40 = 0
+    expect(engine.state.players[0].lapsCompleted).toBe(1);
+
+    engine.mortgage(3, true);
+    expect(engine.state.properties[3].isMortgaged).toBe(true);
+  });
+
+  it('does not count debt-forced mortgages against the voluntary quota', () => {
+    const engine = new MonopolyGameEngine('room123', seats, { specialVictory: true });
+    const p1 = engine.state.players[0];
+    engine.state.properties[1].ownerId = 'p1';
+    engine.state.properties[3].ownerId = 'p1';
+    engine.state.debt = { amount: 500, creditorId: null, reason: 'test debt' };
+    engine.state.phase = 'DEBT';
+    p1.money = 10;
+
+    engine.mortgage(1, true); // forced: raising cash for own debt
+    expect(engine.state.properties[1].isMortgaged).toBe(true);
+    expect(p1.mortgagesThisRound).toBe(0);
+
+    // A further, voluntary mortgage this same round should still work.
+    engine.state.debt = null;
+    engine.state.phase = 'TURN_ENDED';
+    engine.mortgage(3, true);
+    expect(engine.state.properties[3].isMortgaged).toBe(true);
+  });
+
+  it('forecloses a mortgage the owner has not lifted after 3 of their own rounds', () => {
+    const engine = new MonopolyGameEngine('room123', seats, { specialVictory: true });
+    const p1 = engine.state.players[0];
+    engine.state.properties[1].ownerId = 'p1';
+    engine.state.properties[1].isMortgaged = true;
+    engine.state.properties[1].mortgagedAtLap = 0;
+
+    // Two passes of GO (p1's own turns; force it back to p1's turn each time
+    // so this only tests p1's own lap count): not stale yet.
+    for (let i = 0; i < 2; i++) {
+      engine.state.currentPlayerIndex = 0;
+      engine.state.phase = 'ROLLING';
+      engine.state.players[0].position = 35;
+      engine.rollDice(2, 3);
+    }
+    expect(engine.state.properties[1].ownerId).toBe('p1');
+    expect(engine.state.phase).not.toBe('AUCTION');
+
+    // Third pass: now stale, the Bank forecloses and opens an auction.
+    engine.state.currentPlayerIndex = 0;
+    engine.state.phase = 'ROLLING';
+    engine.state.players[0].position = 35;
+    engine.rollDice(2, 3);
+    expect(engine.state.properties[1].ownerId).toBeNull();
+    expect(engine.state.properties[1].isMortgaged).toBe(false);
+    expect(engine.state.phase).toBe('AUCTION');
+    expect(engine.state.auction?.tileIndex).toBe(1);
+  });
+
   it('random board-wide events stay off unless explicitly enabled', () => {
     const engine = new MonopolyGameEngine('room123', seats, { specialVictory: true });
     engine.state.phase = 'TURN_ENDED';

@@ -9,6 +9,8 @@ import {
   AUCTION_EXTEND_MS,
   AUCTION_MIN_INCREMENT,
   AUCTION_MS,
+  FORECLOSURE_ROUNDS,
+  MAX_MORTGAGES_PER_ROUND,
   CardDef,
   CardDraw,
   DebtOffer,
@@ -99,6 +101,7 @@ export class MonopolyGameEngine {
       isConnected: true,
       consecutiveDoubles: 0,
       lapsCompleted: 0,
+      mortgagesThisRound: 0,
       jailCardDecks: []
     }));
 
@@ -215,6 +218,7 @@ export class MonopolyGameEngine {
     if (newPos < oldPos) {
       player.money += GO_SALARY;
       player.lapsCompleted++;
+      player.mortgagesThisRound = 0;
       record(this.state, null, player.playerId, GO_SALARY, 'GO salary');
       this.emitToast(`${player.name} passed GO and collected $${GO_SALARY}.`, 'success');
     }
@@ -247,7 +251,7 @@ export class MonopolyGameEngine {
       this.setupForceBuyTimeout();
     } else if (currentPhase === 'BUY_OFFER' && this.state.buyOffer) {
       // Stay in BUY_OFFER phase waiting for player's purchase choice
-    } else {
+    } else if (!this.tryStartForeclosureAuction()) {
       this.state.phase = 'TURN_ENDED';
     }
 
@@ -275,10 +279,11 @@ export class MonopolyGameEngine {
       prop.ownerId = player.playerId;
       prop.buildLevel = 0;
       prop.isMortgaged = false;
+      prop.mortgagedAtLap = undefined;
       prop.forceBought = false;
       this.emitToast(`${player.name} bought ${tile.name} for $${offer.price}.`, 'success');
       this.state.buyOffer = null;
-      this.state.phase = 'TURN_ENDED';
+      if (!this.tryStartForeclosureAuction()) this.state.phase = 'TURN_ENDED';
       this.checkAndApplyVictory();
       this.notify();
       return;
@@ -294,6 +299,33 @@ export class MonopolyGameEngine {
   // ------------------------------------------------------------------
   // Bank auctions
   // ------------------------------------------------------------------
+
+  // A mortgage the owner hasn't lifted after FORECLOSURE_ROUNDS of their own
+  // laps gets seized and put up for auction. Called wherever a turn would
+  // otherwise settle into TURN_ENDED, so a stale mortgage from any player
+  // (mortgaging is allowed any time, not just on your own turn) gets caught
+  // promptly instead of waiting for that owner's next roll. Returns true if
+  // it started one (the caller should not also set phase to TURN_ENDED).
+  private tryStartForeclosureAuction(): boolean {
+    for (const prop of Object.values(this.state.properties)) {
+      if (!prop.isMortgaged || !prop.ownerId || prop.mortgagedAtLap === undefined) continue;
+      const owner = this.state.players.find((p) => p.playerId === prop.ownerId);
+      if (!owner || owner.lapsCompleted - prop.mortgagedAtLap < FORECLOSURE_ROUNDS) continue;
+      const tile = BOARD_TILES[prop.tileIndex];
+      this.emitToast(
+        `${tile.name} was mortgaged for ${FORECLOSURE_ROUNDS} rounds without being paid off. The Bank forecloses on ${owner.name} and auctions it.`,
+        'warning'
+      );
+      prop.ownerId = null;
+      prop.buildLevel = 0;
+      prop.isMortgaged = false;
+      prop.mortgagedAtLap = undefined;
+      prop.forceBought = false;
+      this.startAuction(prop.tileIndex);
+      return true;
+    }
+    return false;
+  }
 
   private startAuction(tileIndex: number): void {
     this.state.phase = 'AUCTION';
@@ -360,6 +392,7 @@ export class MonopolyGameEngine {
       prop.ownerId = winner.playerId;
       prop.buildLevel = 0;
       prop.isMortgaged = false;
+      prop.mortgagedAtLap = undefined;
       prop.forceBought = false;
       this.emitToast(`SOLD! ${winner.name} wins ${tile.name} at auction for $${auction.highBid}.`, 'success');
     } else {
@@ -367,7 +400,7 @@ export class MonopolyGameEngine {
     }
 
     this.state.auction = null;
-    this.state.phase = 'TURN_ENDED';
+    if (!this.tryStartForeclosureAuction()) this.state.phase = 'TURN_ENDED';
     this.checkAndApplyVictory();
     this.notify();
   }
@@ -396,7 +429,7 @@ export class MonopolyGameEngine {
       }
     }
 
-    if (!this.state.debt) {
+    if (!this.state.debt && !this.tryStartForeclosureAuction()) {
       this.state.phase = 'TURN_ENDED';
     }
     this.checkAndApplyVictory();
@@ -751,7 +784,7 @@ export class MonopolyGameEngine {
       record(this.state, debtor.playerId, null, debt.amount, `Debt: ${debt.reason}`);
     }
     this.state.debt = null;
-    this.state.phase = 'TURN_ENDED';
+    if (!this.tryStartForeclosureAuction()) this.state.phase = 'TURN_ENDED';
     const msg = debt.splits?.length
       ? `${debtor.name} paid off $${debt.amount} (${debt.reason}).`
       : creditor
@@ -763,10 +796,17 @@ export class MonopolyGameEngine {
 
   public mortgage(tileIndex: number, isMortgage: boolean, playerId: string = this.getCurrentPlayer().playerId): void {
     const player = this.manager(playerId);
+    // Raising cash to cover your own active debt isn't a strategic choice --
+    // don't let the per-round quota block it.
+    const payingOwnDebt = this.state.phase === 'DEBT' && !!this.state.debt && this.getCurrentPlayer().playerId === player.playerId;
+    if (isMortgage && !payingOwnDebt && (player.mortgagesThisRound ?? 0) >= MAX_MORTGAGES_PER_ROUND) {
+      throw new Error(`You can only mortgage ${MAX_MORTGAGES_PER_ROUND} property per round. Pass GO to reset it.`);
+    }
     const res = toggleMortgage(this.state, player, tileIndex, isMortgage);
     if (!res.success) {
       throw new Error(res.text);
     }
+    if (isMortgage && !payingOwnDebt) player.mortgagesThisRound = (player.mortgagesThisRound ?? 0) + 1;
     this.emitToast(res.text, 'info');
     this.afterPropertyChange();
   }

@@ -162,6 +162,7 @@ function nextOf(list: number[], from: number): number {
 function payGoSalary(gameState: GameState, player: PlayerState): void {
   player.money += GO_SALARY;
   player.lapsCompleted++;
+  player.mortgagesThisRound = 0;
   record(gameState, null, player.playerId, GO_SALARY, 'GO salary');
 }
 

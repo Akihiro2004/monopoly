@@ -132,6 +132,7 @@ export function applyBankruptcy(
       p.ownerId = null;
       p.buildLevel = 0;
       p.isMortgaged = false;
+      p.mortgagedAtLap = undefined;
       p.forceBought = false;
     }
   });
