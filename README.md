@@ -102,4 +102,5 @@ Since the backend runs on your machine, you can expose it to friends over the in
 - Property buildings: [KayKit City Builder Bits](https://github.com/KayKit-Game-Assets/KayKit-City-Builder-Bits-1.0) by Kay Lousberg, CC0 (see `client/public/models/kaykit/LICENSE.txt`).
 - Flags: [circle-flags](https://github.com/HatScripts/circle-flags), MIT (see `client/public/icons/LICENSE.txt`).
 - Town models: [Kenney City Builder kit](https://github.com/KenneyNL/Starter-Kit-City-Builder), CC0 (see `client/public/models/city/LICENSE.txt`).
+- Background music: "Blueprints and Tea" (provided by the project owner, `client/public/audio/`).
 - Fonts: Lilita One and Nunito (SIL Open Font License) via Fontsource.

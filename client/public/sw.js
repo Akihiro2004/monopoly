@@ -1,7 +1,7 @@
 // TMpoly service worker: makes the app installable and keeps the shell
 // available on flaky connections. Network first (the game is live), falling
 // back to the cache for the app shell and hashed build assets.
-const CACHE = 'tmpoly-v2';
+const CACHE = 'tmpoly-v3';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(['/', '/manifest.webmanifest', '/icon.svg'])));
@@ -20,6 +20,8 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/socket.io') || url.pathname.startsWith('/api')) return;
+  // Music is streamed with range requests: let the browser handle it directly.
+  if (url.pathname.startsWith('/audio/')) return;
 
   // Models, icons and hashed assets never change for a given URL: serve them
   // straight from the cache (fast repeat visits, works on flaky connections).

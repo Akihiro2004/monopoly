@@ -33,7 +33,7 @@ app.use(
     setHeaders(res, filePath) {
       const rel = path.relative(clientDistPath, filePath).split(path.sep).join('/');
       if (rel.startsWith('assets/')) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-      else if (rel.startsWith('models/') || rel.startsWith('icons/')) res.setHeader('Cache-Control', 'public, max-age=604800');
+      else if (rel.startsWith('models/') || rel.startsWith('icons/') || rel.startsWith('audio/')) res.setHeader('Cache-Control', 'public, max-age=604800');
       else res.setHeader('Cache-Control', 'no-cache');
     }
   })
