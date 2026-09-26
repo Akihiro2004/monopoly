@@ -161,254 +161,770 @@
   text-shadow: 0 2px 0 var(--ink);
 }
 
-.logo-sm /* ------------------------------------------------------------------ */
-/* Decorative mini board                                              */
 /* ------------------------------------------------------------------ */
-.mini-board {
-  --gap: 2px;
-  display: grid;
-  grid-template-columns: 1.5fr repeat(9, 1fr) 1.5fr;
-  grid-template-rows: 1.5fr repeat(9, 1fr) 1.5fr;
-  gap: var(--gap);
-  aspect-ratio: 1;
-  padding: 3%;
-  border-radius: 18px;
-  background: var(--ink);
-  border: 4px solid var(--ink);
-  box-shadow: 0 16px 0 #1b1209, 0 40px 60px rgba(43, 29, 16, 0.35);
-  container-type: inline-size;
+/* Menu road with a little car                                        */
+/* ------------------------------------------------------------------ */
+.road {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 44px;
+  background:
+    repeating-linear-gradient(90deg, #fff 0 26px, transparent 26px 52px) 0 50% / 100% 4px no-repeat,
+    #4b4a55;
+  border-top: 4px solid var(--ink);
 }
 
-.mb-tile {
-  position: relative;
-  background: #d8efd5;
-  border-radius: 2px;
-  overflow: hidden;
+.road-car {
+  position: absolute;
+  left: 0;
+  bottom: 22px;
+  width: 58px;
+  height: 30px;
+  animation: car-drive 16s linear infinite;
+  will-change: transform;
 }
 
-.mb-tile.corner {
-  background: #c5e6c0;
-}
-.mb-tile.t-chance {
-  background: #ffe6a8;
-}
-.mb-tile.t-chest {
-  background: #cfe4ff;
+.car-body {
+  position: absolute;
+  inset: 0 0 8px;
+  background: var(--red);
+  border: 3px solid var(--ink);
+  border-radius: 14px 18px 6px 6px;
 }
 
-.mb-tile[class*='band-']::before {
+.car-body::before {
   content: '';
   position: absolute;
-  background: var(--band);
-}
-
-.mb-tile.band-top::before {
-  inset: 0 0 auto 0;
-  height: 32%;
-}
-.mb-tile.band-bottom::before {
-  inset: auto 0 0 0;
-  height: 32%;
-}
-.mb-tile.band-left::before {
-  inset: 0 auto 0 0;
-  width: 32%;
-}
-.mb-tile.band-right::before {
-  inset: 0 0 0 auto;
-  width: 32%;
-}
-
-.mb-center {
-  grid-row: 2 / 11;
-  grid-column: 2 / 11;
-  position: relative;
-  background: #d8efd5;
-  border-radius: 3px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-
-.mb-logo {
-  transform: rotate(-36deg);
-  background: var(--red);
-  color: #fff;
-  font-family: var(--font-display);
-  letter-spacing: 0.08em;
-  font-size: 7cqi;
-  padding: 0.25em 1.1em;
+  left: 12px;
+  top: 3px;
+  width: 20px;
+  height: 8px;
+  border-radius: 4px 8px 2px 2px;
+  background: #bfe6ff;
   border: 2px solid var(--ink);
 }
 
-.mb-deck {
+.car-wheel {
   position: absolute;
-  width: 20%;
-  aspect-ratio: 0.74;
-  border-radius: 4px;
-  border: 2px solid var(--ink);
-  box-shadow: 3px 3px 0 var(--ink);
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--ink);
+  border: 3px solid #cfcfcf;
+  animation: wheel-bump 0.35s ease-in-out infinite alternate;
 }
 
-.mb-deck.chance {
-  top: 12%;
-  left: 12%;
-  background: var(--gold);
-  transform: rotate(14deg);
+.car-wheel.w1 {
+  left: 8px;
 }
 
-.mb-deck.chest {
-  bottom: 12%;
-  right: 12%;
-  background: #7cc0ff;
-  transform: rotate(14deg);
+.car-wheel.w2 {
+  right: 8px;
+}
+
+@keyframes car-drive {
+  from {
+    transform: translateX(-80px);
+  }
+  to {
+    transform: translateX(calc(100vw + 80px));
+  }
+}
+
+@keyframes wheel-bump {
+  to {
+    transform: translateY(-1px);
+  }
+}
+
+.home-screen .hill {
+  bottom: calc(-30vh + 44px);
 }
 
 /* ------------------------------------------------------------------ */
-/* Home: desktop                                                      */
+/* Home layout                                                        */
 /* ------------------------------------------------------------------ */
 .home-layout {
   position: relative;
   z-index: 1;
   min-height: 100%;
   width: 100%;
-  max-width: 1200px;
+  max-width: 1180px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(360px, 420px);
+  grid-template-columns: minmax(0, 1.25fr) minmax(360px, 410px);
   align-items: center;
-  gap: 56px;
-  padding: 48px 56px;
+  gap: 48px;
+  padding: 40px 48px 90px;
 }
 
 .home-hero {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+  grid-template-columns: minmax(0, 1fr) 240px;
   grid-template-areas:
-    'logo art'
-    'sub art'
-    'features features';
+    'title toys'
+    'sub toys'
+    'fan fan';
   align-items: center;
-  column-gap: 20px;
-  row-gap: 26px;
+  column-gap: 16px;
+  row-gap: 18px;
 }
 
-.home-hero .logo {
-  grid-area: logo;
-  justify-self: start;
+.hero-title {
+  grid-area: title;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.hero-title .logo {
+  animation: logo-in 0.7s var(--ease-spring) both;
+}
+
+.hero-title .logo:hover {
+  animation: logo-wobble 0.6s ease-in-out;
+}
+
+@keyframes logo-in {
+  from {
+    transform: rotate(-12deg) scale(0.6);
+    opacity: 0;
+  }
+}
+
+@keyframes logo-wobble {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  30% {
+    transform: rotate(3deg) scale(1.04);
+  }
+  60% {
+    transform: rotate(-6deg);
+  }
+}
+
+.hero-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 10px;
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  background: var(--gold);
+  border: var(--line-thin);
+  box-shadow: 0 3px 0 var(--ink);
+  font-weight: 900;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transform: rotate(2deg);
 }
 
 .hero-sub {
   grid-area: sub;
-  align-self: start;
-  font-size: 1.12rem;
-  font-weight: 800;
-  color: var(--ink);
-  max-width: 420px;
-  background: rgba(255, 250, 240, 0.85);
+  max-width: 440px;
+  padding: 14px 18px;
+  border-radius: 20px 20px 20px 6px;
+  background: rgba(255, 250, 240, 0.94);
   border: var(--line);
-  border-radius: var(--radius-lg);
-  padding: 12px 16px;
-  box-shadow: var(--pop);
+  box-shadow: 0 5px 0 var(--ink);
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.4;
+  color: var(--ink);
 }
 
-.hero-art {
-  grid-area: art;
-  perspective: 1200px;
-  animation: float 6s ease-in-out infinite;
+.hero-sub b {
+  padding: 0 4px;
+  border-radius: 6px;
+  background: #ffe58a;
 }
 
-.hero-art .mini-board {
-  transform: rotateX(50deg) rotateZ(-30deg);
+/* Tumbling dice, money and a coin */
+.hero-toys {
+  grid-area: toys;
+  position: relative;
+  height: 230px;
+  perspective: 700px;
 }
 
-.feature-list {
-  grid-area: features;
-  list-style: none;
+.die3d {
+  position: absolute;
+  width: 72px;
+  height: 72px;
+  filter: drop-shadow(0 10px 0 rgba(43, 29, 16, 0.25));
+}
+
+.die3d.d1 {
+  left: 30px;
+  top: 40px;
+}
+
+.die3d.d2 {
+  left: 130px;
+  top: 96px;
+}
+
+.die3d-cube {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  animation: die-tumble 5.5s cubic-bezier(0.3, 0.9, 0.35, 1) infinite;
+}
+
+.die3d.d2 .die3d-cube {
+  animation-name: die-tumble-2;
+  animation-delay: 0.15s;
+}
+
+.die3d-face {
+  position: absolute;
+  inset: 0;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
+  place-items: center;
+  background: #fff;
+  border: 3px solid var(--ink);
+  border-radius: 16px;
+  backface-visibility: hidden;
 }
 
-.feature {
+.die3d-face .pip-die {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  width: 58px !important;
+  height: 58px !important;
+  padding: 6px;
+  gap: 3px;
+}
+
+.die3d-face .pip-die > span {
+  background: var(--ink);
+}
+
+.die3d-face.f1 .pip-die > span {
+  background: var(--red);
+}
+
+.die3d-face.f1 {
+  transform: rotateY(0deg) translateZ(36px);
+}
+.die3d-face.f6 {
+  transform: rotateY(180deg) translateZ(36px);
+}
+.die3d-face.f3 {
+  transform: rotateY(90deg) translateZ(36px);
+}
+.die3d-face.f4 {
+  transform: rotateY(-90deg) translateZ(36px);
+}
+.die3d-face.f5 {
+  transform: rotateX(90deg) translateZ(36px);
+}
+.die3d-face.f2 {
+  transform: rotateX(-90deg) translateZ(36px);
+}
+
+/* hold still, then a quick tumble that lands on a new face */
+@keyframes die-tumble {
+  0%,
+  30% {
+    transform: translateY(0) rotateX(-20deg) rotateY(25deg);
+  }
+  42% {
+    transform: translateY(-46px) rotateX(200deg) rotateY(160deg);
+  }
+  55%,
+  85% {
+    transform: translateY(0) rotateX(-110deg) rotateY(385deg);
+  }
+  100% {
+    transform: translateY(0) rotateX(-20deg) rotateY(385deg);
+  }
+}
+
+@keyframes die-tumble-2 {
+  0%,
+  30% {
+    transform: translateY(0) rotateX(-18deg) rotateY(-35deg) rotateZ(4deg);
+  }
+  44% {
+    transform: translateY(-38px) rotateX(-230deg) rotateY(-140deg);
+  }
+  57%,
+  85% {
+    transform: translateY(0) rotateX(-18deg) rotateY(-305deg);
+  }
+  100% {
+    transform: translateY(0) rotateX(-18deg) rotateY(-395deg);
+  }
+}
+
+.toy-bill {
+  position: absolute;
+  padding: 10px 16px;
+  border-radius: 6px;
+  border: 3px solid var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  color: var(--green-dark);
+  box-shadow: 0 4px 0 var(--ink);
+  animation: float 4s ease-in-out infinite;
+}
+
+.toy-bill::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 2px dashed rgba(18, 112, 51, 0.35);
+  border-radius: 3px;
+}
+
+.toy-bill.b1 {
+  right: 6px;
+  top: 4px;
+  background: #ffe7a3;
+  rotate: 12deg;
+}
+
+.toy-bill.b2 {
+  left: 0;
+  bottom: 12px;
+  background: #c9f2d3;
+  rotate: -9deg;
+  animation-delay: -2s;
+}
+
+.toy-coin {
+  position: absolute;
+  right: 30px;
+  bottom: 26px;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  color: var(--gold-dark);
+  background: radial-gradient(circle at 35% 30%, #fff3b0, var(--gold) 60%, var(--gold-dark));
+  border: 3px solid var(--ink);
+  box-shadow: 0 4px 0 var(--ink);
+  animation: coin-flip 3.2s ease-in-out infinite;
+}
+
+@keyframes coin-flip {
+  0%,
+  60%,
+  100% {
+    transform: rotateY(0) translateY(0);
+  }
+  75% {
+    transform: rotateY(180deg) translateY(-18px);
+  }
+  90% {
+    transform: rotateY(360deg) translateY(0);
+  }
+}
+
+/* House rules as a fanned hand of cards */
+.rule-fan {
+  grid-area: fan;
+  position: relative;
+  height: 250px;
+  margin-top: 6px;
+}
+
+.rule-card {
+  --i: 0;
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 152px;
+  height: 204px;
+  margin-left: -76px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  border-radius: var(--radius-lg);
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px 10px;
+  border-radius: 16px;
   background: var(--paper);
   border: var(--line);
-  box-shadow: var(--pop);
+  box-shadow: 0 5px 0 var(--ink), 0 14px 26px rgba(43, 29, 16, 0.22);
+  text-align: center;
+  cursor: pointer;
+  transform-origin: 50% 130%;
+  transform: translateX(calc(var(--i) * 58px)) rotate(calc(var(--i) * 7deg));
+  transition: transform 0.35s var(--ease-spring), box-shadow 0.2s ease;
+  animation: deal-in 0.55s var(--ease-spring) both;
+  animation-delay: calc((var(--i) + 2) * 0.07s + 0.2s);
 }
 
-.feature-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  background: var(--gold);
-  border: 2px solid var(--ink);
-  color: var(--ink);
-  flex-shrink: 0;
+@keyframes deal-in {
+  from {
+    transform: translate(0, 120px) rotate(0deg) scale(0.7);
+    opacity: 0;
+  }
 }
 
-.feature:nth-child(2) .feature-icon {
-  background: #ffb4a8;
-}
-.feature:nth-child(3) .feature-icon {
-  background: #a8e6b8;
-}
-.feature:nth-child(4) .feature-icon {
-  background: #b5d4ff;
-}
-.feature:nth-child(5) .feature-icon {
-  background: #dcc6ff;
+/* fan out wider on hover, lift the card under the pointer */
+.rule-fan:hover .rule-card,
+.rule-fan.has-open .rule-card {
+  transform: translateX(calc(var(--i) * 118px)) rotate(calc(var(--i) * 4deg));
 }
 
-.feature-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 0.78rem;
-  color: var(--ink-2);
-  line-height: 1.3;
-  font-weight: 700;
+.rule-fan .rule-card:hover,
+.rule-fan .rule-card.open {
+  z-index: 5;
+  transform: translateX(calc(var(--i) * 118px)) translateY(-26px) rotate(0deg) scale(1.06);
+  box-shadow: 0 8px 0 var(--ink), 0 22px 36px rgba(43, 29, 16, 0.3);
 }
 
-.feature-copy strong {
-  color: var(--ink);
-  font-size: 0.95rem;
+.rule-card-top {
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  height: 58px;
+  margin: 0 -12px 4px;
+  border-radius: 13px 13px 0 0;
+  border-bottom: var(--line);
+  background: var(--tone);
+  color: #fff;
+}
+
+.rule-card-top svg {
+  filter: drop-shadow(0 2px 0 var(--ink));
+}
+
+.rule-card strong {
   font-family: var(--font-display);
   font-weight: 400;
-  letter-spacing: 0.02em;
+  font-size: 1.15rem;
+  line-height: 1;
 }
 
-.panel-card {
+.rule-card-text {
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--ink-2);
+}
+
+.rule-card-foot {
+  margin-top: auto;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+}
+
+.tone-red {
+  --tone: var(--red);
+}
+.tone-orange {
+  --tone: #f58a1f;
+}
+.tone-gold {
+  --tone: #e5a800;
+}
+.tone-blue {
+  --tone: var(--blue);
+}
+.tone-green {
+  --tone: var(--green);
+}
+
+/* ------------------------------------------------------------------ */
+/* Title-deed form                                                    */
+/* ------------------------------------------------------------------ */
+.deed-form {
+  position: relative;
+  overflow: hidden;
+  border-radius: 26px;
+  background: var(--paper);
+  border: var(--line);
+  box-shadow: 0 8px 0 var(--ink), 0 30px 60px rgba(43, 29, 16, 0.28);
+  animation: dialog-in 0.6s var(--ease-spring) both;
+}
+
+.deed-head {
+  padding: 16px 20px 18px;
+  text-align: center;
+  color: #fff;
+  background: var(--red);
+  border-bottom: var(--line);
+  transition: background-color 0.3s ease;
+  box-shadow: inset 0 -6px 0 rgba(0, 0, 0, 0.12);
+}
+
+.deed-head.join {
+  background: var(--blue);
+}
+
+.deed-head small {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+
+.deed-head h2 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 2rem;
+  line-height: 1.05;
+  -webkit-text-stroke: 1px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 3px 0 var(--ink);
+}
+
+.deed-body {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 26px;
-  border-radius: 28px;
-  box-shadow: 0 8px 0 var(--ink), 0 30px 60px rgba(43, 29, 16, 0.25);
+  padding: 18px 22px 20px;
+  /* the inner ruled border of a title deed */
+  margin: 8px;
+  border: 2px solid var(--paper-line);
+  border-radius: 16px;
 }
 
-.panel-head h2 {
-  font-size: 1.9rem;
-  line-height: 1.05;
+.mascot-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  min-height: 48px;
 }
 
-.panel-head p {
-  margin-top: 4px;
-  font-size: 0.92rem;
-  color: var(--ink-2);
+.mascot {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--red);
+  border: var(--line);
+  box-shadow: 0 3px 0 var(--ink);
+  animation: mascot-hop 2.6s ease-in-out infinite;
+}
+
+@keyframes mascot-hop {
+  0%,
+  70%,
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+  78% {
+    transform: translateY(-8px) rotate(-8deg);
+  }
+  86% {
+    transform: translateY(0) rotate(4deg) scale(1.05, 0.95);
+  }
+}
+
+.mascot-bubble {
+  position: relative;
+  padding: 8px 12px;
+  border-radius: 16px 16px 16px 4px;
+  background: #fff;
+  border: var(--line-thin);
+  box-shadow: 0 3px 0 var(--ink);
+  font-weight: 800;
+  font-size: 0.88rem;
+  animation: bubble-pop 0.3s var(--ease-spring);
+}
+
+@keyframes bubble-pop {
+  from {
+    transform: scale(0.85);
+    opacity: 0.4;
+  }
+}
+
+.mode-tickets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.ticket {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 10px 10px 12px;
+  border-radius: 14px;
+  background: var(--paper-2);
+  border: var(--line);
+  box-shadow: 0 4px 0 var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.2s var(--ease-spring), background-color 0.2s ease;
+}
+
+/* ticket notches */
+.ticket::before,
+.ticket::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: var(--paper);
+  border: var(--line-thin);
+}
+
+.ticket::before {
+  left: -8px;
+  clip-path: inset(0 0 0 50%);
+}
+
+.ticket::after {
+  right: -8px;
+  clip-path: inset(0 50% 0 0);
+}
+
+.ticket:hover {
+  transform: translateY(-2px);
+}
+
+.ticket:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--ink);
+}
+
+.ticket-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: var(--line-thin);
+  background: #fff;
+}
+
+.ticket-copy {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+  min-width: 0;
+}
+
+.ticket-copy b {
+  font-weight: 900;
+  font-size: 0.95rem;
+}
+
+.ticket-copy small {
+  font-size: 0.72rem;
   font-weight: 700;
+  color: var(--ink-3);
+}
+
+.ticket.create.active {
+  background: #ffe0dc;
+}
+
+.ticket.create.active .ticket-icon {
+  background: var(--red);
+  color: #fff;
+}
+
+.ticket.join.active {
+  background: #dcebff;
+}
+
+.ticket.join.active .ticket-icon {
+  background: var(--blue);
+  color: #fff;
+}
+
+.ticket.active {
+  transform: translateY(-2px) rotate(-1deg);
+}
+
+/* Room code: six board-tile boxes over one real input */
+.code-boxes {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 7px;
+  cursor: text;
+}
+
+.code-box {
+  display: grid;
+  place-items: center;
+  height: 54px;
+  border-radius: 10px;
+  background: #fff;
+  border: var(--line);
+  border-top-width: 9px;
+  border-top-color: var(--blue);
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  color: var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
+  transition: transform 0.15s var(--ease-spring);
+}
+
+.code-box.filled {
+  animation: box-pop 0.25s var(--ease-spring);
+}
+
+.code-box.caret {
+  border-top-color: var(--gold);
+  background: #fffbe8;
+  transform: translateY(-3px);
+}
+
+@keyframes box-pop {
+  from {
+    transform: scale(0.8);
+  }
+}
+
+.code-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  font-size: 16px; /* no iOS zoom */
+  border: none;
+  cursor: text;
+}
+
+.btn-go {
+  margin-top: 2px;
+}
+
+.deed-form .btn-join {
+  background: var(--blue);
 }
 
 .btn-trail {
   margin-left: auto;
+  transition: transform 0.2s var(--ease-spring);
+}
+
+.btn-go:hover .btn-trail {
+  transform: translateX(4px);
 }
 
 .btn-xl:has(.btn-trail) {
@@ -440,6 +956,17 @@
   vertical-align: -2px;
 }
 
+@media (max-width: 1060px) and (min-width: 821px) {
+  .home-hero {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'title' 'sub' 'fan';
+  }
+
+  .hero-toys {
+    display: none;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Home: mobile                                                       */
 /* ------------------------------------------------------------------ */
@@ -455,16 +982,20 @@
 
   .home-hero {
     flex: 1;
-    min-width: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 14px;
-    padding: calc(28px + var(--safe-top)) 18px 18px;
+    gap: 12px;
+    padding: calc(22px + var(--safe-top)) 16px 14px;
   }
 
-  .home-hero .logo {
+  .hero-title {
+    align-items: center;
+    gap: 10px;
+  }
+
+  .hero-title .logo {
     align-self: center;
   }
 
@@ -472,42 +1003,134 @@
     font-size: clamp(2.2rem, 11vw, 3rem);
   }
 
+  .hero-tag {
+    margin-left: 0;
+  }
+
   .hero-sub {
     text-align: center;
-    font-size: 0.92rem;
-    padding: 8px 12px;
-    order: 3;
+    font-size: 0.9rem;
+    padding: 10px 14px;
+    border-radius: 18px;
   }
 
-  .hero-art {
-    width: min(58vw, 30vh, 260px);
-    margin: 4px auto -4px;
+  .hero-toys {
+    width: 220px;
+    height: 120px;
+    perspective: 500px;
   }
 
-  .hero-art .mini-board {
-    padding: 2.5%;
-    border-radius: 12px;
-    --gap: 1.5px;
+  .die3d {
+    transform: scale(0.7);
   }
 
-  .feature-list {
+  .die3d.d1 {
+    left: 34px;
+    top: 10px;
+  }
+
+  .die3d.d2 {
+    left: 112px;
+    top: 26px;
+  }
+
+  .hero-toys {
     display: none;
+  }
+
+  /* cards become a swipeable row */
+  .rule-fan {
+    display: flex;
+    gap: 10px;
+    width: 100vw;
+    height: auto;
+    margin: 0;
+    padding: 6px 16px 12px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+
+  .rule-fan::-webkit-scrollbar {
+    display: none;
+  }
+
+  .rule-card,
+  .rule-fan:hover .rule-card,
+  .rule-fan.has-open .rule-card,
+  .rule-fan .rule-card:hover,
+  .rule-fan .rule-card.open {
+    position: relative;
+    left: auto;
+    flex: 0 0 104px;
+    width: 104px;
+    height: auto;
+    margin: 0;
+    padding: 0 8px 8px;
+    border-radius: 14px;
+    transform: none;
+    scroll-snap-align: center;
+  }
+
+  .rule-card-top {
+    height: 44px;
+    margin: 0 -8px 2px;
+    border-radius: 11px 11px 0 0;
+  }
+
+  .rule-card strong {
+    font-size: 0.92rem;
+  }
+
+  .rule-card-text,
+  .rule-card-foot {
+    display: none;
+  }
+
+  .road {
+    display: none;
+  }
+
+  .home-screen .hill {
+    bottom: -30vh;
   }
 
   .home-panel {
     flex-shrink: 0;
   }
 
-  .panel-card {
-    border-radius: 30px 30px 0 0;
+  .deed-form {
+    border-radius: 28px 28px 0 0;
     border-bottom: none;
-    padding: 20px 18px calc(16px + var(--safe-bottom));
-    gap: 14px;
     box-shadow: 0 -6px 0 var(--ink), 0 -20px 40px rgba(43, 29, 16, 0.25);
+    padding-bottom: var(--safe-bottom);
   }
 
-  .panel-head {
+  .deed-head {
+    padding: 10px 16px 12px;
+  }
+
+  .deed-head h2 {
+    font-size: 1.5rem;
+  }
+
+  .deed-body {
+    padding: 14px 14px 14px;
+    gap: 13px;
+  }
+
+  .mascot-row {
     display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .road-car,
+  .die3d-cube,
+  .toy-bill,
+  .toy-coin,
+  .mascot {
+    animation: none;
   }
 }
 

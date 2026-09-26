@@ -198,7 +198,7 @@ async function main() {
   await navigate(bob, APP);
   await sleep(600);
   await bob.eval(setInput('input[name="player-name"]', 'Bob'));
-  await bob.eval(clickIf('.segmented button:nth-child(2)'));
+  await bob.eval(clickIf('.mode-tickets button:nth-child(2)'));
   await sleep(150);
   await bob.eval(setInput('input[name="room-code"]', roomCode));
   await sleep(150);
