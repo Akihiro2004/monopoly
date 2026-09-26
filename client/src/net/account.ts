@@ -165,19 +165,62 @@ function fallBack(): void {
   connectSocket();
 }
 
+const POPUP_UNAVAILABLE_CODES = new Set([
+  'auth/popup-blocked',
+  'auth/operation-not-supported-in-this-environment',
+  'auth/web-storage-unsupported',
+  'auth/internal-error'
+]);
+
 /**
  * Upgrade the guest account to Google (keeps the same uid when possible).
- * This navigates away to Google and back (see initAccount for the other
- * half of the flow) rather than opening a popup, which browsers and
- * in-app webviews increasingly block or silently kill.
+ *
+ * Tries a popup first: it completes via postMessage between the two windows,
+ * so it isn't affected by browsers partitioning storage between our domain
+ * and the *.firebaseapp.com auth domain (that partitioning is what makes the
+ * redirect flow below silently fail to complete in a lot of browsers now --
+ * getRedirectResult() comes back with nothing and no error). Falls back to a
+ * full-page redirect only when a popup genuinely can't be used (blocked, or
+ * an in-app / non-browser environment that doesn't support window.open).
  */
 export async function signInWithGoogle(): Promise<void> {
   if (!auth || !authMod) return;
   const provider = new authMod.GoogleAuthProvider();
   useAccount.setState({ busy: true });
+  const current = auth.currentUser;
+  try {
+    if (current?.isAnonymous) {
+      await authMod.linkWithPopup(current, provider);
+    } else {
+      await authMod.signInWithPopup(auth, provider);
+    }
+    useAccount.setState({ busy: false });
+    return;
+  } catch (e) {
+    const err = e as { code?: string };
+    if (err.code === 'auth/credential-already-in-use') {
+      // This Google account is already linked to a different uid. Popup
+      // errors DO reliably carry a reusable credential (unlike redirect
+      // errors), so sign straight into that existing account.
+      const cred = authMod.GoogleAuthProvider.credentialFromError(e as import('firebase/auth').AuthError);
+      useAccount.setState({ busy: false });
+      if (cred) {
+        await authMod.signInWithCredential(auth, cred);
+        return;
+      }
+      throw e;
+    }
+    if (!POPUP_UNAVAILABLE_CODES.has(err.code ?? '')) {
+      // Blocked/cancelled/etc: a real answer, not an environment limitation.
+      useAccount.setState({ busy: false });
+      throw e;
+    }
+  }
+
+  // Popup couldn't be used here at all: fall back to the redirect flow
+  // (initAccount handles completing it on the next load).
   try {
     markSignInPending();
-    const current = auth.currentUser;
     if (current?.isAnonymous) {
       await authMod.linkWithRedirect(current, provider);
     } else {
