@@ -50,6 +50,25 @@ export async function initAccount(): Promise<void> {
     authMod = mod;
     auth = mod.getAuth(initializeApp(config));
     await mod.setPersistence(auth, mod.browserLocalPersistence);
+
+    // Finish a Google sign-in that redirected away and came back. Popups
+    // are blocked outright by some browsers / in-app webviews and get
+    // silently killed by Cross-Origin-Opener-Policy in others, so sign-in
+    // goes through a full-page redirect instead -- it always works.
+    try {
+      await mod.getRedirectResult(auth);
+    } catch (e) {
+      const err = e as { code?: string };
+      if (err.code === 'auth/credential-already-in-use') {
+        // This Google account is already linked to a different uid: sign
+        // into that existing account instead of the (still anonymous) one.
+        const cred = mod.GoogleAuthProvider.credentialFromError(e as import('firebase/auth').AuthError);
+        if (cred) await mod.signInWithCredential(auth, cred);
+      } else {
+        console.warn('Google sign-in redirect failed', e);
+      }
+    }
+
     let connectedAs: string | null = null;
     mod.onIdTokenChanged(auth, async (user) => {
       if (!user) {
@@ -90,7 +109,12 @@ function fallBack(): void {
   connectSocket();
 }
 
-/** Upgrade the guest account to Google (keeps the same uid when possible). */
+/**
+ * Upgrade the guest account to Google (keeps the same uid when possible).
+ * This navigates away to Google and back (see initAccount for the other
+ * half of the flow) rather than opening a popup, which browsers and
+ * in-app webviews increasingly block or silently kill.
+ */
 export async function signInWithGoogle(): Promise<void> {
   if (!auth || !authMod) return;
   const provider = new authMod.GoogleAuthProvider();
@@ -98,23 +122,14 @@ export async function signInWithGoogle(): Promise<void> {
   try {
     const current = auth.currentUser;
     if (current?.isAnonymous) {
-      try {
-        await authMod.linkWithPopup(current, provider);
-        await current.reload();
-        // Name / photo arrive with the link; force a token refresh so the
-        // server sees the new provider.
-        await current.getIdToken(true);
-        const name = current.displayName || (current.email ? current.email.split('@')[0] : null);
-        useAccount.setState({ name, photo: current.photoURL, anonymous: false });
-        return;
-      } catch (e) {
-        // This Google account already exists: switch to it.
-        if ((e as { code?: string }).code !== 'auth/credential-already-in-use') throw e;
-      }
+      await authMod.linkWithRedirect(current, provider);
+    } else {
+      await authMod.signInWithRedirect(auth, provider);
     }
-    await authMod.signInWithPopup(auth, provider);
-  } finally {
+    // The page navigates away now; nothing after this line runs.
+  } catch (e) {
     useAccount.setState({ busy: false });
+    throw e;
   }
 }
 

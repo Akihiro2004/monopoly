@@ -99,6 +99,28 @@ describe('Monopoly Game Engine (LINE Get Rich rules)', () => {
     expect(engine.state.forceBuyOffer?.price).toBe(220); // (60 + 50)*2
   });
 
+  it('force-buy mode "off" turns landing on a developed rival deed into plain rent', () => {
+    const engine = new MonopolyGameEngine('room123', seats, { specialVictory: true, forceBuyMode: 'off' });
+    engine.state.properties[3].ownerId = 'p2';
+    engine.state.properties[3].buildLevel = 1;
+
+    engine.rollDice(1, 2);
+
+    expect(engine.state.phase).toBe('TURN_ENDED');
+    expect(engine.state.forceBuyOffer).toBeNull();
+    expect(engine.state.players[1].money).toBeGreaterThan(1500); // p2 collected rent
+  });
+
+  it('force-buy mode "any" allows forcing raw, unbuilt land too', () => {
+    const engine = new MonopolyGameEngine('room123', seats, { specialVictory: true, forceBuyMode: 'any' });
+    engine.state.properties[3].ownerId = 'p2'; // raw land, buildLevel 0
+
+    engine.rollDice(1, 2);
+
+    expect(engine.state.phase).toBe('FORCE_BUY_OFFER');
+    expect(engine.state.forceBuyOffer?.price).toBe(120); // 60 * 2, no building cost
+  });
+
   it('executes forced sale when buyer accepts: keeps build level, locks landmark', () => {
     const engine = new MonopolyGameEngine('room123', seats, { specialVictory: true });
     engine.state.properties[3].ownerId = 'p2';

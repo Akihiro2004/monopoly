@@ -1,8 +1,8 @@
 import React from 'react';
 import { socket, clearSession } from '../net/socket.js';
 import { useGameStore } from '../store/gameStore.js';
-import { TokenType, PlayerColor } from '@monopoly/shared';
-import { Check, ChevronLeft, Copy, Play, Share2, Timer, Trophy, Users, Palette, Shapes } from 'lucide-react';
+import { TokenType, PlayerColor, ForceBuyMode } from '@monopoly/shared';
+import { Check, ChevronLeft, Copy, Play, Share2, Shuffle, Swords, Timer, Trophy, Users, Palette, Shapes } from 'lucide-react';
 import { LeaderboardButton } from './session/Leaderboard.js';
 import { TOKENS, COLORS } from './lobbyConstants.js';
 import { LobbySeats } from './LobbySeats.js';
@@ -74,6 +74,16 @@ export const LobbyScreen: React.FC = () => {
   const handleTurnTimer = (seconds: number) => {
     if (!isHost) return;
     socket.emit('room:setTurnTimer', { seconds });
+  };
+
+  const handleForceBuyMode = (mode: ForceBuyMode) => {
+    if (!isHost) return;
+    socket.emit('room:setForceBuyMode', { mode });
+  };
+
+  const handleToggleRandomEvents = () => {
+    if (!isHost) return;
+    socket.emit('room:setRandomEvents', { enabled: !roomState.settings.randomEvents });
   };
 
   const handleKick = (playerId: string) => {
@@ -237,6 +247,55 @@ export const LobbyScreen: React.FC = () => {
                   {sec === 0 ? 'Off' : `${sec}s`}
                 </button>
               ))}
+            </div>
+
+            <div className="setting-row">
+              <span className="setting-icon">
+                <Swords size={18} />
+              </span>
+              <div className="setting-copy">
+                <strong>Force-buy</strong>
+                <span>Land on a rival's deed and buy it from them at double price.</span>
+              </div>
+            </div>
+            <div className="segmented small" role="radiogroup" aria-label="Force-buy mode">
+              {(
+                [
+                  ['off', 'Off'],
+                  ['developed', 'Built only'],
+                  ['any', 'Any deed']
+                ] as [ForceBuyMode, string][]
+              ).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  role="radio"
+                  aria-checked={roomState.settings.forceBuyMode === mode}
+                  className={roomState.settings.forceBuyMode === mode ? 'active' : ''}
+                  onClick={() => handleForceBuyMode(mode)}
+                  disabled={!isHost}
+                  title={isHost ? undefined : 'Only the host can change this'}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="setting-row">
+              <span className="setting-icon">
+                <Shuffle size={18} />
+              </span>
+              <div className="setting-copy">
+                <strong>Random events</strong>
+                <span>Occasional board-wide surprises: bank bonuses, market crashes, surprise auctions.</span>
+              </div>
+              <button
+                className={`switch ${roomState.settings.randomEvents ? 'on' : ''}`}
+                onClick={handleToggleRandomEvents}
+                disabled={!isHost}
+                role="switch"
+                aria-checked={roomState.settings.randomEvents}
+                title={isHost ? 'Toggle random events' : 'Only the host can change this'}
+              />
             </div>
           </section>
 

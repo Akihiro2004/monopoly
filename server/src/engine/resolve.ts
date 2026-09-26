@@ -2,6 +2,7 @@ import {
   BOARD_TILES,
   CardDef,
   CardDraw,
+  ForceBuyMode,
   GO_TO_JAIL_TILE_INDEX,
   JAIL_TILE_INDEX,
   GO_SALARY,
@@ -35,7 +36,8 @@ export function resolveLanding(
   chestDeck: CardDef[],
   onCard?: (draw: CardDraw) => void,
   depth = 0,
-  opts: LandingOptions = {}
+  opts: LandingOptions = {},
+  forceBuyMode: ForceBuyMode = 'developed'
 ): ResolveResult {
   const tileIndex = player.position;
   const tile = BOARD_TILES[tileIndex];
@@ -69,7 +71,7 @@ export function resolveLanding(
 
   // 3. Chance / Chest
   if (tile.type === 'chance' || tile.type === 'chest') {
-    return drawCard(gameState, player, tile.type, chanceDeck, chestDeck, onCard, depth);
+    return drawCard(gameState, player, tile.type, chanceDeck, chestDeck, onCard, depth, forceBuyMode);
   }
 
   // 4. Purchasable tiles: Property / Railroad / Utility
@@ -106,7 +108,7 @@ export function resolveLanding(
     if (!opponent) return { needsForceBuyChoice: false, toast: '' };
 
     // Check force-buy eligibility
-    const fbCheck = canForceBuy(tileIndex, player, prop);
+    const fbCheck = canForceBuy(tileIndex, player, prop, forceBuyMode);
     if (fbCheck.eligible) {
       gameState.phase = 'FORCE_BUY_OFFER';
       gameState.forceBuyOffer = createForceBuyOffer(tileIndex, player, prop);
@@ -196,7 +198,8 @@ export function drawCard(
   chanceDeck: CardDef[],
   chestDeck: CardDef[],
   onCard?: (draw: CardDraw) => void,
-  depth = 0
+  depth = 0,
+  forceBuyMode: ForceBuyMode = 'developed'
 ): ResolveResult {
   const deck = deckType === 'chance' ? chanceDeck : chestDeck;
   const deckName = deckType === 'chance' ? 'Chance' : 'Community Chest';
@@ -222,7 +225,7 @@ export function drawCard(
     if (collectGo && target <= player.position) payGoSalary(gameState, player);
     player.position = target;
     if (target === 0 || depth >= 2) return finish();
-    const landed = resolveLanding(gameState, player, chanceDeck, chestDeck, onCard, depth + 1, opts);
+    const landed = resolveLanding(gameState, player, chanceDeck, chestDeck, onCard, depth + 1, opts, forceBuyMode);
     const combined = landed.toast ? `${toast} ${landed.toast}` : toast;
     gameState.lastActionText = combined;
     return { needsForceBuyChoice: landed.needsForceBuyChoice, toast: combined, auctionTile: landed.auctionTile };

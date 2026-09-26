@@ -5,11 +5,20 @@ export type RoomStatus = 'waiting' | 'playing' | 'finished';
 
 export type VictoryType = 'bankruptcy' | 'triple_victory' | 'line_victory';
 
+// 'off' = landing on an opponent's built property is always just rent.
+// 'developed' = classic LINE Get Rich rule: only built-up (house+) deeds can
+// be force-bought, raw land cannot. 'any' = any owned deed can be forced,
+// built or not.
+export type ForceBuyMode = 'off' | 'developed' | 'any';
+
 export interface RoomSettings {
   maxPlayers: number;
   specialVictory: boolean; // LINE Get Rich: Triple Victory & Line Victory enabled
   // Seconds per decision before the server plays the turn (0 = off).
   turnTimeoutSec: number;
+  forceBuyMode: ForceBuyMode;
+  // Occasional board-wide random events (Market Crash, Bank Bonus, ...).
+  randomEvents: boolean;
 }
 
 export interface Seat {

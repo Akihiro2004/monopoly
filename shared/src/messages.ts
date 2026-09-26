@@ -6,6 +6,7 @@ import {
   PlayerColor,
   VictoryType,
   ForceBuyOffer,
+  ForceBuyMode,
   CardDraw,
   TradeOffer
 } from './types.js';
@@ -53,6 +54,8 @@ export interface ClientToServerEvents {
   'room:ready': (payload: { ready: boolean }) => void;
   'room:toggleSpecialVictory': (payload: { enabled: boolean }) => void;
   'room:setTurnTimer': (payload: { seconds: number }) => void;
+  'room:setForceBuyMode': (payload: { mode: ForceBuyMode }) => void;
+  'room:setRandomEvents': (payload: { enabled: boolean }) => void;
   'room:kick': (payload: { playerId: string }) => void;
   'room:start': () => void;
   'room:reconnect': (

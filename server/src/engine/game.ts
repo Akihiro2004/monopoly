@@ -12,6 +12,7 @@ import {
   CardDef,
   CardDraw,
   DebtOffer,
+  ForceBuyMode,
   GameState,
   PlayerState,
   PropertyState,
@@ -59,6 +60,8 @@ export interface GameEngineOptions {
   // Opt in to the occasional board-wide random events (Market Crash, Bank
   // Bonus, ...). Off by default so unit tests stay deterministic.
   randomEvents?: boolean;
+  // 'off' | 'developed' (classic, default) | 'any' (raw land too).
+  forceBuyMode?: ForceBuyMode;
   onStateChange?: (state: GameState) => void;
   onToast?: (toast: { text: string; type?: 'info' | 'success' | 'warning' | 'danger' }) => void;
   // A random event fired: shown as its own big banner client-side, in
@@ -226,7 +229,10 @@ export class MonopolyGameEngine {
       player,
       this.chanceDeck,
       this.chestDeck,
-      (draw: CardDraw) => this.options.onCard?.(draw)
+      (draw: CardDraw) => this.options.onCard?.(draw),
+      0,
+      {},
+      this.options.forceBuyMode
     );
     this.recordMove(player, oldPos, newPos, player.position, player.lapsCompleted > lapsBeforeLanding);
     if (res.toast) {
