@@ -1,5 +1,9 @@
-import React, { useRef, useState } from 'react';
-import { socket, saveSession, loadSession } from '../net/socket.js';
+import React, { useEffect, useRef, useState } from 'react';
+import { socket, saveSession, loadSession, loadRecentSessions } from '../net/socket.js';
+import { useAccount } from '../net/account.js';
+import { ResumeCard } from './session/Resume.js';
+import { AccountChip } from './session/AccountChip.js';
+import { LeaderboardButton } from './session/Leaderboard.js';
 import { useGameStore } from '../store/gameStore.js';
 import {
   ArrowRight,
@@ -46,10 +50,17 @@ const Die3D: React.FC<{ className?: string }> = ({ className = '' }) => (
 type Mode = 'create' | 'join';
 
 export const HomeScreen: React.FC = () => {
-  const saved = loadSession();
+  const saved = loadSession() ?? loadRecentSessions()[0] ?? null;
+  const accountName = useAccount((s) => (s.anonymous ? null : s.name));
   const [name, setName] = useState(saved?.name || '');
-  const [joinCode, setJoinCode] = useState(saved?.roomId || '');
-  const [mode, setMode] = useState<Mode>(saved?.roomId ? 'join' : 'create');
+  const [joinCode, setJoinCode] = useState('');
+  const [mode, setMode] = useState<Mode>('create');
+
+  // Prefill the name from a Google account once it is known.
+  useEffect(() => {
+    if (accountName && !name) setName(accountName.slice(0, 15));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountName]);
   const [busy, setBusy] = useState(false);
   const [codeFocus, setCodeFocus] = useState(false);
   const [openCard, setOpenCard] = useState<number | null>(null);
@@ -63,10 +74,11 @@ export const HomeScreen: React.FC = () => {
     setBusy(true);
     socket.emit('room:create', { name: name.trim() }, (res) => {
       setBusy(false);
-      if (!res.ok || !res.roomId) {
+      if (!res.ok || !res.roomId || !res.playerId || !res.token) {
         addToast(res.error || 'Failed to create room', 'danger');
       } else {
-        saveSession(res.roomId, name.trim());
+        useGameStore.getState().setMyPlayerId(res.playerId);
+        saveSession({ roomId: res.roomId, playerId: res.playerId, token: res.token, name: name.trim() });
       }
     });
   };
@@ -76,12 +88,15 @@ export const HomeScreen: React.FC = () => {
     if (joinCode.trim().length < 6) return addToast('Enter the 6-character room code', 'warning');
     setBusy(true);
     const code = joinCode.trim().toUpperCase();
-    socket.emit('room:join', { roomId: code, name: name.trim() }, (res) => {
+    // A seat this browser already holds in that room is reclaimed with its token.
+    const mine = loadRecentSessions().find((r) => r.roomId === code);
+    socket.emit('room:join', { roomId: code, name: name.trim(), token: mine?.token }, (res) => {
       setBusy(false);
-      if (!res.ok) {
+      if (!res.ok || !res.playerId || !res.token) {
         addToast(res.error || 'Failed to join room', 'danger');
       } else {
-        saveSession(code, name.trim());
+        useGameStore.getState().setMyPlayerId(res.playerId);
+        saveSession({ roomId: code, playerId: res.playerId, token: res.token, name: name.trim() });
       }
     });
   };
@@ -142,6 +157,7 @@ export const HomeScreen: React.FC = () => {
         </section>
 
         <section className="home-panel">
+          <AccountChip />
           <form className="deed-form" onSubmit={submit}>
             <header className={`deed-head ${mode}`}>
               <small>Title deed</small>
@@ -149,6 +165,7 @@ export const HomeScreen: React.FC = () => {
             </header>
 
             <div className="deed-body">
+              <ResumeCard />
               <div className="mascot-row" aria-live="polite">
                 <span className="mascot">
                   <Car size={26} strokeWidth={2.4} />
@@ -276,6 +293,7 @@ export const HomeScreen: React.FC = () => {
               </p>
             </div>
           </form>
+          <LeaderboardButton className="home-lb-btn" />
         </section>
       </div>
     </div>

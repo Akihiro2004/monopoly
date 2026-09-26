@@ -1,6 +1,6 @@
-import React, { Suspense, lazy, useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { useGameStore, initSocketListeners } from './store/gameStore.js';
-import { socket, loadSession, clearSession, saveSession } from './net/socket.js';
+import { socket, loadSession, clearSession, saveSession, loadRecentSessions, adoptSession } from './net/socket.js';
 import { HomeScreen } from './ui/HomeScreen.js';
 import { LobbyScreen } from './ui/LobbyScreen.js';
 import { GameHUD } from './ui/GameHUD.js';
@@ -21,12 +21,17 @@ import { IncomingTradeModal } from './ui/trade/IncomingTradeModal.js';
 import { AuctionModal } from './ui/bank/AuctionModal.js';
 import { GoBanner } from './ui/game/GoBanner.js';
 import { RotateOverlay } from './ui/common/RotateOverlay.js';
+import { ConnectionBanner, ReplacedOverlay } from './ui/session/SessionOverlays.js';
+import { LeaderboardPage } from './ui/session/Leaderboard.js';
 
 export function App() {
   const roomState = useGameStore((s) => s.roomState);
   const [isReconnecting, setIsReconnecting] = useState(() => loadSession() !== null);
   const isMobile = useIsMobile();
-  const inGame = roomState?.status === 'playing';
+  // A finished game stays on screen (board + results) until players leave.
+  const inGame = roomState?.status === 'playing' || roomState?.status === 'finished';
+  const replaced = useGameStore((s) => s.replaced);
+  const reconnectRef = useRef<() => void>(() => undefined);
   const rootClass = `app-root ${isMobile ? 'layout-mobile' : 'layout-desktop'} ${inGame ? 'screen-game' : 'screen-menu'}`;
 
   useEffect(() => {
@@ -34,58 +39,89 @@ export function App() {
 
     let cancelled = false;
 
-    const tryReconnect = () => {
+    const tryReconnect = (force?: unknown) => {
       const session = loadSession();
-      // Already back in a room, or no saved session: nothing to do.
-      if (!session || useGameStore.getState().roomState) {
+      // A tab whose seat moved elsewhere only takes it back on "Play here".
+      if (useGameStore.getState().replaced && force !== true) return;
+      if (!session) {
         if (!cancelled) setIsReconnecting(false);
         return;
       }
-
-      if (!cancelled) setIsReconnecting(true);
+      // Every (re)connection re-registers the seat: after a network drop or
+      // a server restart the server no longer knows this socket.
+      if (!cancelled && !useGameStore.getState().roomState) setIsReconnecting(true);
       socket.emit(
         'room:reconnect',
-        { roomId: session.roomId, playerId: session.playerId, name: session.name },
+        { roomId: session.roomId, playerId: session.playerId, token: session.token, name: session.name },
         (res) => {
           if (cancelled) return;
           if (res.ok) {
-            // Keep the session so further reloads / socket reconnects rejoin.
-            saveSession(session.roomId, session.name);
+            useGameStore.getState().setReplaced(false);
+            saveSession({ ...session, token: res.token ?? session.token });
           } else {
-            // Room is gone (server restart / finished and cleaned up).
+            // Room closed, seat forfeited, or the token no longer matches.
             clearSession();
+            useGameStore.getState().resetAll();
+            if (res.error && res.error !== 'Room not found') useGameStore.getState().addToast(res.error, 'warning');
           }
           setIsReconnecting(false);
         }
       );
     };
+    reconnectRef.current = () => tryReconnect(true);
 
-    // If the socket is already connected, rejoin immediately; otherwise wait.
-    if (socket.connected) {
+    // Rejoin as soon as the connection (and identity) is ready.
+    // Browser was closed mid-game: reopening the site goes straight back to
+    // the match (lobbies stay on the home screen's Resume card).
+    let autoTried = false;
+    const autoResume = () => {
+      if (autoTried || loadSession() || useGameStore.getState().roomState) return;
+      autoTried = true;
+      const recent = loadRecentSessions();
+      if (!recent.length) return;
+      socket.emit(
+        'session:list',
+        { sessions: recent.map(({ roomId, playerId, token }) => ({ roomId, playerId, token })) },
+        (games) => {
+          const game = games.find((g) => g.status === 'playing');
+          if (!game || cancelled) return;
+          const saved = recent.find((r) => r.roomId === game.roomId && r.playerId === game.playerId);
+          const token = game.token ?? saved?.token;
+          if (!token) return;
+          const session = { roomId: game.roomId, playerId: game.playerId, token, name: game.myName };
+          adoptSession(session);
+          useGameStore.getState().setMyPlayerId(game.playerId);
+          setIsReconnecting(true);
+          tryReconnect();
+        }
+      );
+    };
+
+    const onConnect = () => {
       tryReconnect();
-    }
-    socket.on('connect', tryReconnect);
+      autoResume();
+    };
+    if (socket.connected) onConnect();
+    socket.on('connect', onConnect);
 
     return () => {
       cancelled = true;
-      socket.off('connect', tryReconnect);
+      socket.off('connect', onConnect);
     };
   }, []);
 
-  // Keep the persisted session in sync while in a room so a reload always
-  // knows which room + display name to rejoin with.
   // In a room: fetch the 3D chunk in the background while players get ready.
   useEffect(() => {
     if (roomState) preloadScene();
   }, [roomState]);
 
+  // Keep the saved seat's display name current.
   useEffect(() => {
     if (!roomState) return;
-    const mySeat = roomState.seats.find(
-      (s) => s.playerId === useGameStore.getState().myPlayerId
-    );
-    if (mySeat) {
-      saveSession(roomState.roomId, mySeat.displayName);
+    const session = loadSession();
+    const mySeat = roomState.seats.find((s) => s.playerId === useGameStore.getState().myPlayerId);
+    if (session && mySeat && session.roomId === roomState.roomId && session.name !== mySeat.displayName) {
+      saveSession({ ...session, name: mySeat.displayName });
     }
     setIsReconnecting(false);
   }, [roomState]);
@@ -111,7 +147,7 @@ export function App() {
   return (
     <div className={rootClass}>
       {/* 3D Monopoly Canvas (rendered when in playing/finished state) */}
-      {roomState?.status === 'playing' && (
+      {inGame && (
         <Suspense fallback={<div className="scene-loading"><div className="spinner" /><p>Setting up the board…</p></div>}>
           <MonopolyScene />
         </Suspense>
@@ -124,9 +160,10 @@ export function App() {
       {roomState && roomState.status === 'waiting' && <LobbyScreen />}
 
       {/* Screen 3: Game HUD Overlays (when playing) */}
-      {roomState && roomState.status === 'playing' && (
+      {inGame && (
         <>
           <GameHUD />
+          <ConnectionBanner />
           <GoBanner />
           <BuyPropertyModal />
           <ForceBuyModal />
@@ -137,6 +174,9 @@ export function App() {
           <AuctionModal />
         </>
       )}
+
+      {!inGame && <LeaderboardPage />}
+      {replaced && <ReplacedOverlay onUseHere={() => reconnectRef.current()} />}
 
       {/* Victory / Game Over Screen */}
       <VictoryOverlay />

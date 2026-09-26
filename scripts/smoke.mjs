@@ -18,7 +18,8 @@ const check = (label, ok, detail = '') => {
 function startServer() {
   return new Promise((resolve, reject) => {
     serverProcess = spawn(process.execPath, ['server/dist/index.js'], {
-      env: { ...process.env, PORT: String(PORT) },
+      // In-memory only: smoke games must not land in saved rooms / stats.
+      env: { ...process.env, PORT: String(PORT), PERSIST: 'off' },
       stdio: ['ignore', 'pipe', 'pipe']
     });
     let out = '';

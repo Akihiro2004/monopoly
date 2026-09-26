@@ -11,6 +11,8 @@ import { TradeView } from '../trade/TradeView.js';
 import { DiceReadout, GraphicsButton, MuteButton, TurnIdentity } from './TurnHeader.js';
 import { Ticker } from './Ticker.js';
 import { useTurn } from './useTurn.js';
+import { GameMenuButton } from '../session/GameMenu.js';
+import { TurnClock } from '../session/TurnClock.js';
 import { useUnreadChat } from './useUnread.js';
 import { useHudBadges } from './useHudBadges.js';
 import { ChatBubbles } from './ChatBubbles.js';
@@ -52,8 +54,10 @@ export const MobileHUD: React.FC = () => {
         <div className="m-top-row">
           <TurnIdentity turn={turn} size={34} />
           <DiceReadout d1={turn.d1} d2={turn.d2} size={20} />
+          <TurnClock />
           <GraphicsButton />
           <MuteButton />
+          <GameMenuButton />
         </div>
         <PlayerStrip game={turn.game} myPlayerId={myPlayerId} />
       </header>

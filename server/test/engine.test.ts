@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { MonopolyGameEngine } from '../src/engine/game.js';
 import { CardDraw, CHANCE_CARDS, CHEST_CARDS, Seat } from '@monopoly/shared';
 
@@ -589,6 +589,105 @@ describe('Monopoly Game Engine (LINE Get Rich rules)', () => {
       expect(engine.state.properties[39].isMortgaged).toBe(true);
       expect(engine.state.players[1].money).toBe(1500 - 100 - 20);
       expect(engine.state.players[0].money).toBe(1600);
+    });
+  });
+
+  describe('surrender, turn timer and persistence', () => {
+    const three = () => [
+      ...seats,
+      { ...seats[1], seatIndex: 2, playerId: 'p3', displayName: 'Cara', color: 'green' as const, tokenType: 'dog' as const, isHost: false }
+    ];
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('surrender on your own turn returns everything to the Bank and passes the turn', () => {
+      const engine = new MonopolyGameEngine('room123', three(), { specialVictory: false });
+      engine.state.properties[1].ownerId = 'p1';
+      engine.state.properties[1].buildLevel = 2;
+      engine.state.bank.houses = 30;
+      engine.surrender('p1');
+      const alice = engine.state.players[0];
+      expect(alice.isBankrupt).toBe(true);
+      expect(alice.surrendered).toBe(true);
+      expect(engine.state.properties[1].ownerId).toBeNull();
+      expect(engine.state.bank.houses).toBe(32);
+      expect(engine.getCurrentPlayer().playerId).toBe('p2');
+      expect(engine.state.phase).toBe('ROLLING');
+    });
+
+    it('surrender off-turn keeps the turn; the last one standing wins', () => {
+      const engine = new MonopolyGameEngine('room123', three(), { specialVictory: false });
+      engine.surrender('p3');
+      expect(engine.getCurrentPlayer().playerId).toBe('p1');
+      expect(engine.state.phase).toBe('ROLLING');
+      engine.surrender('p1');
+      expect(engine.state.phase).toBe('GAME_OVER');
+      expect(engine.state.winnerId).toBe('p2');
+      expect(() => engine.surrender('p2')).toThrow(/game is over/i);
+    });
+
+    it('surrendering in debt pays the creditor from the sale', () => {
+      const engine = new MonopolyGameEngine('room123', three(), { specialVictory: false });
+      engine.state.phase = 'DEBT';
+      engine.state.debt = { amount: 400, creditorId: 'p2', reason: 'rent' };
+      engine.state.players[0].money = 100;
+      engine.state.properties[39].ownerId = 'p1'; // mortgage value 200
+      engine.surrender('p1');
+      expect(engine.state.players[1].money).toBe(1500 + 300);
+      expect(engine.state.debt).toBeNull();
+      expect(engine.getCurrentPlayer().playerId).toBe('p2');
+    });
+
+    it('the turn timer plays the turn when it runs out', () => {
+      vi.useFakeTimers();
+      const dice: number[] = [];
+      const engine = new MonopolyGameEngine('room123', seats, {
+        specialVictory: false,
+        turnTimerSec: 30,
+        onDice: (d) => dice.push(d.d1 + d.d2)
+      });
+      engine.checkAndApplyVictory();
+      (engine as unknown as { notify: () => void }).notify();
+      expect(engine.state.turnDeadline).toBeGreaterThan(Date.now());
+      vi.advanceTimersByTime(30_000);
+      expect(dice).toHaveLength(1);
+      expect(engine.state.players[0].timeouts).toBe(1);
+      engine.markActive('p1');
+      expect(engine.state.players[0].timeouts).toBe(0);
+    });
+
+    it('an offline player is auto-played on a short clock and removed after 3 missed turns', () => {
+      vi.useFakeTimers();
+      const engine = new MonopolyGameEngine('room123', three(), { specialVictory: false });
+      engine.setConnected('p1', false);
+      expect(engine.state.turnDeadline).not.toBeNull();
+      const alice = engine.state.players[0];
+      // Keep it Alice's turn: the auto-played decisions all belong to her.
+      for (let i = 0; i < 3 && !alice.isBankrupt; i++) {
+        engine.state.currentPlayerIndex = 0;
+        engine.state.phase = 'TURN_ENDED';
+        engine.state.doubles = false;
+        (engine as unknown as { turnKey: string }).turnKey = '';
+        (engine as unknown as { notify: () => void }).notify();
+        vi.advanceTimersByTime(20_000);
+      }
+      expect(alice.isBankrupt).toBe(true);
+      expect(alice.surrendered).toBe(true);
+    });
+
+    it('snapshot / restore rebuilds the same game (decks included)', () => {
+      const engine = new MonopolyGameEngine('room123', seats, { specialVictory: true, turnTimerSec: 60 });
+      engine.rollDice(1, 2);
+      engine.respondToBuyOffer(true);
+      const snap = JSON.parse(JSON.stringify(engine.snapshot()));
+      engine.dispose();
+      const back = MonopolyGameEngine.restore(snap);
+      expect(back.state.properties[3].ownerId).toBe('p1');
+      expect(back.state.players.every((p) => !p.isConnected)).toBe(true);
+      expect(back.snapshot().chance).toEqual(snap.chance);
+      expect(back.options.turnTimerSec).toBe(60);
+      back.dispose();
     });
   });
 

@@ -59,8 +59,7 @@ export const LowCashAlert: React.FC<{ amount: number; className?: string }> = ({
       armed.current = tier;
       const copy = COPY[tier as 1 | 2 | 3];
       setShown({ tier: tier as 1 | 2 | 3, key: Date.now(), tip: copy.tip[Math.floor(Math.random() * copy.tip.length)] });
-      if (tier === 1) audioManager.playTick();
-      else audioManager.playModal();
+      audioManager.playLowCash(tier as 1 | 2 | 3);
     } else {
       // Re-arm tiers once the balance is back above them with some margin.
       while (armed.current > 0 && amount >= LOW_CASH[armed.current - 1] + 50) armed.current -= 1;

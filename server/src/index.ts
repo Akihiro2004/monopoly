@@ -2,6 +2,7 @@ import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import express from 'express';
+import dotenv from 'dotenv';
 import cors from 'cors';
 import compression from 'compression';
 import { Server } from 'socket.io';
@@ -9,12 +10,18 @@ import {
   ClientToServerEvents,
   ServerToClientEvents
 } from '@monopoly/shared';
-import { RoomManager } from './rooms.js';
+import { ProfileStore, RoomManager } from './rooms.js';
+import { FileRoomStore } from './store/fileStore.js';
+import { broadcastRoom, wireEngine } from './wire.js';
+import { verifyIdToken } from './firebase.js';
 import { registerLobbyHandlers } from './handlers/lobby.js';
 import { registerGameHandlers } from './handlers/gameplay.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// One .env at the repo root configures server and client (see .env.example).
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const PORT = parseInt(process.env.PORT || '5000', 10);
 
@@ -62,7 +69,36 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents>(server, {
   pingInterval: 25000
 });
 
-const roomManager = new RoomManager();
+// Running games are saved on this server (JSON files, ROOMS_DIR) so they
+// survive restarts; PERSIST=off keeps them in memory only. Player stats for
+// the leaderboard go to Firestore when Firebase is configured, otherwise to
+// a local history file.
+const fileStore =
+  process.env.PERSIST === 'off' ? undefined : new FileRoomStore(process.env.ROOMS_DIR || path.resolve(__dirname, '../data/rooms'));
+if (fileStore) console.log('Rooms are saved to', process.env.ROOMS_DIR || path.resolve(__dirname, '../data/rooms'));
+
+async function createProfiles(): Promise<ProfileStore | undefined> {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT || process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    try {
+      const { FirestoreProfiles } = await import('./store/firestoreProfiles.js');
+      const profiles = await FirestoreProfiles.create();
+      console.log('Player stats are saved to Firestore');
+      return profiles;
+    } catch (e) {
+      console.warn('Firestore unavailable, keeping stats locally:', (e as Error).message);
+    }
+  }
+  return fileStore;
+}
+
+const roomManager = new RoomManager(fileStore, await createProfiles());
+
+// Firebase sign-in (optional): a valid ID token makes the account uid the
+// player's identity. Invalid / missing tokens just play as guests.
+io.use(async (socket, next) => {
+  socket.data.user = await verifyIdToken(socket.handshake.auth?.idToken as string | undefined);
+  next();
+});
 
 io.on('connection', (socket) => {
   registerLobbyHandlers(io, socket, roomManager);
@@ -70,11 +106,29 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     const { room } = roomManager.handleDisconnect(socket.id);
-    if (room) {
-      io.to(room.roomId).emit('room:state', roomManager.toRoomState(room));
-    }
+    if (room) broadcastRoom(io, roomManager, room.roomId);
   });
 });
+
+// Games in progress come back after a restart; players rejoin with their
+// saved seat token.
+for (const room of await roomManager.restore()) wireEngine(io, roomManager, room.roomId);
+const restoredCount = roomManager.allRooms().length;
+if (restoredCount) console.log(`Restored ${restoredCount} room(s)`);
+
+// Idle / finished rooms are cleaned up.
+setInterval(() => {
+  const removed = roomManager.sweep();
+  if (removed.length) console.log(`Closed idle rooms: ${removed.join(', ')}`);
+}, 60_000).unref();
+
+// Save everything before exiting (deploys send SIGTERM).
+for (const sig of ['SIGINT', 'SIGTERM'] as const) {
+  process.once(sig, async () => {
+    await roomManager.flush().catch(() => undefined);
+    process.exit(0);
+  });
+}
 
 server.listen(PORT, () => {
   console.log(`TMpoly Server running on http://localhost:${PORT}`);

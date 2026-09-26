@@ -18,6 +18,7 @@ import {
   Seat,
   TradeOffer,
   TradeProposal,
+  mortgageBlockReason,
   tradeBlockReason,
   tradeMortgageFees
 } from '@monopoly/shared';
@@ -39,9 +40,14 @@ function shuffle<T>(list: T[]): T[] {
 
 export interface GameEngineOptions {
   specialVictory: boolean;
+  // Seconds per decision before the server plays for the current player
+  // (0 / undefined = no turn timer).
+  turnTimerSec?: number;
   onStateChange?: (state: GameState) => void;
   onToast?: (toast: { text: string; type?: 'info' | 'success' | 'warning' | 'danger' }) => void;
   onCard?: (draw: CardDraw) => void;
+  // Dice the server rolled for a player whose time ran out.
+  onDice?: (dice: { d1: number; d2: number; doubles: boolean }) => void;
 }
 
 export class MonopolyGameEngine {
@@ -51,6 +57,8 @@ export class MonopolyGameEngine {
   private chestDeck: CardDef[];
   private forceBuyTimer: NodeJS.Timeout | null = null;
   private auctionTimer: NodeJS.Timeout | null = null;
+  private turnTimer: NodeJS.Timeout | null = null;
+  private turnKey = '';
 
   constructor(roomId: string, seats: Seat[], options: GameEngineOptions) {
     this.options = options;
@@ -751,6 +759,9 @@ export class MonopolyGameEngine {
       this.state.phase = 'GAME_OVER';
       this.clearForceBuyTimeout();
       this.clearAuctionTimer();
+      if (this.turnTimer) clearTimeout(this.turnTimer);
+      this.turnTimer = null;
+      this.state.turnDeadline = null;
       this.state.auction = null;
       if (result.reason) {
         this.emitToast(`GAME OVER. ${result.reason}`, 'success');
@@ -782,7 +793,254 @@ export class MonopolyGameEngine {
   }
 
   private notify(): void {
+    this.armTurnTimer();
     this.options.onStateChange?.(this.state);
   }
+
+  // ------------------------------------------------------------------
+  // Surrender, turn timer and away players
+  // ------------------------------------------------------------------
+
+  /**
+   * A player gives up: like bankruptcy to the Bank (deeds and buildings go
+   * back, trades are cancelled). Works at any moment, on anyone's turn; a
+   * pending debt of theirs is settled from the sale like a normal bankruptcy.
+   */
+  public surrender(playerId: string, reason: 'surrender' | 'away' = 'surrender'): void {
+    if (this.state.phase === 'GAME_OVER') throw new Error('The game is over');
+    const player = this.state.players.find((p) => p.playerId === playerId);
+    if (!player || player.isBankrupt) throw new Error('You are no longer in this game');
+    const isCurrent = this.getCurrentPlayer().playerId === playerId;
+
+    // Their own pending decision / debt ends with them.
+    const debt = isCurrent ? this.state.debt : null;
+    if (isCurrent) {
+      this.clearForceBuyTimeout();
+      this.state.buyOffer = null;
+      this.state.forceBuyOffer = null;
+      this.state.debt = null;
+      if (this.state.phase === 'AUCTION') this.finishAuctionSilently();
+    } else if (this.state.forceBuyOffer?.targetPlayerId === playerId) {
+      // The deed being force-bought returns to the Bank instead.
+      this.clearForceBuyTimeout();
+      this.state.forceBuyOffer = null;
+      this.state.phase = 'TURN_ENDED';
+    }
+    if (this.state.auction?.highBidderId === playerId) {
+      this.state.auction.highBidderId = null;
+      this.state.auction.highBid = 0;
+    }
+
+    while ((player.jailCardDecks?.length ?? 0) > 0) this.returnJailCard(player);
+    applyBankruptcy(this.state, player, debt?.creditorId ?? null, debt?.amount ?? 0, debt?.splits);
+    player.surrendered = true;
+    this.emitToast(
+      reason === 'away'
+        ? `${player.name} was away too long and left the game. Their properties went back to the Bank.`
+        : `${player.name} surrendered. Their properties went back to the Bank.`,
+      'warning'
+    );
+
+    if (this.checkAndApplyVictory()) {
+      this.notify();
+      return;
+    }
+    if (isCurrent) {
+      this.state.doubles = false;
+      this.state.doublesCount = 0;
+      this.advanceToNextPlayer();
+      return;
+    }
+    this.notify();
+  }
+
+  // Auction closed early because the player whose turn it is left.
+  private finishAuctionSilently(): void {
+    if (this.state.phase !== 'AUCTION' || !this.state.auction) return;
+    this.finishAuction();
+  }
+
+  /** Starts the clocks for the opening move (call once the game begins). */
+  public begin(): void {
+    this.turnKey = '';
+    this.armTurnTimer();
+  }
+
+  /** The player acted themselves: their missed-turn streak resets. */
+  public markActive(playerId: string): void {
+    const p = this.state.players.find((pl) => pl.playerId === playerId);
+    if (p && p.timeouts) p.timeouts = 0;
+  }
+
+  /** Presence change: an away current player gets a shorter clock. */
+  public setConnected(playerId: string, connected: boolean): void {
+    const p = this.state.players.find((pl) => pl.playerId === playerId);
+    if (!p || p.isConnected === connected) return;
+    p.isConnected = connected;
+    if (this.getCurrentPlayer()?.playerId === playerId) this.turnKey = '';
+    this.notify();
+  }
+
+  // Phases where the current player owes a decision (auctions and force-buy
+  // offers run their own clocks).
+  private static readonly TIMED_PHASES = ['ROLLING', 'BUY_OFFER', 'TURN_ENDED', 'DEBT'];
+  private static readonly AWAY_SEC = 20;
+  private static readonly AWAY_LIMIT = 3;
+
+  private armTurnTimer(): void {
+    const base = this.options.turnTimerSec ?? 0;
+    const current = this.getCurrentPlayer();
+    const timed =
+      this.state.phase !== 'GAME_OVER' &&
+      MonopolyGameEngine.TIMED_PHASES.includes(this.state.phase) &&
+      !!current &&
+      !current.isBankrupt &&
+      (base > 0 || !current.isConnected);
+    const key = timed ? `${this.state.turnNumber}:${this.state.currentPlayerIndex}:${this.state.phase}:${current.isConnected}` : '';
+    if (key === this.turnKey) return;
+    this.turnKey = key;
+    if (this.turnTimer) clearTimeout(this.turnTimer);
+    this.turnTimer = null;
+    if (!timed) {
+      this.state.turnDeadline = null;
+      return;
+    }
+    // Someone who is offline gets a short clock even with the timer off, so
+    // one closed tab never freezes the table. Debts get extra time to plan.
+    let sec = base > 0 ? base : MonopolyGameEngine.AWAY_SEC;
+    if (!current.isConnected) sec = Math.min(sec, MonopolyGameEngine.AWAY_SEC);
+    if (this.state.phase === 'DEBT' && current.isConnected) sec *= 2;
+    this.state.turnDeadline = Date.now() + sec * 1000;
+    this.turnTimer = setTimeout(() => this.onTurnTimeout(), sec * 1000);
+  }
+
+  /** The clock ran out: play the current decision for the player. */
+  public onTurnTimeout(): void {
+    this.turnTimer = null;
+    this.turnKey = '';
+    const player = this.getCurrentPlayer();
+    if (!player || player.isBankrupt || this.state.phase === 'GAME_OVER') return;
+    player.timeouts = (player.timeouts ?? 0) + 1;
+
+    if (!player.isConnected && player.timeouts >= MonopolyGameEngine.AWAY_LIMIT) {
+      this.surrender(player.playerId, 'away');
+      return;
+    }
+
+    try {
+      switch (this.state.phase) {
+        case 'ROLLING':
+          this.emitToast(`${player.name} ran out of time. Rolling for them.`, 'info');
+          this.options.onDice?.(this.rollDice());
+          break;
+        case 'BUY_OFFER':
+          this.emitToast(`${player.name} ran out of time and passed on the property.`, 'info');
+          this.respondToBuyOffer(false);
+          break;
+        case 'TURN_ENDED':
+          this.endTurn();
+          break;
+        case 'DEBT':
+          this.autoSettleDebt(player);
+          break;
+      }
+    } catch {
+      // A failed auto-action must never stall the game: move on.
+      const phase = this.state.phase as string;
+      if (phase !== 'GAME_OVER' && phase !== 'AUCTION' && phase !== 'DEBT') {
+        this.state.phase = 'TURN_ENDED';
+        this.endTurn();
+      }
+    }
+  }
+
+  // Sells buildings (top levels first), then mortgages land until the debt is
+  // covered; declares bankruptcy when nothing is left.
+  private autoSettleDebt(player: PlayerState): void {
+    this.emitToast(`${player.name} ran out of time. The Bank settles their debt.`, 'warning');
+    const owned = () => Object.values(this.state.properties).filter((p) => p.ownerId === player.playerId);
+    let guard = 60;
+    while (this.state.phase === 'DEBT' && this.state.debt && player.money < this.state.debt.amount && guard-- > 0) {
+      const built = owned()
+        .filter((p) => p.buildLevel > 0)
+        .sort((a, b) => b.buildLevel - a.buildLevel)[0];
+      if (built) {
+        sellBuilding(this.state, player, built.tileIndex);
+        continue;
+      }
+      const land = owned().find((p) => !p.isMortgaged && !mortgageBlockReason(this.state, player.playerId, p.tileIndex));
+      if (!land) break;
+      toggleMortgage(this.state, player, land.tileIndex, true);
+    }
+    this.tryPayDebt();
+    if (this.state.phase === 'DEBT') {
+      this.declareBankruptcy();
+      return;
+    }
+    this.notify();
+  }
+
+  // ------------------------------------------------------------------
+  // Persistence
+  // ------------------------------------------------------------------
+
+  /** Everything needed to rebuild this game after a server restart. */
+  public snapshot(): EngineSnapshot {
+    return {
+      state: this.state,
+      chance: this.chanceDeck.map((c) => c.id),
+      chest: this.chestDeck.map((c) => c.id),
+      specialVictory: this.options.specialVictory,
+      turnTimerSec: this.options.turnTimerSec ?? 0
+    };
+  }
+
+  public static restore(snap: EngineSnapshot, options: Omit<GameEngineOptions, 'specialVictory' | 'turnTimerSec'> = {}): MonopolyGameEngine {
+    const engine = new MonopolyGameEngine(snap.state.roomId, [], {
+      ...options,
+      specialVictory: snap.specialVictory,
+      turnTimerSec: snap.turnTimerSec
+    });
+    const byId = new Map([...CHANCE_CARDS, ...CHEST_CARDS].map((c) => [c.id, c]));
+    const deck = (ids: string[], fallback: CardDef[]) => {
+      const cards = ids.map((id) => byId.get(id)).filter((c): c is CardDef => !!c);
+      return cards.length ? cards : shuffle([...fallback]);
+    };
+    engine.state = snap.state;
+    engine.chanceDeck = deck(snap.chance, CHANCE_CARDS);
+    engine.chestDeck = deck(snap.chest, CHEST_CARDS);
+    // Nobody is connected right after a restart; they rejoin one by one.
+    for (const p of engine.state.players) p.isConnected = false;
+    engine.state.turnDeadline = null;
+    engine.resumeTimers();
+    return engine;
+  }
+
+  private resumeTimers(): void {
+    if (this.state.phase === 'AUCTION' && this.state.auction) {
+      // Give bidders a moment to come back.
+      this.state.auction.endsAt = Math.max(this.state.auction.endsAt, Date.now() + AUCTION_EXTEND_MS);
+      this.scheduleAuctionEnd();
+    }
+    if (this.state.phase === 'FORCE_BUY_OFFER' && this.state.forceBuyOffer) this.setupForceBuyTimeout();
+    this.turnKey = '';
+    this.armTurnTimer();
+  }
+
+  /** Stops every timer (room closed / game discarded). */
+  public dispose(): void {
+    this.clearForceBuyTimeout();
+    this.clearAuctionTimer();
+    if (this.turnTimer) clearTimeout(this.turnTimer);
+    this.turnTimer = null;
+  }
+}
+
+export interface EngineSnapshot {
+  state: GameState;
+  chance: string[];
+  chest: string[];
+  specialVictory: boolean;
+  turnTimerSec: number;
 }
 

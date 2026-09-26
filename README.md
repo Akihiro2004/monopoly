@@ -97,6 +97,38 @@ Since the backend runs on your machine, you can expose it to friends over the in
 
 ---
 
+## Sessions, accounts & leaderboard
+
+- **Your seat is safe.** Every seat has a secret token saved in the browser.
+  Reload, lose the connection or even close the browser: opening the site
+  again puts you straight back into your match. A lobby you left open shows
+  up as "Continue where you left off" on the home screen.
+- **One window per seat.** Opening your seat in a second tab or device moves
+  it there; the old window shows "Playing somewhere else".
+- **Surrender or leave** from the in-game menu (the menu button, top right).
+  Surrender returns your properties to the Bank and lets you keep watching;
+  leaving forfeits the game.
+- **Turn timer** (lobby setting: off / 60 / 90 / 120 s). When time runs out the
+  game plays that step for you. Players who go offline are auto-played after
+  20 s and leave the game after 3 missed turns, so nobody can stall a table.
+- **Restarts are harmless.** Running games are saved to `server/data/rooms`
+  (`ROOMS_DIR`) and restored when the server starts again.
+- **Leaderboard** (home screen and lobby): wins, win rate and best score
+  (highest net worth at the end of a game).
+
+### Firebase (optional)
+
+Copy `.env.example` to `.env` and follow the steps in it. Firebase only
+handles **players**: guest / Google sign-in (so a player and their stats
+follow them to any device) and one small Firestore document per player for
+the leaderboard. The game itself keeps running on this server, and the usage
+fits the free Spark plan (one write per player per finished game, leaderboard
+reads cached for 5 minutes). Deploy `firestore.rules` so browsers cannot read
+or write Firestore directly. Without Firebase everything works as a guest and
+the leaderboard uses the server's local history.
+
+---
+
 ## Credits
 
 - Property buildings: [KayKit City Builder Bits](https://github.com/KayKit-Game-Assets/KayKit-City-Builder-Bits-1.0) by Kay Lousberg, CC0 (see `client/public/models/kaykit/LICENSE.txt`).

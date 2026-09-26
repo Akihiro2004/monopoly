@@ -12,6 +12,25 @@ export function registerGameHandlers(
   socket: Socket<ClientToServerEvents, ServerToClientEvents>,
   roomManager: RoomManager
 ) {
+  // Any action by a player resets their missed-turn streak (turn timer).
+  socket.onAny((event: string) => {
+    if (!/^(game|auction|trade):/.test(event)) return;
+    const info = roomManager.getPlayerBySocket(socket.id);
+    if (info) roomManager.getRoom(info.roomId)?.engine?.markActive(info.playerId);
+  });
+
+  socket.on('game:surrender', () => {
+    const info = roomManager.getPlayerBySocket(socket.id);
+    if (!info) return;
+    const room = roomManager.getRoom(info.roomId);
+    if (!room || !room.engine) return;
+    try {
+      room.engine.surrender(info.playerId);
+    } catch (e: any) {
+      socket.emit('error', { message: e.message });
+    }
+  });
+
   socket.on('game:roll', () => {
     const info = roomManager.getPlayerBySocket(socket.id);
     if (!info) return;

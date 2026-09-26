@@ -5,90 +5,140 @@ import {
 } from '@monopoly/shared';
 
 const PLAYER_ID_KEY = 'monopoly_player_id';
-const SESSION_KEY = 'monopoly_session_v1';
+const SESSION_KEY = 'monopoly_session_v2';
+const RECENT_KEY = 'tmpoly_recent_sessions';
 
+/** A seat this browser holds: room, identity and the seat's secret token. */
 export interface PersistedSession {
   roomId: string;
   playerId: string;
+  token: string;
   name: string;
 }
 
-// Storage is intentionally per-tab (sessionStorage): a tab reload restores
-// the same seat, while a second tab gets its own identity so two players can
-// share one browser/profile without colliding on the same seat.
-function readStorage(key: string): string | null {
+// The live seat is per tab (sessionStorage): a reload rejoins it and a second
+// tab can play as someone else. Recent seats also go to localStorage so a
+// closed tab can be resumed from the home screen.
+function read(store: 'session' | 'local', key: string): string | null {
   try {
-    return sessionStorage.getItem(key);
+    return (store === 'session' ? sessionStorage : localStorage).getItem(key);
   } catch {
-    return memStore[key] ?? null;
+    return memStore[`${store}:${key}`] ?? null;
   }
 }
 
-function writeStorage(key: string, value: string): void {
+function write(store: 'session' | 'local', key: string, value: string): void {
   try {
-    sessionStorage.setItem(key, value);
+    (store === 'session' ? sessionStorage : localStorage).setItem(key, value);
   } catch {
-    memStore[key] = value;
+    memStore[`${store}:${key}`] = value;
   }
 }
 
-function removeStorage(key: string): void {
+function remove(store: 'session' | 'local', key: string): void {
   try {
-    sessionStorage.removeItem(key);
+    (store === 'session' ? sessionStorage : localStorage).removeItem(key);
   } catch {
-    delete memStore[key];
+    delete memStore[`${store}:${key}`];
   }
 }
 
 const memStore: Record<string, string> = {};
 
-// Persistent (per-tab) playerId so a reload rejoins the same seat.
-export function getOrCreatePlayerId(): string {
-  const stored = readStorage(PLAYER_ID_KEY);
-  if (stored) return stored;
+// Signed-in account (Firebase uid): the identity on every device.
+let accountUid: string | null = null;
+export function setAccountUid(uid: string | null): void {
+  accountUid = uid;
+}
 
+// Guest identity for this tab.
+export function getOrCreatePlayerId(): string {
+  const stored = read('session', PLAYER_ID_KEY);
+  if (stored) return stored;
   const pid = 'p_' + Math.random().toString(36).substring(2, 10);
-  writeStorage(PLAYER_ID_KEY, pid);
+  write('session', PLAYER_ID_KEY, pid);
   return pid;
 }
 
-export function saveSession(roomId: string, name: string): void {
-  const session: PersistedSession = {
-    roomId: roomId.toUpperCase(),
-    playerId: getOrCreatePlayerId(),
-    name
-  };
-  writeStorage(SESSION_KEY, JSON.stringify(session));
+/** Who this tab plays as right now. */
+export function currentPlayerId(): string {
+  return accountUid ?? getOrCreatePlayerId();
+}
+
+export function saveSession(session: PersistedSession): void {
+  const s = { ...session, roomId: session.roomId.toUpperCase() };
+  write('session', SESSION_KEY, JSON.stringify(s));
+  const recent = loadRecentSessions().filter((r) => !(r.roomId === s.roomId && r.playerId === s.playerId));
+  write('local', RECENT_KEY, JSON.stringify([s, ...recent].slice(0, 6)));
 }
 
 export function loadSession(): PersistedSession | null {
   try {
-    const raw = readStorage(SESSION_KEY);
+    const raw = read('session', SESSION_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as PersistedSession;
-    if (!parsed.roomId || !parsed.playerId) return null;
-    return {
-      roomId: parsed.roomId.toUpperCase(),
-      playerId: parsed.playerId,
-      name: parsed.name || ''
-    };
+    if (!parsed.roomId || !parsed.playerId || !parsed.token) return null;
+    return { ...parsed, roomId: parsed.roomId.toUpperCase(), name: parsed.name || '' };
   } catch {
     return null;
   }
 }
 
+/** Forget this tab's seat (and drop it from the resume list). */
 export function clearSession(): void {
-  removeStorage(SESSION_KEY);
+  const s = loadSession();
+  remove('session', SESSION_KEY);
+  if (s) forgetRecent(s.roomId, s.playerId);
 }
 
-const playerId = getOrCreatePlayerId();
+export function loadRecentSessions(): PersistedSession[] {
+  try {
+    const list = JSON.parse(read('local', RECENT_KEY) ?? '[]') as PersistedSession[];
+    return Array.isArray(list) ? list.filter((s) => s && s.roomId && s.playerId && s.token) : [];
+  } catch {
+    return [];
+  }
+}
 
-// Connect to root origin (works on localhost:5173 via proxy AND on tunneled HTTPS)
+export function forgetRecent(roomId: string, playerId?: string): void {
+  const list = loadRecentSessions().filter((r) => !(r.roomId === roomId.toUpperCase() && (!playerId || r.playerId === playerId)));
+  write('local', RECENT_KEY, JSON.stringify(list));
+}
+
+/** Resume a seat in this tab (e.g. from the home screen after a closed tab). */
+export function adoptSession(s: PersistedSession): void {
+  if (!accountUid) write('session', PLAYER_ID_KEY, s.playerId);
+  saveSession(s);
+}
+
+// Connect to root origin (works on localhost:5173 via proxy AND on tunneled
+// HTTPS). The connection opens once the identity is known (connectSocket).
 export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io('/', {
-  query: { playerId },
   transports: ['websocket', 'polling'],
-  autoConnect: true,
+  autoConnect: false,
   reconnection: true,
   reconnectionAttempts: Infinity,
   reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000
 });
+
+/**
+ * (Re)opens the connection as the current identity. `idToken` is the
+ * Firebase ID token when signed in; the server verifies it.
+ */
+export function connectSocket(idToken?: string | null): void {
+  socket.auth = idToken ? { idToken } : {};
+  socket.io.opts.query = { playerId: currentPlayerId() };
+  if (socket.connected) socket.disconnect();
+  socket.connect();
+}
+
+/** Keeps the handshake token fresh for future reconnects (no reconnect now). */
+export function refreshSocketToken(idToken: string): void {
+  socket.auth = { idToken };
+}
+
+/** Forget the seat in this tab only (it stays resumable elsewhere). */
+export function dropTabSession(): void {
+  remove('session', SESSION_KEY);
+}

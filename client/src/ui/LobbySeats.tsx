@@ -1,6 +1,6 @@
 import React from 'react';
 import { Seat } from '@monopoly/shared';
-import { Crown, UserPlus } from 'lucide-react';
+import { Crown, UserPlus, X } from 'lucide-react';
 import { TOKENS } from './lobbyConstants.js';
 import { PlayerAvatar } from './common/PlayerAvatar.js';
 
@@ -8,9 +8,11 @@ interface SeatsProps {
   seats: Seat[];
   myPlayerId: string;
   maxPlayers?: number;
+  // Host only: remove a player from the lobby.
+  onKick?: (playerId: string) => void;
 }
 
-export const LobbySeats: React.FC<SeatsProps> = ({ seats, myPlayerId, maxPlayers = 6 }) => {
+export const LobbySeats: React.FC<SeatsProps> = ({ seats, myPlayerId, maxPlayers = 6, onKick }) => {
   const empty = Math.max(0, maxPlayers - seats.length);
 
   return (
@@ -37,6 +39,16 @@ export const LobbySeats: React.FC<SeatsProps> = ({ seats, myPlayerId, maxPlayers
               <span className="badge green">Ready</span>
             ) : (
               <span className="badge">Not ready</span>
+            )}
+            {onKick && !isMe && (
+              <button
+                className="icon-btn seat-kick"
+                onClick={() => onKick(seat.playerId)}
+                aria-label={`Remove ${seat.displayName}`}
+                title={`Remove ${seat.displayName}`}
+              >
+                <X size={15} strokeWidth={3} />
+              </button>
             )}
           </li>
         );

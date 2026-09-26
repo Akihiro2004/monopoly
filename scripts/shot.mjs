@@ -145,7 +145,7 @@ async function navigate(cdp, url) {
 async function main() {
   await fs.mkdir(OUT_DIR, { recursive: true });
 
-  server = spawn(process.execPath, ['server/dist/index.js'], { env: { ...process.env, PORT: String(PORT) }, stdio: 'ignore' });
+  server = spawn(process.execPath, ['server/dist/index.js'], { env: { ...process.env, PORT: String(PORT), PERSIST: 'off' }, stdio: 'ignore' });
   for (let i = 0; i < 40; i++) {
     try {
       const res = await fetch(APP);

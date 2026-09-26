@@ -8,6 +8,7 @@ export type VictoryType = 'bankruptcy' | 'triple_victory' | 'line_victory';
 export interface RoomSettings {
   maxPlayers: number;
   specialVictory: boolean; // LINE Get Rich: Triple Victory & Line Victory enabled
+  // Seconds per decision before the server plays the turn (0 = off).
   turnTimeoutSec: number;
 }
 
@@ -99,6 +100,10 @@ export interface PlayerState {
   consecutiveDoubles: number;
   // Times this player has passed / landed on GO. Building on land needs >= 1.
   lapsCompleted: number;
+  // Left the game by surrendering (also counted as bankrupt).
+  surrendered?: boolean;
+  // Turns in a row the server had to play for this player (turn timer).
+  timeouts?: number;
 }
 
 export type GamePhase =
@@ -225,6 +230,8 @@ export interface GameState {
   winnerId: string | null;
   victoryType: VictoryType | null;
   lastActionText: string;
+  // When the current decision times out (ms timestamp), null = no timer.
+  turnDeadline?: number | null;
 }
 
 // Chat

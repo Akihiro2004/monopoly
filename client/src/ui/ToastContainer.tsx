@@ -13,7 +13,7 @@ const ICONS = {
 export const ToastContainer: React.FC = () => {
   const toasts = useGameStore((s) => s.toasts);
   const removeToast = useGameStore((s) => s.removeToast);
-  const inGame = useGameStore((s) => s.roomState?.status === 'playing');
+  const inGame = useGameStore((s) => !!s.roomState && s.roomState.status !== 'waiting');
   const isMobile = useIsMobile();
 
   // Phones in-game use the compact ticker instead of a toast stack.

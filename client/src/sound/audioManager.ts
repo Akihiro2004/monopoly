@@ -393,6 +393,120 @@ class AudioManager {
     this.tone(1200, { vol: 0.06, dur: 0.05 });
   }
 
+  // ---- Soft, calm cues (kalimba-like bells in a pentatonic scale) ----
+
+  // A mellow bell: sine body + a quiet octave shimmer, slow attack and a
+  // long, gentle decay. Everything below builds on it.
+  private bell(freq: number, at = 0, vol = 0.12, dur = 0.9) {
+    try {
+      this.initContext();
+      if (!this.ctx || !this.sfxGain) return;
+      const now = this.ctx.currentTime + at;
+      const out = this.ctx.createGain();
+      out.gain.setValueAtTime(0.0001, now);
+      out.gain.linearRampToValueAtTime(vol, now + 0.025);
+      out.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+      // soften the top end so nothing sounds harsh
+      const lp = this.ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 2600;
+      out.connect(lp);
+      lp.connect(this.sfxGain);
+      const partials: [number, number][] = [
+        [1, 1],
+        [2, 0.18],
+        [3.01, 0.05]
+      ];
+      for (const [mult, amp] of partials) {
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq * mult, now);
+        g.gain.value = amp;
+        osc.connect(g);
+        g.connect(out);
+        osc.start(now);
+        osc.stop(now + dur + 0.05);
+      }
+    } catch (_) {}
+  }
+
+  // Someone joined / came back online.
+  public playJoin() {
+    this.bell(523.25, 0, 0.09);
+    this.bell(783.99, 0.1, 0.08);
+  }
+
+  // Someone left / went offline.
+  public playLeave() {
+    this.bell(659.25, 0, 0.07);
+    this.bell(440.0, 0.12, 0.07, 1.1);
+  }
+
+  // It is your turn: a small rising arpeggio.
+  public playMyTurn() {
+    [523.25, 659.25, 783.99].forEach((f, i) => this.bell(f, i * 0.09, 0.09));
+  }
+
+  // Low cash: 1 = under $300, 2 = under $200, 3 = under $100 (lower, longer).
+  public playLowCash(tier: 1 | 2 | 3) {
+    if (tier === 1) {
+      this.bell(440.0, 0, 0.08, 1.1);
+    } else if (tier === 2) {
+      this.bell(440.0, 0, 0.09, 1.0);
+      this.bell(349.23, 0.16, 0.09, 1.3);
+    } else {
+      this.bell(440.0, 0, 0.1, 0.9);
+      this.bell(349.23, 0.16, 0.1, 1.0);
+      this.bell(293.66, 0.34, 0.11, 1.6);
+    }
+  }
+
+  // Paid rent (soft step down) / received rent (soft step up + shimmer).
+  public playRentPaid() {
+    this.bell(659.25, 0, 0.08);
+    this.bell(523.25, 0.1, 0.08, 1.0);
+  }
+
+  public playRentReceived() {
+    this.bell(523.25, 0, 0.08);
+    this.bell(659.25, 0.09, 0.08);
+    this.bell(1046.5, 0.18, 0.05, 1.2);
+  }
+
+  // Sent to jail: two low, muted bells.
+  public playJail() {
+    this.bell(220.0, 0, 0.11, 0.8);
+    this.bell(196.0, 0.2, 0.11, 1.2);
+  }
+
+  // A player surrendered: slow, descending.
+  public playSurrender() {
+    [587.33, 493.88, 392.0].forEach((f, i) => this.bell(f, i * 0.18, 0.08, 1.3));
+  }
+
+  // Connection dropped / restored.
+  public playDisconnect() {
+    this.bell(392.0, 0, 0.07, 1.0);
+  }
+
+  public playReconnect() {
+    this.bell(392.0, 0, 0.07);
+    this.bell(587.33, 0.1, 0.07);
+  }
+
+  // Last seconds of your clock: a soft wooden tick.
+  public playClockTick() {
+    this.tone(1760, { vol: 0.035, dur: 0.05 });
+    this.noiseBurst(0, 0.03, 0.03, 2400, 'bandpass');
+  }
+
+  // Someone else bought a property / a trade went through.
+  public playSoftDeal() {
+    this.bell(783.99, 0, 0.06);
+    this.bell(987.77, 0.07, 0.05);
+  }
+
   // Background music: "Blueprints and Tea", looped seamlessly.
   //
   // The track starts with 0.5 s of silence + a short fade-in and ends with a

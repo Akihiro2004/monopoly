@@ -9,7 +9,7 @@ import {
   CardDraw,
   GO_SALARY
 } from '@monopoly/shared';
-import { socket, getOrCreatePlayerId } from '../net/socket.js';
+import { socket, currentPlayerId, clearSession } from '../net/socket.js';
 import { audioManager } from '../sound/audioManager.js';
 
 export interface ToastMessage {
@@ -67,7 +67,16 @@ interface GameStore {
   cardDraw: CardDraw | null;
   activity: ActivityEntry[];
 
+  // This seat was opened in another tab / device.
+  replaced: boolean;
+  // Socket connection is down (shows a reconnect banner in game).
+  offline: boolean;
+  leaderboardOpen: boolean;
+
   // Actions
+  setMyPlayerId: (id: string) => void;
+  setReplaced: (v: boolean) => void;
+  setLeaderboardOpen: (v: boolean) => void;
   setRoomState: (room: RoomState) => void;
   setGameState: (game: GameState) => void;
   releaseMoneyHold: () => void;
@@ -110,7 +119,7 @@ function writePref(key: string, value: string): void {
 }
 
 export const useGameStore = create<GameStore>((set) => ({
-  myPlayerId: getOrCreatePlayerId(),
+  myPlayerId: currentPlayerId(),
   roomState: null,
   gameState: null,
   rawGame: null,
@@ -136,6 +145,12 @@ export const useGameStore = create<GameStore>((set) => ({
   cardDraw: null,
   activity: [],
 
+  replaced: false,
+  offline: false,
+  leaderboardOpen: false,
+  setLeaderboardOpen: (leaderboardOpen) => set({ leaderboardOpen }),
+  setMyPlayerId: (myPlayerId) => set({ myPlayerId }),
+  setReplaced: (replaced) => set({ replaced }),
   setRoomState: (roomState) => set({ roomState }),
   setGameState: (gameState) =>
     set((s) => {
@@ -244,6 +259,7 @@ export const useGameStore = create<GameStore>((set) => ({
       walkPaused: false,
       buyOffer: null,
       winner: null,
+      replaced: false,
     }),
 }));
 
@@ -324,11 +340,43 @@ export function initSocketListeners() {
   registerLateListeners();
 
   socket.on('room:state', (room) => {
+    const prev = useGameStore.getState().roomState;
     useGameStore.getState().setRoomState(room);
+    // Soft cues when others join / leave / drop / come back.
+    if (!prev || prev.roomId !== room.roomId) return;
+    const myId = useGameStore.getState().myPlayerId;
+    const was = new Map(prev.seats.map((s) => [s.playerId, s.isConnected]));
+    const now = new Map(room.seats.map((s) => [s.playerId, s.isConnected]));
+    let joined = false;
+    let left = false;
+    for (const [id, conn] of now) {
+      if (id === myId) continue;
+      if (!was.has(id) || (conn && was.get(id) === false)) joined = true;
+      else if (!conn && was.get(id)) left = true;
+    }
+    for (const id of was.keys()) if (id !== myId && !now.has(id)) left = true;
+    if (joined) audioManager.playJoin();
+    else if (left) audioManager.playLeave();
+  });
+
+  socket.on('connect', () => useGameStore.setState({ offline: false }));
+  socket.on('disconnect', () => useGameStore.setState({ offline: true }));
+
+  socket.on('session:replaced', () => {
+    useGameStore.getState().setReplaced(true);
+  });
+
+  socket.on('room:kicked', () => {
+    const st = useGameStore.getState();
+    clearSession();
+    st.resetAll();
+    st.addToast('You left the room (removed by the host or from another tab).', 'warning');
   });
 
   socket.on('game:state', (game) => {
     const prev = useGameStore.getState();
+    // Late updates after leaving a room are ignored.
+    if (!prev.roomState || prev.roomState.roomId !== game.roomId) return;
     const prevGame = prev.rawGame;
     const myId = prev.myPlayerId;
     prev.setGameState(game);
@@ -355,6 +403,17 @@ export function initSocketListeners() {
     if (prevGame.phase !== 'AUCTION' && game.phase === 'AUCTION') {
       audioManager.playModal();
     }
+
+    // My turn begins (after the previous token finished walking).
+    const curNow = game.players[game.currentPlayerIndex];
+    const prevCur = prevGame.players[prevGame.currentPlayerIndex];
+    if (curNow?.playerId === myId && (prevCur?.playerId !== myId || prevGame.turnNumber !== game.turnNumber) && game.phase === 'ROLLING') {
+      enqueueEvent(() => audioManager.playMyTurn());
+    }
+
+    // Someone was sent to jail
+    const jailed = game.players.some((p) => p.inJail && !prevGame.players.find((q) => q.playerId === p.playerId)?.inJail);
+    if (jailed) enqueueEvent(() => audioManager.playJail());
 
     // Debt entered and I am the debtor
     const cur = game.players[game.currentPlayerIndex];
@@ -406,7 +465,20 @@ function showGameToast(text: string, type?: ToastMessage['type']) {
   // Debt entry already plays the debt alarm via the DEBT phase change,
   // and bankruptcy plays its own dirge via the state change — the toasts
   // for those arrive alongside, so skip them here to avoid stacking.
-  const coveredByStateSound = /owes \$|cannot afford|cannot pay|bankrupt|game over/i.test(text);
+  const coveredByStateSound = /owes \$|cannot afford|cannot pay|bankrupt|game over|arrested|jail/i.test(text);
+  const st = useGameStore.getState();
+  const myName = st.gameState?.players.find((p) => p.playerId === st.myPlayerId)?.name;
+  const rent = /^(.+?) paid \$\d+ rent to (.+?)\.$/.exec(text) ?? /^(.+?) declined force-buy\. Paid \$\d+ rent to (.+?)\.$/.exec(text);
+  if (rent && myName && (rent[1] === myName || rent[2] === myName)) {
+    if (rent[1] === myName) audioManager.playRentPaid();
+    else audioManager.playRentReceived();
+    return;
+  }
+  if (/surrendered|left the game/i.test(text)) return audioManager.playSurrender();
+  if (/^It is now .+'s turn\.$/.test(text)) return; // my-turn cue / silence
+  if (type === 'success' && myName && !text.startsWith(myName) && /bought|completed a trade|wins .* at auction/i.test(text)) {
+    return audioManager.playSoftDeal();
+  }
   if (type === 'success') audioManager.playCoin();
   else if (type === 'danger' && !coveredByStateSound) audioManager.playError();
   else if (type === 'warning' && !coveredByStateSound) audioManager.playModal();

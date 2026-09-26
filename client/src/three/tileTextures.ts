@@ -1,5 +1,9 @@
 import * as THREE from 'three';
-import { BOARD_TILES, COUNTRY_NAMES, SIDE_NAMES, TileDef } from '@monopoly/shared';
+import { BOARD_TILES, COLOR_GROUPS, COUNTRY_NAMES, GROUP_COUNTRY, SIDE_NAMES, TileDef } from '@monopoly/shared';
+import { BOARD_COORDINATES } from './boardCoords.js';
+
+// Half the size of the painted centre square (CenterBoard box is 14.7 wide).
+const CENTER_HALF = 7.35;
 import { TIERS, currentTier, usePerfStore } from '../store/perfStore.js';
 
 // Canvas-painted board art (classic Monopoly look): crisp text and icons on
@@ -475,7 +479,7 @@ function centerArt(): HTMLCanvasElement {
   }
 
   // Card spots (the 3D decks sit on these)
-  const spot = (x: number, y: number, color: string, label: string) => {
+  const spot = (x: number, y: number, color: string, label: string, labelY = 180) => {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(-0.25);
@@ -488,11 +492,12 @@ function centerArt(): HTMLCanvasElement {
     ctx.fillStyle = color;
     ctx.font = `44px ${DISPLAY}`;
     ctx.textAlign = 'center';
-    ctx.fillText(label, 0, 180);
+    ctx.fillText(label, 0, labelY);
     ctx.restore();
   };
   spot(S / 2 - 3.6 * 70, S / 2 - 3.4 * 70, '#f58a1f', 'CHANCE');
-  spot(S / 2 + 3.6 * 70, S / 2 + 3.2 * 70, '#2f7de1', 'CHEST');
+  // Chest caption above its spot: the country names run along the edge below.
+  spot(S / 2 + 3.6 * 70, S / 2 + 3.2 * 70, '#2f7de1', 'CHEST', -150);
 
   // Region names along each edge (canvas bottom = GO side of the board)
   ctx.save();
@@ -513,6 +518,55 @@ function centerArt(): HTMLCanvasElement {
     ctx.fillText(SIDE_NAMES[i].toUpperCase(), 0, 0);
     ctx.restore();
   });
+  ctx.restore();
+
+  // Country names, each centred on its own tiles just inside the tile ring
+  // (so the country stays readable when buildings cover the tile flags).
+  const toPx = (v: number) => ((v + CENTER_HALF) / (CENTER_HALF * 2)) * S;
+  const inset = 108;
+  ctx.save();
+  ctx.font = `32px ${DISPLAY}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  for (const [group, idxs] of Object.entries(COLOR_GROUPS)) {
+    const country = GROUP_COUNTRY[group];
+    if (!country || !idxs.length) continue;
+    const side = Math.floor(idxs[0] / 10);
+    const pos = idxs.map((i) => BOARD_COORDINATES[i].position);
+    const avgX = pos.reduce((a, p) => a + p[0], 0) / pos.length;
+    const avgZ = pos.reduce((a, p) => a + p[2], 0) / pos.length;
+    const [x, y, r] =
+      side === 0
+        ? [toPx(avgX), S - inset, 0]
+        : side === 1
+          ? [inset, toPx(avgZ), Math.PI / 2]
+          : side === 2
+            ? [toPx(avgX), inset, Math.PI]
+            : [S - inset, toPx(avgZ), -Math.PI / 2];
+    const label = COUNTRY_NAMES[country].toUpperCase();
+    // Keep clear of the corners, where the neighbouring side's labels run.
+    const half = ctx.measureText(label).width / 2;
+    const lo = inset + 26 + half;
+    const hi = S - inset - 26 - half;
+    const along = (v: number) => Math.min(hi, Math.max(lo, v));
+    const px = side === 0 || side === 2 ? along(x) : x;
+    const py = side === 1 || side === 3 ? along(y) : y;
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(r);
+    // a short underline in the country colour
+    const w = ctx.measureText(label).width;
+    ctx.fillStyle = BAND_HEX[group] ?? '#999';
+    roundRect(ctx, -w / 2, 20, w, 7, 4);
+    ctx.fill();
+    ctx.lineWidth = 7;
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.strokeText(label, 0, 0);
+    ctx.fillStyle = 'rgba(43,29,16,0.78)';
+    ctx.fillText(label, 0, 0);
+    ctx.restore();
+  }
   ctx.restore();
 
   // Diagonal red TMpoly plate

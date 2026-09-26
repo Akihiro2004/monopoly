@@ -16,8 +16,10 @@ import './styles/modals.css';
 import './styles/bank.css';
 import './styles/planner.css';
 import './styles/property.css';
+import './styles/session.css';
 import App from './App.tsx';
 import { registerPwa } from './pwa.js';
+import { initAccount } from './net/account.js';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -26,3 +28,5 @@ createRoot(document.getElementById('root')!).render(
 );
 
 registerPwa();
+// Sign in (Firebase guest / Google) if configured, then connect.
+initAccount();

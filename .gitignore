@@ -4,3 +4,9 @@ dist
 .DS_Store
 *.log
 shots
+.env.local
+# Saved rooms / match history (local persistence)
+server/data/
+# Firebase service account keys
+*-firebase-adminsdk-*.json
+service-account*.json

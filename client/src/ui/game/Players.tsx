@@ -56,7 +56,7 @@ const PlayerCard: React.FC<{ game: GameState; player: PlayerState; active: boole
             <span className="truncate">{p.name}</span>
             {isMe && <span className="badge">You</span>}
           </span>
-          <span className={`pcard-money money tnum cash-t${tier}`}>{p.isBankrupt ? 'Bankrupt' : money(p.money)}</span>
+          <span className={`pcard-money money tnum cash-t${tier}`}>{p.isBankrupt ? (p.surrendered ? 'Surrendered' : 'Bankrupt') : money(p.money)}</span>
           <Deltas value={p.money} />
         </div>
         {rank !== undefined && !p.isBankrupt && <span className={`pcard-rank r${rank}`}>{ORDINAL[rank]}</span>}
