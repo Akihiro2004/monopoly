@@ -1146,3 +1146,131 @@ button.deed-chip:active:not(:disabled) {
     transform: rotate(0deg);
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Passed GO celebration                                              */
+/* ------------------------------------------------------------------ */
+.go-banner {
+  position: fixed;
+  z-index: 120;
+  left: 50%;
+  top: 34%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: go-pop 2.6s var(--ease-spring) forwards;
+}
+
+.go-rays {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 420px;
+  height: 420px;
+  margin: -210px 0 0 -210px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(rgba(255, 198, 41, 0.55) 0 12deg, rgba(255, 198, 41, 0) 12deg 24deg);
+  mask-image: radial-gradient(circle, #000 30%, transparent 68%);
+  -webkit-mask-image: radial-gradient(circle, #000 30%, transparent 68%);
+  animation: spin 6s linear infinite;
+}
+
+.go-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px 12px 12px;
+  border-radius: 22px;
+  background: var(--paper);
+  border: var(--line);
+  box-shadow: 0 6px 0 var(--ink), 0 20px 40px rgba(43, 29, 16, 0.3);
+  white-space: nowrap;
+}
+
+.go-copy {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.05;
+}
+
+.go-title {
+  font-family: var(--font-display);
+  font-size: 1.9rem;
+  color: var(--red);
+  -webkit-text-stroke: 1px var(--ink);
+  paint-order: stroke fill;
+}
+
+.go-sub {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--ink-2);
+}
+
+.go-amount {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  padding: 2px 12px;
+  border-radius: 14px;
+  background: #b9f2c8;
+  border: var(--line);
+  color: var(--green-dark);
+  transform: rotate(4deg);
+}
+
+.go-coin {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 26px;
+  height: 26px;
+  margin: -13px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff3b0, var(--gold) 55%, var(--gold-dark));
+  border: 2px solid var(--ink);
+  --a: calc(var(--i) * 36deg);
+  animation: coin-fly 1.4s var(--ease-out) forwards;
+}
+
+@keyframes coin-fly {
+  from {
+    transform: rotate(var(--a)) translateY(0) scale(0.4);
+    opacity: 1;
+  }
+  to {
+    transform: rotate(var(--a)) translateY(-150px) scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes go-pop {
+  0% {
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0;
+  }
+  12% {
+    transform: translate(-50%, -50%) scale(1.08);
+    opacity: 1;
+  }
+  20%,
+  82% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -62%) scale(0.9);
+    opacity: 0;
+  }
+}
+
+.layout-mobile .go-banner {
+  top: 40%;
+}
+
+.layout-mobile .go-title {
+  font-size: 1.5rem;
+}
+
+.layout-mobile .go-amount {
+  font-size: 1.6rem;
+}

@@ -16,8 +16,8 @@ export interface CardDef {
 
 export const CHANCE_CARDS: CardDef[] = [
   { id: 'ch_1', deck: 'chance', action: { type: 'moveTo', tileIndex: 0, passGoCheck: true, text: 'Advance to GO! Collect $200.' } },
-  { id: 'ch_2', deck: 'chance', action: { type: 'moveTo', tileIndex: 24, passGoCheck: true, text: 'Advance to Illinois Ave.' } },
-  { id: 'ch_3', deck: 'chance', action: { type: 'moveTo', tileIndex: 39, passGoCheck: false, text: 'Take a walk on Boardwalk.' } },
+  { id: 'ch_2', deck: 'chance', action: { type: 'moveTo', tileIndex: 24, passGoCheck: true, text: 'Fly to London. Collect $200 if you pass GO.' } },
+  { id: 'ch_3', deck: 'chance', action: { type: 'moveTo', tileIndex: 39, passGoCheck: false, text: 'Take a trip to New York.' } },
   { id: 'ch_4', deck: 'chance', action: { type: 'money', amount: 50, text: 'Bank pays you dividend of $50.' } },
   { id: 'ch_5', deck: 'chance', action: { type: 'getOutOfJail', text: 'Get Out of Jail Free card.' } },
   { id: 'ch_6', deck: 'chance', action: { type: 'jail', text: 'Go directly to Jail. Do not pass GO.' } },

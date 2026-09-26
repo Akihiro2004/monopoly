@@ -1,6 +1,8 @@
 import React from 'react';
 import { BOARD_TILES } from '@monopoly/shared';
-import { Train, Lightbulb } from 'lucide-react';
+import { Plane, Lightbulb } from 'lucide-react';
+import { COUNTRY_NAMES } from '@monopoly/shared';
+import { Flag } from './Flag.js';
 import { GROUP_HEX, money, rentSchedule } from '../theme.js';
 
 // Paper-style title deed card.
@@ -13,9 +15,10 @@ export const TitleDeed: React.FC<{ tileIndex: number; highlightLevel?: number }>
   return (
     <div className={`title-deed ${isProperty ? '' : 'plain'}`} style={{ '--g': GROUP_HEX[tile.group] } as React.CSSProperties}>
       <div className="title-deed-head">
-        {tile.type === 'railroad' && <Train size={26} />}
+        {tile.type === 'railroad' && <Plane size={26} />}
         {tile.type === 'utility' && <Lightbulb size={26} />}
-        <small>Title deed</small>
+        {tile.country && <Flag country={tile.country} size={34} className="deed-flag" />}
+        <small>{tile.country ? COUNTRY_NAMES[tile.country] : 'Title deed'}</small>
         <h3>{tile.name}</h3>
       </div>
       <dl className="title-deed-rows">

@@ -4,6 +4,7 @@ import { ArrowUpCircle, Banknote, Castle, Landmark, Lock, MapPin, Undo2 } from '
 import { socket } from '../../net/socket.js';
 import { audioManager } from '../../sound/audioManager.js';
 import { useTurn } from './useTurn.js';
+import { Flag } from '../common/Flag.js';
 import { GROUP_HEX, GROUP_LABEL, GROUP_ORDER, LEVEL_NAMES, completeSets, money, rentLabel, netWorth, ownedBy } from '../theme.js';
 
 const LevelSteps: React.FC<{ level: number }> = ({ level }) => (
@@ -78,7 +79,7 @@ export const Portfolio: React.FC<PortfolioProps> = ({ hideSummary, liquidOnly })
         return (
           <section key={group} className="deed-group" style={{ '--g': GROUP_HEX[group] } as React.CSSProperties}>
             <header className="deed-group-head">
-              <span className="group-dot" />
+              {COLOR_GROUPS[group] ? <Flag group={group} size={18} /> : <span className="group-dot" />}
               <span>{GROUP_LABEL[group]}</span>
               {setSize ? (
                 ownedInGroup === setSize ? (
@@ -115,7 +116,7 @@ export const Portfolio: React.FC<PortfolioProps> = ({ hideSummary, liquidOnly })
                             <span>{LEVEL_NAMES[p.buildLevel]}</span>
                           </>
                         ) : (
-                          <span>{tile.type === 'railroad' ? 'Railroad' : 'Utility'}</span>
+                          <span>{tile.type === 'railroad' ? 'Airport' : 'Utility'}</span>
                         )}
                         {!p.isMortgaged && <span className="deed-rent tnum">Rent {rentLabel(game, p)}</span>}
                       </span>

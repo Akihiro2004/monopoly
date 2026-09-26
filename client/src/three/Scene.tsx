@@ -9,6 +9,7 @@ import { Board3D } from './Board3D.js';
 import { Tokens3D } from './Tokens3D.js';
 import { Dice3D } from './Dice3D.js';
 import { Environment } from './Environment.js';
+import { GoBurst } from './GoBurst.js';
 
 const FOV = 45;
 
@@ -125,14 +126,12 @@ export const MonopolyScene: React.FC = () => {
   // HUD chrome floating over the canvas, in CSS px. Desktop: player cards on
   // the left, the collapsible panel on the right, turn banner + roll button.
   // Mobile: status bar on top, action + tab bar at the bottom.
+  // Symmetric left/right so the board (and the ROLL button under it) sit on
+  // the screen's center line.
+  const side = isMobile ? 0 : Math.max(260, panelCollapsed ? 96 : (wideDesktop ? 390 : 340) + 30);
   const insets: Insets = isMobile
     ? { top: 110, bottom: 150, left: 0, right: 0 }
-    : {
-        top: 80,
-        bottom: 150,
-        left: 260,
-        right: panelCollapsed ? 96 : (wideDesktop ? 390 : 340) + 30
-      };
+    : { top: 80, bottom: 150, left: side, right: side };
 
   return (
     <div className="canvas-container">
@@ -183,6 +182,8 @@ export const MonopolyScene: React.FC = () => {
               currentPlayerIndex={gameState.currentPlayerIndex}
             />
           )}
+
+          <GoBurst />
 
           {/* Animated Dice in center of board */}
           <Dice3D />

@@ -246,7 +246,7 @@ const ActiveMarker: React.FC<{ color: string }> = ({ color }) => {
   );
 };
 
-type PathItem = { kind: 'step' | 'glide'; tile: number } | { kind: 'pause'; seconds: number };
+type PathItem = { kind: 'step' | 'glide'; tile: number; passGo?: boolean } | { kind: 'pause'; seconds: number };
 
 const STEP_DURATION = 0.17; // seconds per tile hop
 const DICE_WAIT = 0.95; // let the dice tumble before walking
@@ -295,7 +295,9 @@ const AnimatedToken: React.FC<{
       lastSeq.current = move.seq;
       path = walkSteps(from, move.landed);
       if (move.landed !== move.to) {
-        path.push({ kind: 'pause', seconds: LANDING_PAUSE }, { kind: 'glide', tile: move.to });
+        // Card moves that wrap around the board (or land on GO) pay the salary.
+        const passGo = move.to !== 10 && (move.to === 0 || move.to < move.landed);
+        path.push({ kind: 'pause', seconds: LANDING_PAUSE }, { kind: 'glide', tile: move.to, passGo });
       }
       waitTimer.current = DICE_WAIT;
     } else {
@@ -384,6 +386,9 @@ const AnimatedToken: React.FC<{
         visualTile.current = next.tile;
         isStepping.current = false;
         audioManager.playStep();
+        if ((next.kind === 'step' && next.tile === 0) || (next.kind === 'glide' && next.passGo)) {
+          useGameStore.getState().celebrateGo(player.playerId);
+        }
         if (pathQueue.current.length === 0) finishWalk();
       }
       return;

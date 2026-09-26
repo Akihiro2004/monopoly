@@ -2,6 +2,7 @@ import React from 'react';
 import { BOARD_TILES, GameState, TradeOffer } from '@monopoly/shared';
 import { ArrowRight, Lock } from 'lucide-react';
 import { PlayerAvatar } from '../common/PlayerAvatar.js';
+import { Flag } from '../common/Flag.js';
 import { GROUP_HEX, money } from '../theme.js';
 
 export const DeedChip: React.FC<{
@@ -24,6 +25,7 @@ export const DeedChip: React.FC<{
       title={title ?? tile.name}
     >
       <span className="deed-chip-band" />
+      {tile.country && <Flag country={tile.country} size={16} />}
       <span className="deed-chip-name truncate">{tile.name}</span>
       {disabled ? <Lock size={12} /> : <span className="deed-chip-price tnum">{money(tile.price)}</span>}
     </Tag>

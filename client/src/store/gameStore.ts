@@ -41,6 +41,10 @@ interface GameStore {
   snoozedTrades: string[];
   // Desktop: right panel collapsed into the compact dock.
   panelCollapsed: boolean;
+  // Debt planner shrunk to a pill so the player can look at the board.
+  debtMinimized: boolean;
+  // Latest "passed GO" celebration (3D coin burst + banner).
+  goCelebration: { id: number; playerId: string } | null;
   // Auction the player closed with "Not interested" (see auctionKey).
   dismissedAuction: string | null;
   chatMessages: ChatMessage[];
@@ -61,6 +65,8 @@ interface GameStore {
   snoozeTrade: (id: string) => void;
   setPanelCollapsed: (collapsed: boolean) => void;
   setDismissedAuction: (key: string | null) => void;
+  celebrateGo: (playerId: string) => void;
+  setDebtMinimized: (v: boolean) => void;
   addChatMessage: (msg: ChatMessage) => void;
   addToast: (text: string, type?: 'info' | 'success' | 'warning' | 'danger') => void;
   removeToast: (id: string) => void;
@@ -99,6 +105,8 @@ export const useGameStore = create<GameStore>((set) => ({
   snoozedTrades: [],
   panelCollapsed: readPref('ui.panelCollapsed') === '1',
   dismissedAuction: null,
+  goCelebration: null,
+  debtMinimized: false,
   chatMessages: [],
   toasts: [],
   winner: null,
@@ -129,6 +137,12 @@ export const useGameStore = create<GameStore>((set) => ({
     set({ panelCollapsed });
   },
   setDismissedAuction: (dismissedAuction) => set({ dismissedAuction }),
+  setDebtMinimized: (debtMinimized) => set({ debtMinimized }),
+  celebrateGo: (playerId) => {
+    audioManager.playCoin();
+    setTimeout(() => audioManager.playBuy(), 180);
+    set((s) => ({ goCelebration: { id: (s.goCelebration?.id ?? 0) + 1, playerId } }));
+  },
   snoozeTrade: (id) => set((s) => ({ snoozedTrades: [...s.snoozedTrades, id] })),
   addChatMessage: (msg) =>
     set((s) => ({ chatMessages: [...s.chatMessages.slice(-50), msg] })),

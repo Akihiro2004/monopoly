@@ -67,6 +67,7 @@ export interface TileDef {
   // rentByLevel: index 0 = base rent, 1 = house, 2 = building, 3 = hotel, 4 = landmark
   rentByLevel: [number, number, number, number, number];
   buildCost: number; // cost per upgrade level (0 for non-buildable)
+  country?: string; // ISO 3166 alpha-2 of the city's country (color sets)
 }
 
 // BuildLevel: 0 = unbuilt/raw land, 1 = house, 2 = building, 3 = hotel, 4 = landmark

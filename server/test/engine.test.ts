@@ -365,7 +365,7 @@ describe('Monopoly Game Engine (LINE Get Rich rules)', () => {
   it('resolves the destination tile after a Chance "advance to" card', () => {
     const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
     (engine as any).chanceDeck = [
-      { id: 'x', deck: 'chance', action: { type: 'moveTo', tileIndex: 24, passGoCheck: true, text: 'Advance to Illinois Ave.' } }
+      { id: 'x', deck: 'chance', action: { type: 'moveTo', tileIndex: 24, passGoCheck: true, text: 'Fly to London.' } }
     ];
     engine.state.players[0].position = 5;
     engine.rollDice(1, 1); // lands on Chance (7)

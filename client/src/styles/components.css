@@ -635,3 +635,16 @@
     transform: translateY(100%);
   }
 }
+
+.flag {
+  display: inline-block;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  flex-shrink: 0;
+  background: #fff;
+  object-fit: cover;
+}
+
+.deed-flag {
+  margin-bottom: 4px;
+}

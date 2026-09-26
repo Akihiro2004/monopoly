@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BOARD_TILES, TileDef } from '@monopoly/shared';
+import { BOARD_TILES, COUNTRY_NAMES, SIDE_NAMES, TileDef } from '@monopoly/shared';
 
 // Canvas-painted board art (classic Monopoly look): crisp text and icons on
 // every tile instead of floating 3D text. Canvas top edge = the tile's inner
@@ -105,25 +105,41 @@ function chest(ctx: CanvasRenderingContext2D, x: number, y: number, s: number) {
   ctx.restore();
 }
 
-function train(ctx: CanvasRenderingContext2D, x: number, y: number, s: number) {
+function airplane(ctx: CanvasRenderingContext2D, x: number, y: number, s: number) {
   ctx.save();
   ctx.translate(x, y);
-  ctx.fillStyle = INK;
-  ctx.fillRect(-s * 0.5, -s * 0.1, s * 0.75, s * 0.3); // boiler
-  ctx.fillRect(s * 0.1, -s * 0.38, s * 0.38, s * 0.58); // cab
-  ctx.fillRect(-s * 0.4, -s * 0.35, s * 0.12, s * 0.25); // chimney
-  ctx.fillStyle = FACE;
-  ctx.fillRect(s * 0.18, -s * 0.3, s * 0.22, s * 0.16); // window
-  ctx.fillStyle = INK;
-  for (const wx of [-s * 0.35, -s * 0.05, s * 0.3]) {
-    ctx.beginPath();
-    ctx.arc(wx, s * 0.3, s * 0.12, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  ctx.rotate(-Math.PI / 4);
+  ctx.lineWidth = s * 0.05;
+  ctx.strokeStyle = INK;
+  ctx.fillStyle = '#2f7de1';
+  // fuselage
   ctx.beginPath();
-  ctx.moveTo(-s * 0.5, s * 0.2);
-  ctx.lineTo(-s * 0.68, s * 0.42);
-  ctx.lineTo(-s * 0.5, s * 0.42);
+  ctx.ellipse(0, 0, s * 0.09, s * 0.48, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  // wings
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.06, -s * 0.05);
+  ctx.lineTo(-s * 0.46, s * 0.12);
+  ctx.lineTo(-s * 0.46, s * 0.2);
+  ctx.lineTo(-s * 0.06, s * 0.1);
+  ctx.moveTo(s * 0.06, -s * 0.05);
+  ctx.lineTo(s * 0.46, s * 0.12);
+  ctx.lineTo(s * 0.46, s * 0.2);
+  ctx.lineTo(s * 0.06, s * 0.1);
+  ctx.fill();
+  ctx.stroke();
+  // tail
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.04, s * 0.34);
+  ctx.lineTo(-s * 0.2, s * 0.46);
+  ctx.lineTo(s * 0.2, s * 0.46);
+  ctx.lineTo(s * 0.04, s * 0.34);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#bfe6ff';
+  ctx.beginPath();
+  ctx.ellipse(0, -s * 0.34, s * 0.045, s * 0.07, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
@@ -229,7 +245,7 @@ function paintEdge(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.strokeRect(3, 3, w - 6, h - 6);
 }
 
-function standardTile(tile: TileDef): HTMLCanvasElement {
+function standardTile(tile: TileDef, flags: Record<string, HTMLImageElement>): HTMLCanvasElement {
   const W = 256;
   const H = 384;
   const [c, ctx] = canvas(W, H);
@@ -251,6 +267,20 @@ function standardTile(tile: TileDef): HTMLCanvasElement {
     ctx.lineTo(W, 98);
     ctx.stroke();
     nameTop = 120;
+    // Country flag medallion on the band
+    const flag = tile.country ? flags[tile.country] : undefined;
+    if (flag) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(W / 2, 52, 36, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+      ctx.lineWidth = 6;
+      ctx.stroke();
+      ctx.clip();
+      ctx.drawImage(flag, W / 2 - 33, 52 - 33, 66, 66);
+      ctx.restore();
+    }
   }
 
   const name =
@@ -269,7 +299,7 @@ function standardTile(tile: TileDef): HTMLCanvasElement {
       chest(ctx, W / 2, iconY, 130);
       break;
     case 'railroad':
-      train(ctx, W / 2, iconY, 150);
+      airplane(ctx, W / 2, iconY, 170);
       break;
     case 'utility':
       if (tile.index === 12) bulb(ctx, W / 2, iconY - 10, 150);
@@ -279,6 +309,13 @@ function standardTile(tile: TileDef): HTMLCanvasElement {
       if (tile.index === 4) moneyBag(ctx, W / 2, iconY, 120);
       else diamond(ctx, W / 2, iconY, 130);
       break;
+  }
+
+  if (tile.type === 'property' && tile.country) {
+    ctx.font = `800 24px ${BODY}`;
+    ctx.fillStyle = '#6b5a45';
+    ctx.fillText(COUNTRY_NAMES[tile.country].toUpperCase(), W / 2, nameTop + lines.length * 34 + 10);
+    ctx.fillStyle = INK;
   }
 
   ctx.font = `800 30px ${BODY}`;
@@ -456,6 +493,27 @@ function centerArt(): HTMLCanvasElement {
   spot(S / 2 - 3.6 * 70, S / 2 - 3.4 * 70, '#f58a1f', 'CHANCE');
   spot(S / 2 + 3.6 * 70, S / 2 + 3.2 * 70, '#2f7de1', 'CHEST');
 
+  // Region names along each edge (canvas bottom = GO side of the board)
+  ctx.save();
+  ctx.font = `46px ${DISPLAY}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(43,29,16,0.55)';
+  const edge: [number, number, number][] = [
+    [S / 2, S - 44, 0],
+    [44, S / 2, Math.PI / 2],
+    [S / 2, 44, Math.PI],
+    [S - 44, S / 2, -Math.PI / 2]
+  ];
+  edge.forEach(([x, y, r], i) => {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(r);
+    ctx.fillText(SIDE_NAMES[i].toUpperCase(), 0, 0);
+    ctx.restore();
+  });
+  ctx.restore();
+
   // Diagonal red TMpoly plate
   ctx.save();
   ctx.translate(S / 2, S / 2);
@@ -489,6 +547,21 @@ export interface BoardTextures {
 
 let cache: Promise<BoardTextures> | null = null;
 
+function loadFlags(): Promise<Record<string, HTMLImageElement>> {
+  const codes = Object.keys(COUNTRY_NAMES);
+  return Promise.all(
+    codes.map(
+      (c) =>
+        new Promise<[string, HTMLImageElement | null]>((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve([c, img]);
+          img.onerror = () => resolve([c, null]);
+          img.src = `/icons/flags/${c}.svg`;
+        })
+    )
+  ).then((pairs) => Object.fromEntries(pairs.filter((p): p is [string, HTMLImageElement] => p[1] !== null)));
+}
+
 // Waits for the web fonts so the canvas text uses Lilita One / Nunito.
 export function loadBoardTextures(): Promise<BoardTextures> {
   if (!cache) {
@@ -498,8 +571,9 @@ export function loadBoardTextures(): Promise<BoardTextures> {
       document.fonts.load(`800 30px ${BODY}`)
     ])
       .catch(() => undefined)
-      .then(() => ({
-        tiles: BOARD_TILES.map((t) => toTexture(t.index % 10 === 0 ? cornerTile(t) : standardTile(t))),
+      .then(loadFlags)
+      .then((flags) => ({
+        tiles: BOARD_TILES.map((t) => toTexture(t.index % 10 === 0 ? cornerTile(t) : standardTile(t, flags))),
         center: toTexture(centerArt())
       }));
   }

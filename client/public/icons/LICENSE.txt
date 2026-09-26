@@ -1,0 +1,2 @@
+Flags: circle-flags by HatScripts, MIT License, https://github.com/HatScripts/circle-flags
+(extracted from @iconify-json/circle-flags)

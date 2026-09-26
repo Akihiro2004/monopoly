@@ -38,15 +38,15 @@ export const GROUP_HEX: Record<TileGroup, string> = {
 };
 
 export const GROUP_LABEL: Record<TileGroup, string> = {
-  brown: 'Brown',
-  lightblue: 'Light Blue',
-  pink: 'Pink',
-  orange: 'Orange',
-  red: 'Red',
-  yellow: 'Yellow',
-  green: 'Green',
-  darkblue: 'Dark Blue',
-  railroad: 'Railroads',
+  brown: 'Malaysia',
+  lightblue: 'Indonesia',
+  pink: 'China',
+  orange: 'Japan',
+  red: 'United Kingdom',
+  yellow: 'France',
+  green: 'Brazil',
+  darkblue: 'United States',
+  railroad: 'Airports',
   utility: 'Utilities',
   special: 'Special'
 };
@@ -136,7 +136,7 @@ export function rentSchedule(tileIndex: number): { label: string; value: string 
   if (!tile) return [];
   if (tile.type === 'railroad') {
     return [1, 2, 3, 4].map((n) => ({
-      label: n === 1 ? '1 railroad owned' : `${n} railroads owned`,
+      label: n === 1 ? '1 airport owned' : `${n} airports owned`,
       value: money(25 * Math.pow(2, n - 1))
     }));
   }

@@ -7,7 +7,7 @@ import { GameHUD } from './ui/GameHUD.js';
 import { BuyPropertyModal } from './ui/BuyPropertyModal.js';
 import { ForceBuyModal } from './ui/ForceBuyModal.js';
 import { CardModal } from './ui/CardModal.js';
-import { DebtModal } from './ui/DebtModal.js';
+import { DebtPlanner } from './ui/debt/DebtPlanner.js';
 import { VictoryOverlay } from './ui/VictoryOverlay.js';
 import { ToastContainer } from './ui/ToastContainer.js';
 import { MonopolyScene } from './three/Scene.js';
@@ -15,6 +15,7 @@ import { useIsMobile } from './hooks/useIsMobile.js';
 import { Logo, Sky } from './ui/common/Sky.js';
 import { IncomingTradeModal } from './ui/trade/IncomingTradeModal.js';
 import { AuctionModal } from './ui/bank/AuctionModal.js';
+import { GoBanner } from './ui/game/GoBanner.js';
 import { RotateOverlay } from './ui/common/RotateOverlay.js';
 
 export function App() {
@@ -113,10 +114,11 @@ export function App() {
       {roomState && roomState.status === 'playing' && (
         <>
           <GameHUD />
+          <GoBanner />
           <BuyPropertyModal />
           <ForceBuyModal />
           <CardModal />
-          <DebtModal />
+          <DebtPlanner />
           <IncomingTradeModal />
           <AuctionModal />
         </>

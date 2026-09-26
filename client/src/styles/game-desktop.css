@@ -257,8 +257,8 @@
 /* Bottom dock with the big round ROLL button ------------------------------ */
 .d-dock {
   position: absolute;
-  left: var(--left-space);
-  right: var(--panel-space);
+  left: max(var(--left-space), var(--panel-space));
+  right: max(var(--left-space), var(--panel-space));
   bottom: 26px;
   display: flex;
   justify-content: center;
