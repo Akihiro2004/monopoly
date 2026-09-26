@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Handshake, Minus, Plus, Send } from 'lucide-react';
-import { tradeBlockReason, tradeMortgageFees } from '@monopoly/shared';
+import { Handshake, MessageSquareText, Minus, Plus, Repeat2, Send } from 'lucide-react';
+import { TradeOffer, tradeBlockReason, tradeMortgageFees } from '@monopoly/shared';
 import { socket } from '../../net/socket.js';
 import { useGameStore } from '../../store/gameStore.js';
 import { audioManager } from '../../sound/audioManager.js';
@@ -33,18 +33,31 @@ const MoneyStepper: React.FC<{ value: number; max: number; onChange: (v: number)
   );
 };
 
-export const TradeComposer: React.FC<{ onClose: () => void; partnerId?: string; layer?: string }> = ({ onClose, partnerId, layer }) => {
+const sameSet = (a: number[], b: number[]) => a.length === b.length && a.every((x) => b.includes(x));
+
+/**
+ * New trade, or (with `counter`) a counter-offer: the incoming offer is
+ * loaded from your side (what they asked from you = what you give) so you
+ * only change what you want and send it back.
+ */
+export const TradeComposer: React.FC<{ onClose: () => void; partnerId?: string; layer?: string; counter?: TradeOffer }> = ({
+  onClose,
+  partnerId,
+  layer,
+  counter
+}) => {
   const game = useGameStore((s) => s.gameState);
   const myPlayerId = useGameStore((s) => s.myPlayerId);
   const partners = useMemo(
     () => game?.players.filter((p) => p.playerId !== myPlayerId && !p.isBankrupt) ?? [],
     [game, myPlayerId]
   );
-  const [toId, setToId] = useState(partnerId ?? partners[0]?.playerId ?? '');
-  const [giveMoney, setGiveMoney] = useState(0);
-  const [getMoney, setGetMoney] = useState(0);
-  const [giveProps, setGiveProps] = useState<number[]>([]);
-  const [getProps, setGetProps] = useState<number[]>([]);
+  const [toId, setToId] = useState(counter?.fromId ?? partnerId ?? partners[0]?.playerId ?? '');
+  const [giveMoney, setGiveMoney] = useState(counter?.getMoney ?? 0);
+  const [getMoney, setGetMoney] = useState(counter?.giveMoney ?? 0);
+  const [giveProps, setGiveProps] = useState<number[]>(counter?.getProps ?? []);
+  const [getProps, setGetProps] = useState<number[]>(counter?.giveProps ?? []);
+  const [message, setMessage] = useState('');
 
   if (!game) return null;
   const me = game.players.find((p) => p.playerId === myPlayerId);
@@ -61,14 +74,24 @@ export const TradeComposer: React.FC<{ onClose: () => void; partnerId?: string; 
   };
 
   const empty = giveMoney === 0 && getMoney === 0 && giveProps.length === 0 && getProps.length === 0;
+  // A counter-offer must change something (otherwise just accept).
+  const unchanged =
+    !!counter &&
+    giveMoney === counter.getMoney &&
+    getMoney === counter.giveMoney &&
+    sameSet(giveProps, counter.getProps) &&
+    sameSet(getProps, counter.giveProps);
 
   const send = () => {
     audioManager.playClick();
-    socket.emit('trade:propose', { toId, giveMoney, giveProps, getMoney, getProps });
+    const proposal = { toId, giveMoney, giveProps, getMoney, getProps, message: message.trim() || undefined };
+    if (counter) socket.emit('trade:counter', { tradeId: counter.id, proposal });
+    else socket.emit('trade:propose', proposal);
     onClose();
   };
 
-  const deeds = (ownerId: string, selected: number[], set: (v: number[]) => void) => {
+  // `was`: the deeds in the offer being countered (changes get marked).
+  const deeds = (ownerId: string, selected: number[], set: (v: number[]) => void, was?: number[]) => {
     const list = ownedBy(game, ownerId).sort((a, b) => a.tileIndex - b.tileIndex);
     if (list.length === 0) return <p className="trade-nothing">No properties</p>;
     return (
@@ -83,6 +106,7 @@ export const TradeComposer: React.FC<{ onClose: () => void; partnerId?: string; 
               disabled={!!reason}
               mortgaged={p.isMortgaged}
               level={p.buildLevel}
+              changed={!!was && was.includes(p.tileIndex) !== selected.includes(p.tileIndex)}
               title={reason ?? undefined}
               onClick={() => toggle(selected, set, p.tileIndex)}
             />
@@ -93,15 +117,19 @@ export const TradeComposer: React.FC<{ onClose: () => void; partnerId?: string; 
   };
 
   return (
-    <Modal width={640} onClose={onClose} label="New trade" layer={layer}>
-      <div className="modal-pad trade-composer">
+    <Modal width={640} onClose={onClose} label={counter ? 'Counter-offer' : 'New trade'} layer={layer}>
+      <div className={`modal-pad trade-composer ${counter ? 'is-counter' : ''}`}>
         <div className="modal-title">
           <span className="modal-title-icon">
-            <Handshake size={22} />
+            {counter ? <Repeat2 size={22} /> : <Handshake size={22} />}
           </span>
           <div>
-            <h2 className="display">Make a trade</h2>
-            <p>Offer cash and deeds. Cities keep their buildings when traded; mortgaged deeds can be traded too.</p>
+            <h2 className="display">{counter ? 'Counter-offer' : 'Make a trade'}</h2>
+            <p>
+              {counter
+                ? `Change what you give or ask for, then send it back to ${partner?.name ?? 'them'}. Round ${(counter.round ?? 1) + 1}.`
+                : 'Offer cash and deeds. Cities keep their buildings when traded; mortgaged deeds can be traded too.'}
+            </p>
           </div>
         </div>
 
@@ -110,14 +138,14 @@ export const TradeComposer: React.FC<{ onClose: () => void; partnerId?: string; 
         ) : (
           <>
             <div className="partner-row" role="radiogroup" aria-label="Trade with">
-              {partners.map((p) => (
+              {partners.filter((p) => !counter || p.playerId === toId).map((p) => (
                 <button
                   key={p.playerId}
                   type="button"
                   role="radio"
                   aria-checked={p.playerId === toId}
                   className={`partner ${p.playerId === toId ? 'active' : ''}`}
-                  onClick={() => pickPartner(p.playerId)}
+                  onClick={() => !counter && pickPartner(p.playerId)}
                 >
                   <PlayerAvatar token={p.tokenType} color={p.color} size={34} />
                   <span className="truncate">{p.name}</span>
@@ -130,14 +158,16 @@ export const TradeComposer: React.FC<{ onClose: () => void; partnerId?: string; 
               <section className="trade-col give">
                 <header>You give</header>
                 <MoneyStepper name="give-money" value={giveMoney} max={me.money} onChange={setGiveMoney} />
-                {deeds(me.playerId, giveProps, setGiveProps)}
+                {counter && giveMoney !== counter.getMoney && <WasNote amount={counter.getMoney} />}
+                {deeds(me.playerId, giveProps, setGiveProps, counter?.getProps)}
               </section>
               <section className="trade-col get">
                 <header>You get{partner ? ` from ${partner.name}` : ''}</header>
                 {partner && (
                   <>
                     <MoneyStepper name="get-money" value={getMoney} max={partner.money} onChange={setGetMoney} />
-                    {deeds(partner.playerId, getProps, setGetProps)}
+                    {counter && getMoney !== counter.giveMoney && <WasNote amount={counter.giveMoney} />}
+                    {deeds(partner.playerId, getProps, setGetProps, counter?.giveProps)}
                   </>
                 )}
               </section>
@@ -149,12 +179,29 @@ export const TradeComposer: React.FC<{ onClose: () => void; partnerId?: string; 
               partnerName={partner?.name ?? 'They'}
             />
 
+            <label className="trade-note-field">
+              <MessageSquareText size={16} />
+              <input
+                name="trade-note"
+                maxLength={80}
+                placeholder={counter ? 'Add a note, e.g. "Add $50 and it\'s a deal"' : 'Add a note (optional)'}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+              />
+            </label>
+
             <div className="modal-actions">
               <button type="button" className="btn btn-secondary btn-lg" onClick={onClose}>
                 Cancel
               </button>
-              <button type="button" className="btn btn-success btn-lg btn-send-trade" onClick={send} disabled={empty || !partner}>
-                <Send size={18} /> Send offer
+              <button
+                type="button"
+                className="btn btn-success btn-lg btn-send-trade"
+                onClick={send}
+                disabled={empty || !partner || unchanged}
+                title={unchanged ? 'Change something first (or just accept their offer)' : undefined}
+              >
+                {counter ? <Repeat2 size={18} /> : <Send size={18} />} {counter ? 'Send counter-offer' : 'Send offer'}
               </button>
             </div>
           </>
@@ -163,6 +210,10 @@ export const TradeComposer: React.FC<{ onClose: () => void; partnerId?: string; 
     </Modal>
   );
 };
+
+const WasNote: React.FC<{ amount: number }> = ({ amount }) => (
+  <small className="was-note tnum">was {money(amount)}</small>
+);
 
 // Classic rule: whoever receives a mortgaged deed pays the Bank 10% interest.
 const MortgageFeeNote: React.FC<{ myFee: number; theirFee: number; partnerName: string }> = ({ myFee, theirFee, partnerName }) => {

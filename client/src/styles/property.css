@@ -437,3 +437,109 @@
 .deed-chip-lv.landmark {
   background: var(--purple);
 }
+
+/* Counter-offers */
+.modal-actions.four {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.trade-card.is-counter {
+  border-color: var(--blue);
+}
+
+.counter-badge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.trade-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 8px 0 2px;
+  padding: 7px 10px;
+  border-radius: 12px 12px 12px 4px;
+  background: #eef5ff;
+  border: 2px solid var(--blue);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.trade-message svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--blue);
+}
+
+/* changed since the last round */
+.deed-chip.changed,
+.cash-chip.changed {
+  box-shadow: 0 0 0 3px var(--gold);
+  animation: changed-pulse 1.4s ease-in-out 2;
+}
+
+@keyframes changed-pulse {
+  50% {
+    box-shadow: 0 0 0 5px rgba(255, 198, 41, 0.6);
+  }
+}
+
+.deed-removed {
+  opacity: 0.45;
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+
+.deed-removed .deed-chip {
+  pointer-events: none;
+}
+
+.was-inline {
+  margin-left: 5px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--ink-3);
+  text-decoration: line-through;
+}
+
+.was-note {
+  display: block;
+  margin: -4px 0 4px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--ink-3);
+  text-decoration: line-through;
+}
+
+.trade-note-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 0 12px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: #fff;
+  border: var(--line-thin);
+}
+
+.trade-note-field svg {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+
+.trade-note-field input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  font-size: 16px;
+}

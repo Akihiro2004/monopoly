@@ -233,6 +233,10 @@ export function registerGameHandlers(
     withEngine((engine, playerId) => engine.cancelTrade(tradeId, playerId));
   });
 
+  socket.on('trade:counter', ({ tradeId, proposal }) => {
+    withEngine((engine, playerId) => engine.counterTrade(tradeId, playerId, proposal ?? ({} as never)));
+  });
+
   socket.on('chat:send', ({ text }) => {
     const info = roomManager.getPlayerBySocket(socket.id);
     if (!info) return;

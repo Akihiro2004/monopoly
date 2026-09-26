@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Check, Handshake, Plus, X } from 'lucide-react';
+import { Check, Handshake, Plus, Repeat2, X } from 'lucide-react';
+import { TradeOffer } from '@monopoly/shared';
 import { socket } from '../../net/socket.js';
 import { useGameStore } from '../../store/gameStore.js';
 import { audioManager } from '../../sound/audioManager.js';
@@ -17,6 +18,7 @@ export const TradeView: React.FC = () => {
   const game = useGameStore((s) => s.gameState);
   const myPlayerId = useGameStore((s) => s.myPlayerId);
   const [composing, setComposing] = useState(false);
+  const [countering, setCountering] = useState<TradeOffer | null>(null);
   if (!game) return null;
 
   const me = game.players.find((p) => p.playerId === myPlayerId);
@@ -44,6 +46,11 @@ export const TradeView: React.FC = () => {
                   <button className="btn btn-secondary btn-sm" onClick={() => respondTrade(t.id, false)}>
                     <X size={15} strokeWidth={3} /> Decline
                   </button>
+                  {(t.round ?? 1) < 10 && (
+                    <button className="btn btn-blue btn-sm btn-counter-trade" onClick={() => setCountering(t)}>
+                      <Repeat2 size={15} strokeWidth={2.6} /> Counter
+                    </button>
+                  )}
                   <button className="btn btn-success btn-sm btn-accept-trade" onClick={() => respondTrade(t.id, true)}>
                     <Check size={15} strokeWidth={3} /> Accept
                   </button>
@@ -76,11 +83,12 @@ export const TradeView: React.FC = () => {
       {incoming.length === 0 && outgoing.length === 0 && (
         <div className="empty-state">
           <Handshake size={30} />
-          <span>Swap cash and deeds with other players, any time. Only unbuilt properties can be traded.</span>
+          <span>Swap cash and cities with other players, any time. Got an offer you almost like? Send a counter-offer.</span>
         </div>
       )}
 
       {composing && <TradeComposer onClose={() => setComposing(false)} />}
+      {countering && <TradeComposer counter={countering} onClose={() => setCountering(null)} />}
     </div>
   );
 };

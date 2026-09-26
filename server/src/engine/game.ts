@@ -18,6 +18,7 @@ import {
   Seat,
   TradeOffer,
   TradeProposal,
+  TradeTerms,
   mortgageBlockReason,
   tradeBlockReason,
   tradeMortgageFees
@@ -545,22 +546,82 @@ export class MonopolyGameEngine {
     return null;
   }
 
-  public proposeTrade(fromId: string, proposal: TradeProposal): TradeOffer {
-    if (this.state.phase === 'GAME_OVER') throw new Error('The game is over');
-    const draft = {
+  private static readonly MAX_ROUNDS = 10;
+
+  private tradeDraft(fromId: string, proposal: TradeProposal) {
+    const message = typeof proposal.message === 'string' ? proposal.message.trim().slice(0, 80) : '';
+    return {
       fromId,
       toId: proposal.toId,
       giveMoney: Math.floor(Number(proposal.giveMoney) || 0),
       getMoney: Math.floor(Number(proposal.getMoney) || 0),
       giveProps: [...new Set((proposal.giveProps ?? []).map(Number))],
-      getProps: [...new Set((proposal.getProps ?? []).map(Number))]
+      getProps: [...new Set((proposal.getProps ?? []).map(Number))],
+      ...(message ? { message } : {})
     };
+  }
+
+  /**
+   * The receiver answers an offer with changed terms. The original offer is
+   * replaced by one going back the other way (round + 1); earlier rounds are
+   * kept so both sides can see what changed.
+   */
+  public counterTrade(tradeId: string, playerId: string, proposal: TradeProposal): TradeOffer {
+    if (this.state.phase === 'GAME_OVER') throw new Error('The game is over');
+    const original = this.state.trades.find((t) => t.id === tradeId);
+    if (!original) throw new Error('That trade is no longer available');
+    if (original.toId !== playerId) throw new Error('Only the receiving player can counter this trade');
+    const round = (original.round ?? 1) + 1;
+    if (round > MonopolyGameEngine.MAX_ROUNDS) throw new Error('This negotiation has gone on long enough: accept or decline');
+
+    const draft = this.tradeDraft(playerId, { ...proposal, toId: original.fromId });
+    const invalid = this.validateTrade(draft);
+    if (invalid) throw new Error(invalid);
+    const same =
+      draft.giveMoney === original.getMoney &&
+      draft.getMoney === original.giveMoney &&
+      [...draft.giveProps].sort().join() === [...original.getProps].sort().join() &&
+      [...draft.getProps].sort().join() === [...original.giveProps].sort().join();
+    if (same) throw new Error('Change something before sending it back, or just accept');
+
+    const previous: TradeTerms = {
+      fromId: original.fromId,
+      toId: original.toId,
+      giveMoney: original.giveMoney,
+      giveProps: original.giveProps,
+      getMoney: original.getMoney,
+      getProps: original.getProps,
+      ...(original.message ? { message: original.message } : {})
+    };
+    // Replace the answered offer (and any other open offer between them).
+    this.state.trades = this.state.trades.filter(
+      (t) => t.id !== tradeId && !(t.fromId === playerId && t.toId === original.fromId)
+    );
+    const offer: TradeOffer = {
+      ...draft,
+      id: Math.random().toString(36).slice(2, 10),
+      createdAt: Date.now(),
+      round,
+      history: [...(original.history ?? []), previous].slice(-4)
+    };
+    this.state.trades.push(offer);
+
+    const from = this.state.players.find((p) => p.playerId === playerId)!;
+    const to = this.state.players.find((p) => p.playerId === original.fromId)!;
+    this.emitToast(`${from.name} sent a counter-offer to ${to.name}.`, 'info');
+    this.notify();
+    return offer;
+  }
+
+  public proposeTrade(fromId: string, proposal: TradeProposal): TradeOffer {
+    if (this.state.phase === 'GAME_OVER') throw new Error('The game is over');
+    const draft = this.tradeDraft(fromId, proposal);
     const invalid = this.validateTrade(draft);
     if (invalid) throw new Error(invalid);
 
     // One open offer per pair: a new proposal replaces the previous one.
     this.state.trades = this.state.trades.filter((t) => !(t.fromId === fromId && t.toId === draft.toId));
-    const offer: TradeOffer = { ...draft, id: Math.random().toString(36).slice(2, 10), createdAt: Date.now() };
+    const offer: TradeOffer = { ...draft, id: Math.random().toString(36).slice(2, 10), createdAt: Date.now(), round: 1 };
     this.state.trades.push(offer);
 
     const from = this.state.players.find((p) => p.playerId === fromId)!;

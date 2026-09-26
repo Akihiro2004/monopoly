@@ -41,7 +41,7 @@ export interface LeaderboardEntry {
   account: boolean;
 }
 
-export type TradeProposal = Omit<TradeOffer, 'id' | 'fromId' | 'createdAt'>;
+export type TradeProposal = Omit<TradeOffer, 'id' | 'fromId' | 'createdAt' | 'round' | 'history'>;
 
 // Client -> Server events
 export interface ClientToServerEvents {
@@ -86,6 +86,9 @@ export interface ClientToServerEvents {
   'trade:propose': (payload: TradeProposal) => void;
   'trade:respond': (payload: { tradeId: string; accept: boolean }) => void;
   'trade:cancel': (payload: { tradeId: string }) => void;
+  // The receiver sends back changed terms (from their own point of view:
+  // give = what they give, get = what they ask for).
+  'trade:counter': (payload: { tradeId: string; proposal: TradeProposal }) => void;
 
   // Chat
   'chat:send': (payload: { text: string }) => void;

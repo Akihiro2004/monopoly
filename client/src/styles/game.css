@@ -950,9 +950,18 @@
 
 .trade-card-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
   padding: 0 10px 12px;
+}
+
+/* Decline / Counter / Accept share the row evenly */
+.trade-card-actions > .btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-left: 8px;
+  padding-right: 8px;
 }
 
 .cash-chip {

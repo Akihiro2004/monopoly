@@ -506,6 +506,52 @@ describe('Monopoly Game Engine (LINE Get Rich rules)', () => {
     expect(engine.state.bank.hotels).toBe(12);
   });
 
+  it('counter-offers go back and forth and can be accepted', () => {
+    const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+    engine.state.properties[1].ownerId = 'p1';
+    engine.state.properties[39].ownerId = 'p2';
+    const first = engine.proposeTrade('p1', { toId: 'p2', giveMoney: 100, giveProps: [1], getMoney: 0, getProps: [39] });
+    expect(first.round).toBe(1);
+    expect(() => engine.counterTrade(first.id, 'p1', { toId: 'p2', giveMoney: 0, giveProps: [], getMoney: 0, getProps: [] })).toThrow(/receiving player/);
+    // Unchanged terms are refused.
+    expect(() =>
+      engine.counterTrade(first.id, 'p2', { toId: 'p1', giveMoney: 0, giveProps: [39], getMoney: 100, getProps: [1] })
+    ).toThrow(/Change something/);
+
+    // Bob wants $300 instead of $100.
+    const counter = engine.counterTrade(first.id, 'p2', {
+      toId: 'p1',
+      giveMoney: 0,
+      giveProps: [39],
+      getMoney: 300,
+      getProps: [1],
+      message: 'Make it 300'
+    });
+    expect(engine.state.trades).toHaveLength(1);
+    expect(counter).toMatchObject({ fromId: 'p2', toId: 'p1', round: 2, getMoney: 300, message: 'Make it 300' });
+    expect(counter.history?.[0]).toMatchObject({ fromId: 'p1', giveMoney: 100 });
+    expect(engine.state.trades.some((t) => t.id === first.id)).toBe(false);
+
+    engine.respondToTrade(counter.id, 'p1', true);
+    expect(engine.state.properties[39].ownerId).toBe('p1');
+    expect(engine.state.properties[1].ownerId).toBe('p2');
+    expect(engine.state.players[0].money).toBe(1200);
+    expect(engine.state.players[1].money).toBe(1800);
+  });
+
+  it('a negotiation stops after 10 rounds', () => {
+    const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+    let t = engine.proposeTrade('p1', { toId: 'p2', giveMoney: 1, giveProps: [], getMoney: 0, getProps: [] });
+    for (let r = 2; r <= 10; r++) {
+      const by = t.toId;
+      t = engine.counterTrade(t.id, by, { toId: t.fromId, giveMoney: r, giveProps: [], getMoney: 0, getProps: [] });
+    }
+    expect(t.round).toBe(10);
+    expect(() => engine.counterTrade(t.id, t.toId, { toId: t.fromId, giveMoney: 99, giveProps: [], getMoney: 0, getProps: [] })).toThrow(
+      /long enough/
+    );
+  });
+
   describe('selling and mortgages (classic rules)', () => {
     it('any player can sell buildings at any time, straight down to a chosen level', () => {
       const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });

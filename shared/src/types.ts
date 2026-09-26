@@ -156,6 +156,23 @@ export interface TradeOffer {
   getMoney: number;
   getProps: number[];
   createdAt: number;
+  // Negotiation: 1 = first offer, +1 per counter-offer.
+  round?: number;
+  // Short note from the sender ("add $50 and it's yours").
+  message?: string;
+  // Earlier rounds, oldest first (terms as the sender of that round saw them).
+  history?: TradeTerms[];
+}
+
+/** One round of a negotiation: `fromId` gives `give*` and asks for `get*`. */
+export interface TradeTerms {
+  fromId: string;
+  toId: string;
+  giveMoney: number;
+  giveProps: number[];
+  getMoney: number;
+  getProps: number[];
+  message?: string;
 }
 
 // A drawn Chance / Community Chest card, broadcast for the info modal.
