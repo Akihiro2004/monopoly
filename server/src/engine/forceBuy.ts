@@ -6,6 +6,7 @@ import {
   PropertyState,
   ForceBuyOffer
 } from '@monopoly/shared';
+import { record } from './bank.js';
 
 /**
  * Calculates force-buy price for a property:
@@ -105,6 +106,12 @@ export function executeForceBuy(
     return { success: false, text: 'Invalid participants or property' };
   }
 
+  // Re-check at execution: a Landmark is never acquirable.
+  if (prop.buildLevel >= 4) {
+    gameState.forceBuyOffer = null;
+    return { success: false, text: `${tile.name} is a Landmark and cannot be acquired` };
+  }
+
   if (buyer.money < offer.price) {
     return { success: false, text: `${buyer.name} cannot afford the $${offer.price} force-buy` };
   }
@@ -112,6 +119,7 @@ export function executeForceBuy(
   // Transaction
   buyer.money -= offer.price;
   seller.money += offer.price;
+  record(gameState, buyer.playerId, seller.playerId, offer.price, `Force-bought ${tile.name}`);
   prop.ownerId = buyer.playerId;
   // KEEP existing build level!
   prop.buildLevel = offer.currentBuildLevel;

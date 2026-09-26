@@ -5,6 +5,7 @@ import {
   ChatMessage
 } from '@monopoly/shared';
 import { RoomManager } from '../rooms.js';
+import { MonopolyGameEngine } from '../engine/game.js';
 
 export function registerGameHandlers(
   io: Server<ClientToServerEvents, ServerToClientEvents>,
@@ -175,6 +176,34 @@ export function registerGameHandlers(
     } catch (e: any) {
       socket.emit('error', { message: e.message });
     }
+  });
+
+  const withEngine = (fn: (engine: MonopolyGameEngine, playerId: string) => void) => {
+    const info = roomManager.getPlayerBySocket(socket.id);
+    if (!info) return;
+    const room = roomManager.getRoom(info.roomId);
+    if (!room || !room.engine) return;
+    try {
+      fn(room.engine, info.playerId);
+    } catch (e: any) {
+      socket.emit('error', { message: e.message });
+    }
+  };
+
+  socket.on('auction:bid', ({ amount }) => {
+    withEngine((engine, playerId) => engine.placeBid(playerId, amount));
+  });
+
+  socket.on('trade:propose', (proposal) => {
+    withEngine((engine, playerId) => engine.proposeTrade(playerId, proposal));
+  });
+
+  socket.on('trade:respond', ({ tradeId, accept }) => {
+    withEngine((engine, playerId) => engine.respondToTrade(tradeId, playerId, accept));
+  });
+
+  socket.on('trade:cancel', ({ tradeId }) => {
+    withEngine((engine, playerId) => engine.cancelTrade(tradeId, playerId));
   });
 
   socket.on('chat:send', ({ text }) => {

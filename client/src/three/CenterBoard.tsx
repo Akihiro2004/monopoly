@@ -1,96 +1,98 @@
-import React from 'react';
-import { Text } from '@react-three/drei';
-import { BOLD_FONT } from './fonts.js';
+import React, { useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { useGameStore } from '../store/gameStore.js';
+import * as THREE from 'three';
 
-// One deck of cards (stack of thin boxes with a labeled top card)
+// A stack of cards with a colored top card and a painted "?"/chest mark.
 const CardDeck: React.FC<{
   position: [number, number, number];
   rotation?: [number, number, number];
   color: string;
-  label: string;
-  labelColor: string;
-}> = ({ position, rotation = [0, 0, 0], color, label, labelColor }) => {
-  const cardCount = 8;
-  const cardH = 0.045;
+  mark: 'chance' | 'chest';
+}> = ({ position, rotation = [0, 0, 0], color, mark }) => {
+  const cardCount = 9;
+  const cardH = 0.04;
+  const topArt = useMemo(() => {
+    const c = document.createElement('canvas');
+    c.width = 256;
+    c.height = 340;
+    const ctx = c.getContext('2d')!;
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, 256, 340);
+    ctx.strokeStyle = '#2b1d10';
+    ctx.lineWidth = 14;
+    ctx.strokeRect(14, 14, 228, 312);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = mark === 'chance' ? '220px "Lilita One", sans-serif' : '64px "Lilita One", sans-serif';
+    ctx.lineWidth = 12;
+    ctx.strokeStyle = '#2b1d10';
+    ctx.fillStyle = '#fff';
+    const text = mark === 'chance' ? '?' : 'CHEST';
+    ctx.strokeText(text, 128, 175);
+    ctx.fillText(text, 128, 175);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }, [color, mark]);
+
+  // When a card from this deck is drawn, the top card lifts off and vanishes
+  // (the 2D card animation takes over from the same spot on screen).
+  const lifted = useGameStore((s) => s.cardDraw?.deck === mark);
+  const top = useRef<THREE.Group>(null);
+  const t = useRef(0);
+  useFrame((_, dt) => {
+    const g = top.current;
+    if (!g) return;
+    const target = lifted ? 1 : 0;
+    if (t.current === target) return;
+    t.current = lifted ? Math.min(1, t.current + Math.min(dt, 0.05) * 4) : 0;
+    const k = t.current;
+    g.position.y = k * 1.4;
+    g.rotation.x = -k * 0.9;
+    g.scale.setScalar(1 - k * 0.6);
+    g.visible = k < 0.98;
+  });
 
   return (
     <group position={position} rotation={rotation}>
-      {Array.from({ length: cardCount }).map((_, i) => (
-        <mesh key={i} castShadow receiveShadow position={[0, i * cardH, 0]}>
+      {Array.from({ length: cardCount - 1 }).map((_, i) => (
+        <mesh key={i} castShadow receiveShadow position={[(i % 2) * 0.02, i * cardH, (i % 3) * 0.015]}>
           <boxGeometry args={[1.7, cardH, 2.3]} />
-          <meshStandardMaterial
-            color={i === cardCount - 1 ? color : '#f1f5f9'}
-            roughness={0.6}
-          />
+          <meshStandardMaterial color={i % 2 ? '#fffaf0' : '#f2e6cc'} roughness={0.7} />
         </mesh>
       ))}
-      {/* Label on top card */}
-      <Text
-        font={BOLD_FONT}
-        position={[0, cardCount * cardH + 0.01, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        fontSize={0.55}
-        color={labelColor}
-        anchorX="center"
-        anchorY="middle"
-      >
-        {label}
-      </Text>
-      {/* Slight side shadow line to read as a paper stack */}
-      <mesh position={[0, (cardCount * cardH) / 2, -1.16]}>
-        <boxGeometry args={[1.68, cardCount * cardH, 0.02]} />
-        <meshStandardMaterial color="#cbd5e1" roughness={0.9} />
-      </mesh>
+      {/* the drawable top card */}
+      <group ref={top} position={[0, (cardCount - 1) * cardH, 0]}>
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={[1.7, cardH, 2.3]} />
+          <meshStandardMaterial color={color} roughness={0.7} />
+        </mesh>
+        <mesh position={[0.0, cardH / 2 + 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[1.66, 2.26]} />
+          <meshStandardMaterial map={topArt} roughness={0.6} />
+        </mesh>
+      </group>
     </group>
   );
 };
 
-// Center of the board: diagonal red MONOPOLY-style banner + card decks
-export const CenterBoard: React.FC = () => {
+// Center of the board: painted art (logo + card spots) and the two decks.
+export const CenterBoard: React.FC<{ texture: THREE.Texture | null }> = ({ texture }) => {
+  const materials = useMemo(() => {
+    const side = new THREE.MeshStandardMaterial({ color: '#cfe3c6', roughness: 0.85 });
+    const top = new THREE.MeshStandardMaterial({ color: texture ? '#ffffff' : '#e4f1dd', map: texture, roughness: 0.8 });
+    return [side, side, top, side, side, side];
+  }, [texture]);
+
   return (
     <group>
-      {/* Cream playing surface (top flush with the tile tops) */}
-      <mesh receiveShadow position={[0, 0.15, 0]}>
-        <boxGeometry args={[14.6, 0.18, 14.6]} />
-        <meshStandardMaterial color="#eef2e9" roughness={0.85} />
+      <mesh receiveShadow position={[0, 0.15, 0]} material={materials}>
+        <boxGeometry args={[14.7, 0.18, 14.7]} />
       </mesh>
 
-      {/* Diagonal red logo banner */}
-      <group position={[0, 0.29, 0]} rotation={[0, Math.PI / 5, 0]}>
-        <mesh castShadow receiveShadow>
-          <boxGeometry args={[11.5, 0.1, 2.1]} />
-          <meshStandardMaterial color="#dc2626" roughness={0.5} />
-        </mesh>
-        <Text
-          font={BOLD_FONT}
-          position={[0, 0.06, 0]}
-          rotation={[-Math.PI / 2, 0, 0]}
-          fontSize={1.15}
-          color="#ffffff"
-          anchorX="center"
-          anchorY="middle"
-        >
-          MONOPOLY 3D
-        </Text>
-      </group>
-
-      {/* Chance deck (yellow, upper-left area) */}
-      <CardDeck
-        position={[-3.6, 0.2625, -3.4]}
-        rotation={[0, 0.25, 0]}
-        color="#facc15"
-        label="?"
-        labelColor="#1e3a8a"
-      />
-
-      {/* Community Chest deck (blue, lower-right area) */}
-      <CardDeck
-        position={[3.6, 0.2625, 3.2]}
-        rotation={[0, 0.25, 0]}
-        color="#3b82f6"
-        label="CHEST"
-        labelColor="#ffffff"
-      />
+      <CardDeck position={[-3.6, 0.26, -3.4]} rotation={[0, 0.25, 0]} color="#f58a1f" mark="chance" />
+      <CardDeck position={[3.6, 0.26, 3.2]} rotation={[0, 0.25, 0]} color="#2f7de1" mark="chest" />
     </group>
   );
 };

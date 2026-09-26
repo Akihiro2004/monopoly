@@ -6,19 +6,35 @@ import {
   JAIL_FINE,
   JAIL_TILE_INDEX,
   STARTING_MONEY,
+  AUCTION_EXTEND_MS,
+  AUCTION_MIN_INCREMENT,
+  AUCTION_MS,
   CardDef,
   CardDraw,
   DebtOffer,
   GameState,
   PlayerState,
   PropertyState,
-  Seat
+  Seat,
+  TradeOffer,
+  TradeProposal,
+  tradeBlockReason
 } from '@monopoly/shared';
 import { executeForceBuy } from './forceBuy.js';
 import { buildProperty, sellBuilding, toggleMortgage } from './actions.js';
 import { applyBankruptcy, calculateRent, payRent } from './rent.js';
 import { resolveLanding } from './resolve.js';
+import { createBank, record } from './bank.js';
 import { checkVictory } from './victory.js';
+
+// Fisher-Yates: a fair shuffle (sort(() => random) is biased).
+function shuffle<T>(list: T[]): T[] {
+  for (let i = list.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  return list;
+}
 
 export interface GameEngineOptions {
   specialVictory: boolean;
@@ -33,6 +49,7 @@ export class MonopolyGameEngine {
   private chanceDeck: CardDef[];
   private chestDeck: CardDef[];
   private forceBuyTimer: NodeJS.Timeout | null = null;
+  private auctionTimer: NodeJS.Timeout | null = null;
 
   constructor(roomId: string, seats: Seat[], options: GameEngineOptions) {
     this.options = options;
@@ -50,7 +67,9 @@ export class MonopolyGameEngine {
       jailCards: 0,
       isBankrupt: false,
       isConnected: true,
-      consecutiveDoubles: 0
+      consecutiveDoubles: 0,
+      lapsCompleted: 0,
+      jailCardDecks: []
     }));
 
     const properties: Record<number, PropertyState> = {};
@@ -64,8 +83,8 @@ export class MonopolyGameEngine {
       };
     }
 
-    this.chanceDeck = [...CHANCE_CARDS].sort(() => Math.random() - 0.5);
-    this.chestDeck = [...CHEST_CARDS].sort(() => Math.random() - 0.5);
+    this.chanceDeck = shuffle([...CHANCE_CARDS]);
+    this.chestDeck = shuffle([...CHEST_CARDS]);
 
     this.state = {
       roomId,
@@ -80,9 +99,24 @@ export class MonopolyGameEngine {
       buyOffer: null,
       forceBuyOffer: null,
       debt: null,
+      trades: [],
+      lastMove: null,
+      bank: createBank(),
+      auction: null,
       winnerId: null,
       victoryType: null,
       lastActionText: 'Game started. Roll to begin.'
+    };
+  }
+
+  private recordMove(player: PlayerState, from: number, landed: number, to: number, passedGo = false): void {
+    this.state.lastMove = {
+      seq: (this.state.lastMove?.seq ?? 0) + 1,
+      playerId: player.playerId,
+      from,
+      landed,
+      to,
+      passedGo
     };
   }
 
@@ -111,7 +145,9 @@ export class MonopolyGameEngine {
       } else {
         player.jailTurns++;
         if (player.jailTurns >= 3) {
-          player.money = Math.max(0, player.money - JAIL_FINE);
+          const fine = Math.min(player.money, JAIL_FINE);
+          player.money -= fine;
+          record(this.state, player.playerId, null, fine, 'Jail fine');
           player.inJail = false;
           player.jailTurns = 0;
           this.emitToast(`${player.name} paid $${JAIL_FINE} after 3 turns in Jail.`, 'info');
@@ -127,6 +163,7 @@ export class MonopolyGameEngine {
     if (doubles) {
       this.state.doublesCount++;
       if (this.state.doublesCount >= 3) {
+        this.recordMove(player, player.position, JAIL_TILE_INDEX, JAIL_TILE_INDEX);
         player.position = JAIL_TILE_INDEX;
         player.inJail = true;
         player.jailTurns = 0;
@@ -146,12 +183,15 @@ export class MonopolyGameEngine {
 
     if (newPos < oldPos) {
       player.money += GO_SALARY;
+      player.lapsCompleted++;
+      record(this.state, null, player.playerId, GO_SALARY, 'GO salary');
       this.emitToast(`${player.name} passed GO and collected $${GO_SALARY}.`, 'success');
     }
 
     player.position = newPos;
     (this.state as any).phase = 'RESOLVING';
 
+    const lapsBeforeLanding = player.lapsCompleted;
     const res = resolveLanding(
       this.state,
       player,
@@ -159,6 +199,7 @@ export class MonopolyGameEngine {
       this.chestDeck,
       (draw: CardDraw) => this.options.onCard?.(draw)
     );
+    this.recordMove(player, oldPos, newPos, player.position, player.lapsCompleted > lapsBeforeLanding);
     if (res.toast) {
       this.emitToast(res.toast, 'info');
     }
@@ -166,6 +207,8 @@ export class MonopolyGameEngine {
     const currentPhase = this.state.phase as string;
     if (this.state.debt) {
       this.state.phase = 'DEBT';
+    } else if (res.auctionTile !== undefined) {
+      this.startAuction(res.auctionTile);
     } else if (currentPhase === 'FORCE_BUY_OFFER' && this.state.forceBuyOffer) {
       this.setupForceBuyTimeout();
     } else if (currentPhase === 'BUY_OFFER' && this.state.buyOffer) {
@@ -194,16 +237,100 @@ export class MonopolyGameEngine {
         throw new Error('Insufficient funds to buy property');
       }
       player.money -= offer.price;
+      record(this.state, player.playerId, null, offer.price, `Bought ${tile.name}`);
       prop.ownerId = player.playerId;
       prop.buildLevel = 0;
       prop.isMortgaged = false;
       prop.forceBought = false;
       this.emitToast(`${player.name} bought ${tile.name} for $${offer.price}.`, 'success');
-    } else {
-      this.emitToast(`${player.name} decided not to buy ${tile.name}.`, 'info');
+      this.state.buyOffer = null;
+      this.state.phase = 'TURN_ENDED';
+      this.checkAndApplyVictory();
+      this.notify();
+      return;
     }
 
+    // Real Monopoly: a declined property goes to auction by the Bank.
+    this.emitToast(`${player.name} passed on ${tile.name}. The Bank opens an auction!`, 'info');
     this.state.buyOffer = null;
+    this.startAuction(offer.tileIndex);
+    this.notify();
+  }
+
+  // ------------------------------------------------------------------
+  // Bank auctions
+  // ------------------------------------------------------------------
+
+  private startAuction(tileIndex: number): void {
+    this.state.phase = 'AUCTION';
+    this.state.auction = {
+      tileIndex,
+      highBid: 0,
+      highBidderId: null,
+      endsAt: Date.now() + AUCTION_MS,
+      bidders: []
+    };
+    this.scheduleAuctionEnd();
+  }
+
+  private scheduleAuctionEnd(): void {
+    this.clearAuctionTimer();
+    const auction = this.state.auction;
+    if (!auction) return;
+    this.auctionTimer = setTimeout(() => this.finishAuction(), Math.max(0, auction.endsAt - Date.now()));
+  }
+
+  private clearAuctionTimer(): void {
+    if (this.auctionTimer) {
+      clearTimeout(this.auctionTimer);
+      this.auctionTimer = null;
+    }
+  }
+
+  public placeBid(playerId: string, amount: number): void {
+    const auction = this.state.auction;
+    if (this.state.phase !== 'AUCTION' || !auction) throw new Error('There is no auction running');
+    const bidder = this.state.players.find((p) => p.playerId === playerId);
+    if (!bidder || bidder.isBankrupt) throw new Error('You cannot bid in this auction');
+    const bid = Math.floor(Number(amount));
+    const minimum = auction.highBid + AUCTION_MIN_INCREMENT;
+    if (!Number.isFinite(bid) || bid < minimum) throw new Error(`Bid at least $${minimum}`);
+    if (bid > bidder.money) throw new Error(`You only have $${bidder.money}`);
+    if (Date.now() > auction.endsAt) throw new Error('The auction has closed');
+
+    auction.highBid = bid;
+    auction.highBidderId = playerId;
+    if (!auction.bidders.includes(playerId)) auction.bidders.push(playerId);
+    auction.endsAt = Math.max(auction.endsAt, Date.now() + AUCTION_EXTEND_MS);
+    this.scheduleAuctionEnd();
+    this.emitToast(`${bidder.name} bids $${bid} for ${BOARD_TILES[auction.tileIndex].name}.`, 'info');
+    this.notify();
+  }
+
+  /** Closes the auction: the highest bidder pays the Bank and takes the deed. */
+  public finishAuction(): void {
+    const auction = this.state.auction;
+    if (this.state.phase !== 'AUCTION' || !auction) return;
+    this.clearAuctionTimer();
+    const tile = BOARD_TILES[auction.tileIndex];
+    const winner = auction.highBidderId
+      ? this.state.players.find((p) => p.playerId === auction.highBidderId)
+      : undefined;
+
+    if (winner && !winner.isBankrupt && winner.money >= auction.highBid) {
+      const prop = this.state.properties[auction.tileIndex];
+      winner.money -= auction.highBid;
+      record(this.state, winner.playerId, null, auction.highBid, `Won auction: ${tile.name}`);
+      prop.ownerId = winner.playerId;
+      prop.buildLevel = 0;
+      prop.isMortgaged = false;
+      prop.forceBought = false;
+      this.emitToast(`SOLD! ${winner.name} wins ${tile.name} at auction for $${auction.highBid}.`, 'success');
+    } else {
+      this.emitToast(`No bids for ${tile.name}. It stays with the Bank.`, 'info');
+    }
+
+    this.state.auction = null;
     this.state.phase = 'TURN_ENDED';
     this.checkAndApplyVictory();
     this.notify();
@@ -235,7 +362,7 @@ export class MonopolyGameEngine {
       this.state.forceBuyOffer = null;
       if (opponent) {
         const rent = calculateRent(this.state, offer.tileIndex, this.state.dice[0] + this.state.dice[1]);
-        const result = payRent(this.state, player, opponent, rent);
+        const result = payRent(this.state, player, opponent, rent, `Rent for ${BOARD_TILES[offer.tileIndex].name}`);
         if (result.debt !== undefined) {
           this.enterDebt(player, result.debt, opponent.playerId, `rent for ${BOARD_TILES[offer.tileIndex].name}`);
         } else {
@@ -257,6 +384,7 @@ export class MonopolyGameEngine {
       throw new Error('Cannot pay jail fine');
     }
     player.money -= JAIL_FINE;
+    record(this.state, player.playerId, null, JAIL_FINE, 'Jail fine');
     player.inJail = false;
     player.jailTurns = 0;
     this.emitToast(`${player.name} paid $${JAIL_FINE} and left Jail.`, 'info');
@@ -269,10 +397,20 @@ export class MonopolyGameEngine {
       throw new Error('No jail cards');
     }
     player.jailCards--;
+    this.returnJailCard(player);
     player.inJail = false;
     player.jailTurns = 0;
     this.emitToast(`${player.name} used a Get Out of Jail Free card.`, 'success');
     this.notify();
+  }
+
+  // A used (or forfeited) Get Out of Jail Free card goes back under its deck.
+  private returnJailCard(player: PlayerState): void {
+    const deckType = player.jailCardDecks?.shift() ?? 'chance';
+    const deck = deckType === 'chance' ? this.chanceDeck : this.chestDeck;
+    const source = deckType === 'chance' ? CHANCE_CARDS : CHEST_CARDS;
+    const card = source.find((c) => c.action.type === 'getOutOfJail');
+    if (card && !deck.includes(card)) deck.push(card);
   }
 
   public build(tileIndex: number): void {
@@ -311,23 +449,128 @@ export class MonopolyGameEngine {
     const player = this.getCurrentPlayer();
     const debt = this.state.debt;
     this.clearForceBuyTimeout();
+    this.clearAuctionTimer();
     this.state.buyOffer = null;
     this.state.forceBuyOffer = null;
+    this.state.auction = null;
     this.state.debt = null;
 
-    applyBankruptcy(this.state, player, debt.creditorId);
+    while ((player.jailCardDecks?.length ?? 0) > 0) this.returnJailCard(player);
+    const { raised, paid } = applyBankruptcy(this.state, player, debt.creditorId, debt.amount, debt.splits);
     const creditor = debt.creditorId
       ? this.state.players.find((p) => p.playerId === debt.creditorId)
       : null;
     const msg = creditor
-      ? `${player.name} went BANKRUPT. All properties transfer to ${creditor.name}.`
-      : `${player.name} went BANKRUPT. Properties return to the bank.`;
-    this.state.lastActionText = msg;
+      ? `${player.name} went BANKRUPT. Everything was sold to the bank for $${raised}; ${creditor.name} receives $${paid}.`
+      : `${player.name} went BANKRUPT. Everything was sold back to the bank.`;
     this.emitToast(msg, 'danger');
 
     if (!this.checkAndApplyVictory()) {
-      this.state.phase = 'TURN_ENDED';
+      // The bankrupt player has nothing left to do: move straight on.
+      this.state.doubles = false;
+      this.state.doublesCount = 0;
+      this.advanceToNextPlayer();
+      return;
     }
+    this.notify();
+  }
+
+  // ------------------------------------------------------------------
+  // Trading (any time, any player, like the real game)
+  // ------------------------------------------------------------------
+
+  private validateTrade(t: Omit<TradeOffer, 'id' | 'createdAt'>): string | null {
+    const from = this.state.players.find((p) => p.playerId === t.fromId);
+    const to = this.state.players.find((p) => p.playerId === t.toId);
+    if (!from || !to || from === to) return 'Pick another player to trade with';
+    if (from.isBankrupt || to.isBankrupt) return 'Bankrupt players cannot trade';
+    const ints = [t.giveMoney, t.getMoney];
+    if (ints.some((n) => !Number.isInteger(n) || n < 0)) return 'Money amounts must be whole, non-negative numbers';
+    if (new Set([...t.giveProps, ...t.getProps]).size !== t.giveProps.length + t.getProps.length) {
+      return 'A property can only appear once in a trade';
+    }
+    if (t.giveMoney === 0 && t.getMoney === 0 && t.giveProps.length === 0 && t.getProps.length === 0) {
+      return 'The trade is empty';
+    }
+    if (from.money < t.giveMoney) return `${from.name} does not have $${t.giveMoney}`;
+    if (to.money < t.getMoney) return `${to.name} does not have $${t.getMoney}`;
+    for (const i of t.giveProps) {
+      const reason = tradeBlockReason(this.state.properties[i], from.playerId);
+      if (reason) return reason;
+    }
+    for (const i of t.getProps) {
+      const reason = tradeBlockReason(this.state.properties[i], to.playerId);
+      if (reason) return reason;
+    }
+    return null;
+  }
+
+  public proposeTrade(fromId: string, proposal: TradeProposal): TradeOffer {
+    if (this.state.phase === 'GAME_OVER') throw new Error('The game is over');
+    const draft = {
+      fromId,
+      toId: proposal.toId,
+      giveMoney: Math.floor(Number(proposal.giveMoney) || 0),
+      getMoney: Math.floor(Number(proposal.getMoney) || 0),
+      giveProps: [...new Set((proposal.giveProps ?? []).map(Number))],
+      getProps: [...new Set((proposal.getProps ?? []).map(Number))]
+    };
+    const invalid = this.validateTrade(draft);
+    if (invalid) throw new Error(invalid);
+
+    // One open offer per pair: a new proposal replaces the previous one.
+    this.state.trades = this.state.trades.filter((t) => !(t.fromId === fromId && t.toId === draft.toId));
+    const offer: TradeOffer = { ...draft, id: Math.random().toString(36).slice(2, 10), createdAt: Date.now() };
+    this.state.trades.push(offer);
+
+    const from = this.state.players.find((p) => p.playerId === fromId)!;
+    const to = this.state.players.find((p) => p.playerId === draft.toId)!;
+    this.emitToast(`${from.name} sent a trade offer to ${to.name}.`, 'info');
+    this.notify();
+    return offer;
+  }
+
+  public respondToTrade(tradeId: string, playerId: string, accept: boolean): void {
+    const trade = this.state.trades.find((t) => t.id === tradeId);
+    if (!trade) throw new Error('That trade is no longer available');
+    if (trade.toId !== playerId) throw new Error('Only the receiving player can answer this trade');
+    const from = this.state.players.find((p) => p.playerId === trade.fromId)!;
+    const to = this.state.players.find((p) => p.playerId === trade.toId)!;
+    this.state.trades = this.state.trades.filter((t) => t.id !== tradeId);
+
+    if (!accept) {
+      this.emitToast(`${to.name} declined ${from.name}'s trade.`, 'info');
+      this.notify();
+      return;
+    }
+
+    const invalid = this.validateTrade(trade);
+    if (invalid) {
+      this.notify();
+      throw new Error(`Trade cancelled: ${invalid}`);
+    }
+
+    from.money += trade.getMoney - trade.giveMoney;
+    to.money += trade.giveMoney - trade.getMoney;
+    record(this.state, from.playerId, to.playerId, trade.giveMoney, 'Trade');
+    record(this.state, to.playerId, from.playerId, trade.getMoney, 'Trade');
+    for (const i of trade.giveProps) this.state.properties[i].ownerId = to.playerId;
+    for (const i of trade.getProps) this.state.properties[i].ownerId = from.playerId;
+
+    // Offers that referenced these deeds or this cash may now be stale.
+    this.state.trades = this.state.trades.filter((t) => this.validateTrade(t) === null);
+
+    this.emitToast(`${from.name} and ${to.name} completed a trade.`, 'success');
+    this.tryPayDebt();
+    this.checkAndApplyVictory();
+    this.notify();
+  }
+
+  public cancelTrade(tradeId: string, playerId: string): void {
+    const trade = this.state.trades.find((t) => t.id === tradeId);
+    if (!trade) return;
+    if (trade.fromId !== playerId) throw new Error('Only the sender can cancel this trade');
+    this.state.trades = this.state.trades.filter((t) => t.id !== tradeId);
     this.notify();
   }
 
@@ -341,7 +584,7 @@ export class MonopolyGameEngine {
     amount: number,
     reason: string
   ): void {
-    const result = payRent(this.state, debtor, creditor, amount);
+    const result = payRent(this.state, debtor, creditor, amount, reason.charAt(0).toUpperCase() + reason.slice(1));
     if (result.debt !== undefined) {
       this.enterDebt(debtor, result.debt, creditor.playerId, reason);
     } else {
@@ -382,14 +625,29 @@ export class MonopolyGameEngine {
     const creditor = debt.creditorId
       ? this.state.players.find((p) => p.playerId === debt.creditorId)
       : null;
-    if (creditor && !creditor.isBankrupt) {
+    if (debt.splits?.length) {
+      for (const sp of debt.splits) {
+        const to = this.state.players.find((p) => p.playerId === sp.playerId);
+        if (to && !to.isBankrupt) {
+          to.money += sp.amount;
+          record(this.state, debtor.playerId, to.playerId, sp.amount, `Debt: ${debt.reason}`);
+        } else {
+          record(this.state, debtor.playerId, null, sp.amount, `Debt: ${debt.reason}`);
+        }
+      }
+    } else if (creditor && !creditor.isBankrupt) {
       creditor.money += debt.amount;
+      record(this.state, debtor.playerId, creditor.playerId, debt.amount, `Debt: ${debt.reason}`);
+    } else {
+      record(this.state, debtor.playerId, null, debt.amount, `Debt: ${debt.reason}`);
     }
     this.state.debt = null;
     this.state.phase = 'TURN_ENDED';
-    const msg = creditor
-      ? `${debtor.name} paid off $${debt.amount} debt to ${creditor.name}.`
-      : `${debtor.name} paid off $${debt.amount} debt to the bank.`;
+    const msg = debt.splits?.length
+      ? `${debtor.name} paid off $${debt.amount} (${debt.reason}).`
+      : creditor
+        ? `${debtor.name} paid off $${debt.amount} debt to ${creditor.name}.`
+        : `${debtor.name} paid off $${debt.amount} debt to the bank.`;
     this.state.lastActionText = msg;
     this.emitToast(msg, 'success');
   }
@@ -452,6 +710,9 @@ export class MonopolyGameEngine {
       this.state.winnerId = result.winnerId;
       this.state.victoryType = result.victoryType;
       this.state.phase = 'GAME_OVER';
+      this.clearForceBuyTimeout();
+      this.clearAuctionTimer();
+      this.state.auction = null;
       if (result.reason) {
         this.emitToast(`GAME OVER. ${result.reason}`, 'success');
       }

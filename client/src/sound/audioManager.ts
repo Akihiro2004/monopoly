@@ -1,14 +1,11 @@
-// Procedural Web Audio API sound synthesizer for 3D Monopoly
-// Zero external asset dependencies, zero network latency, 100% offline reliable.
+// TMpoly audio: procedural Web Audio sound effects + a streamed music track.
 
 class AudioManager {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private sfxGain: GainNode | null = null;
-  private bgmGain: GainNode | null = null;
   private muted: boolean = false;
   private bgmPlaying: boolean = false;
-  private bgmTimer: any = null;
   private listeners: Array<(muted: boolean) => void> = [];
 
   constructor() {
@@ -37,10 +34,6 @@ class AudioManager {
     this.sfxGain.gain.value = 0.7;
     this.sfxGain.connect(this.masterGain);
 
-    this.bgmGain = this.ctx.createGain();
-    this.bgmGain.gain.value = 0.25;
-    this.bgmGain.connect(this.masterGain);
-
     if (!this.muted && !this.bgmPlaying) {
       this.startBGM();
     }
@@ -65,7 +58,9 @@ class AudioManager {
       this.masterGain.gain.setTargetAtTime(this.muted ? 0 : 1, this.ctx.currentTime, 0.05);
     }
     this.listeners.forEach((l) => l(this.muted));
-    if (!this.muted && !this.bgmPlaying) {
+    if (this.muted) {
+      this.stopBGM();
+    } else {
       this.startBGM();
     }
     return this.muted;
@@ -343,150 +338,171 @@ class AudioManager {
     this.tone(1200, { vol: 0.06, dur: 0.05 });
   }
 
-  // Cheerful folk BGM loop (family game night): pentatonic melody over
-  // ukulele-style strums, soft bass, shaker + tambourine. 8 bars, loops.
-  public startBGM() {
-    if (this.bgmPlaying) return;
-    this.initContext();
-    if (!this.ctx || !this.bgmGain) return;
-    this.bgmPlaying = true;
+  // Background music: "Blueprints and Tea", looped seamlessly.
+  //
+  // The track starts with 0.5 s of silence + a short fade-in and ends with a
+  // ~5 s fade-out + 2.4 s of silence, so a plain `loop` leaves ~3 s of dead
+  // air. Two streamed <audio> elements take turns instead: shortly before
+  // the fade-out the next one starts at the first note and they crossfade
+  // (equal-power) through Web Audio gain nodes (element.volume is ignored on
+  // iOS). Streaming keeps memory low: no 57 MB decoded buffer.
+  private static readonly BGM_URL = '/audio/blueprints-and-tea.mp3';
+  // 96 kbps encode (~1.9 MB vs ~3.9 MB) for phones, weak devices and data-saver.
+  private static readonly BGM_URL_LIGHT = '/audio/blueprints-and-tea-mobile.mp3';
 
-    const BPM = 112;
-    const BEAT = 60 / BPM;
-
-    const midi = (m: number) => 440 * Math.pow(2, (m - 69) / 12);
-
-    // [midi note, beats] — 8 bars x 4 beats = 32 beats total
-    const melody: Array<[number, number]> = [
-      [64, 0.5], [67, 0.5], [72, 1], [67, 0.5], [69, 0.5], [67, 1], // Bar 1 (C)
-      [69, 0.5], [72, 0.5], [74, 1], [72, 0.5], [69, 0.5], [65, 1], // Bar 2 (F)
-      [76, 1], [74, 0.5], [72, 0.5], [74, 0.5], [76, 0.5], [67, 1], // Bar 3 (C)
-      [74, 1], [71, 0.5], [67, 0.5], [69, 0.5], [71, 0.5], [74, 1], // Bar 4 (G)
-      [64, 0.5], [67, 0.5], [72, 1], [76, 1], [74, 0.5], [72, 0.5], // Bar 5 (C)
-      [69, 1], [67, 0.5], [69, 0.5], [72, 1], [69, 1], // Bar 6 (F)
-      [71, 0.5], [74, 0.5], [79, 1], [74, 0.5], [71, 0.5], [67, 1], // Bar 7 (G)
-      [72, 1.5], [67, 0.5], [64, 1], [60, 1] // Bar 8 (C, resolve)
-    ];
-
-    // One chord per bar: bass root/fifth + strum tones (all MIDI)
-    const bars = [
-      { bass: [48, 55], tones: [60, 64, 67] }, // C
-      { bass: [53, 60], tones: [57, 60, 65] }, // F
-      { bass: [48, 55], tones: [60, 64, 67] }, // C
-      { bass: [55, 62], tones: [55, 59, 62] }, // G
-      { bass: [48, 55], tones: [60, 64, 67] }, // C
-      { bass: [53, 60], tones: [57, 60, 65] }, // F
-      { bass: [55, 62], tones: [55, 59, 62] }, // G
-      { bass: [48, 55], tones: [60, 64, 67] } // C
-    ];
-
-    // Absolute beat position of every melody note (precomputed once)
-    const melodyEvents: Array<{ beat: number; midi: number }> = [];
-    let cursor = 0;
-    for (const [m, d] of melody) {
-      melodyEvents.push({ beat: cursor, midi: m });
-      cursor += d;
+  private static bgmUrl(): string {
+    try {
+      const nav = navigator as Navigator & {
+        connection?: { saveData?: boolean; effectiveType?: string };
+        deviceMemory?: number;
+      };
+      const light =
+        window.matchMedia?.('(pointer: coarse)').matches ||
+        nav.connection?.saveData === true ||
+        /(^|-)2g$|^3g$/.test(nav.connection?.effectiveType ?? '') ||
+        (nav.deviceMemory !== undefined && nav.deviceMemory <= 4);
+      return light ? AudioManager.BGM_URL_LIGHT : AudioManager.BGM_URL;
+    } catch {
+      return AudioManager.BGM_URL;
     }
+  }
+  private static readonly BGM_VOLUME = 0.35;
+  private static readonly BGM_START = 0.5; // skip the leading silence
+  private static readonly BGM_TAIL = 5.6; // hand over this long before the end
+  private static readonly BGM_FADE = 3; // crossfade length (s)
 
-    const ctx = this.ctx;
-    const noiseBuf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.2), ctx.sampleRate);
-    const noiseData = noiseBuf.getChannelData(0);
-    for (let i = 0; i < noiseData.length; i++) noiseData[i] = Math.random() * 2 - 1;
+  private decks: { el: HTMLAudioElement; gain: GainNode | null }[] = [];
+  private deckIdx = 0;
+  private crossfading = false;
+  private loopTimer: ReturnType<typeof setInterval> | null = null;
 
-    // Plucky lead / strum voice
-    const pluck = (freq: number, t: number, vol: number, dur = 0.45) => {
-      if (!this.ctx || !this.bgmGain) return;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, t);
-      gain.gain.setValueAtTime(0.001, t);
-      gain.gain.linearRampToValueAtTime(vol, t + 0.012);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      osc.connect(gain);
-      gain.connect(this.bgmGain);
-      osc.start(t);
-      osc.stop(t + dur + 0.05);
-    };
-
-    // Soft round bass voice
-    const bassNote = (freq: number, t: number, vol = 0.24) => {
-      if (!this.ctx || !this.bgmGain) return;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, t);
-      gain.gain.setValueAtTime(0.001, t);
-      gain.gain.linearRampToValueAtTime(vol, t + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
-      osc.connect(gain);
-      gain.connect(this.bgmGain);
-      osc.start(t);
-      osc.stop(t + 0.65);
-    };
-
-    // Short filtered noise tick (shaker / tambourine)
-    const tick = (t: number, vol: number, filterFreq: number) => {
-      if (!this.ctx || !this.bgmGain) return;
-      const src = this.ctx.createBufferSource();
-      src.buffer = noiseBuf;
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = 'highpass';
-      filter.frequency.value = filterFreq;
-      const gain = this.ctx.createGain();
-      gain.gain.setValueAtTime(vol, t);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
-      src.connect(filter);
-      filter.connect(gain);
-      gain.connect(this.bgmGain);
-      src.start(t);
-      src.stop(t + 0.1);
-    };
-
-    const humanize = () => (Math.random() - 0.5) * 0.016;
-    let bar = 0;
-
-    const scheduleBar = () => {
-      if (!this.bgmPlaying || !this.ctx || !this.bgmGain) return;
-      const barStartBeat = bar * 4;
-      const t0 = this.ctx.currentTime + 0.08;
-
-      // Melody notes starting inside this bar
-      for (const ev of melodyEvents) {
-        if (ev.beat >= barStartBeat && ev.beat < barStartBeat + 4) {
-          const t = t0 + (ev.beat - barStartBeat) * BEAT + humanize();
-          pluck(midi(ev.midi), t, 0.15 + Math.random() * 0.04);
+  private ensureDecks(): boolean {
+    if (typeof Audio === 'undefined') return false;
+    if (this.decks.length) return true;
+    const url = AudioManager.bgmUrl();
+    for (let i = 0; i < 2; i++) {
+      const el = new Audio(url);
+      el.preload = i === 0 ? 'auto' : 'metadata';
+      let gain: GainNode | null = null;
+      if (this.ctx && this.masterGain) {
+        try {
+          const src = this.ctx.createMediaElementSource(el);
+          gain = this.ctx.createGain();
+          gain.gain.value = 0;
+          src.connect(gain);
+          gain.connect(this.masterGain);
+        } catch {
+          gain = null;
         }
       }
-
-      // Boom-chick accompaniment: bass root, strum, bass fifth, strum
-      const chord = bars[bar];
-      const at = (beats: number) => t0 + beats * BEAT + humanize();
-      bassNote(midi(chord.bass[0]), at(0));
-      chord.tones.forEach((tone, i) => pluck(midi(tone), at(1) + i * 0.03, 0.055));
-      bassNote(midi(chord.bass[1]), at(2));
-      chord.tones.forEach((tone, i) => pluck(midi(tone), at(3) + i * 0.03, 0.05));
-
-      // Shaker 8ths + tambourine on 2 & 4
-      for (let s = 0; s < 8; s++) {
-        tick(at(s * 0.5), s % 2 === 0 ? 0.028 : 0.02, 6500);
+      if (!gain) {
+        // No Web Audio: a single element with a plain loop still works.
+        el.loop = true;
+        el.volume = AudioManager.BGM_VOLUME;
       }
-      tick(at(1), 0.05, 8000);
-      tick(at(3), 0.05, 8000);
+      this.decks.push({ el, gain });
+    }
+    // Pause while the tab / app is in the background (battery, data).
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.pauseDecks();
+      else if (this.bgmPlaying && !this.muted) this.resumeCurrent();
+    });
+    return true;
+  }
 
-      bar = (bar + 1) % bars.length;
-      this.bgmTimer = setTimeout(scheduleBar, 4 * BEAT * 1000);
-    };
+  private fadeTo(gain: GainNode | null, value: number, seconds: number) {
+    if (!gain || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.setValueAtTime(gain.gain.value, now);
+    // Sine-shaped curve ~ equal power: no dip in loudness mid-crossfade.
+    const steps = 24;
+    const from = gain.gain.value;
+    const curve = new Float32Array(steps);
+    for (let i = 0; i < steps; i++) {
+      const k = i / (steps - 1);
+      curve[i] = value > from ? from + (value - from) * Math.sin((k * Math.PI) / 2) : value + (from - value) * Math.cos((k * Math.PI) / 2);
+    }
+    gain.gain.setValueCurveAtTime(curve, now, Math.max(0.05, seconds));
+  }
 
-    scheduleBar();
+  private resumeCurrent() {
+    const deck = this.decks[this.deckIdx];
+    if (!deck) return;
+    this.crossfading = false;
+    this.decks.forEach((d, i) => {
+      if (i !== this.deckIdx) {
+        d.el.pause();
+        if (d.gain) d.gain.gain.value = 0;
+      }
+    });
+    deck.el.play().then(
+      () => this.fadeTo(deck.gain, AudioManager.BGM_VOLUME, 0.6),
+      () => {
+        this.bgmPlaying = false;
+      }
+    );
+  }
+
+  private pauseDecks() {
+    this.decks.forEach((d) => d.el.pause());
+    this.crossfading = false;
+  }
+
+  // Checks (10x a second) whether it is time to hand over to the other deck.
+  private watchLoop() {
+    if (this.loopTimer) return;
+    this.loopTimer = setInterval(() => {
+      if (!this.bgmPlaying || this.crossfading || document.hidden) return;
+      const cur = this.decks[this.deckIdx];
+      if (!cur?.gain) return; // plain-loop fallback
+      const dur = cur.el.duration;
+      if (!isFinite(dur) || cur.el.paused) return;
+      if (cur.el.currentTime < dur - AudioManager.BGM_TAIL) return;
+
+      this.crossfading = true;
+      const nextIdx = 1 - this.deckIdx;
+      const next = this.decks[nextIdx];
+      next.el.currentTime = AudioManager.BGM_START;
+      next.el.play().then(
+        () => {
+          this.fadeTo(next.gain, AudioManager.BGM_VOLUME, AudioManager.BGM_FADE);
+          this.fadeTo(cur.gain, 0, AudioManager.BGM_FADE);
+          this.deckIdx = nextIdx;
+          setTimeout(() => {
+            cur.el.pause();
+            this.crossfading = false;
+          }, AudioManager.BGM_FADE * 1000 + 300);
+        },
+        () => {
+          // Could not start the next deck: fall back to restarting this one.
+          cur.el.currentTime = AudioManager.BGM_START;
+          this.crossfading = false;
+        }
+      );
+    }, 100);
+  }
+
+  public startBGM() {
+    if (this.muted || this.bgmPlaying) return;
+    if (!this.ctx) {
+      // Creating the context starts the music itself (see initContext).
+      this.initContext();
+      if (this.ctx) return;
+    }
+    if (!this.ensureDecks()) return;
+    this.bgmPlaying = true;
+    const deck = this.decks[this.deckIdx];
+    if (deck.el.currentTime < AudioManager.BGM_START) deck.el.currentTime = AudioManager.BGM_START;
+    // Browsers only allow audio after a user gesture; sounds are triggered by
+    // clicks, so the first click starts the music.
+    this.resumeCurrent();
+    this.watchLoop();
   }
 
   public stopBGM() {
     this.bgmPlaying = false;
-    if (this.bgmTimer) {
-      clearTimeout(this.bgmTimer);
-      this.bgmTimer = null;
-    }
+    this.pauseDecks();
   }
 }
 

@@ -67,6 +67,7 @@ export interface TileDef {
   // rentByLevel: index 0 = base rent, 1 = house, 2 = building, 3 = hotel, 4 = landmark
   rentByLevel: [number, number, number, number, number];
   buildCost: number; // cost per upgrade level (0 for non-buildable)
+  country?: string; // ISO 3166 alpha-2 of the city's country (color sets)
 }
 
 // BuildLevel: 0 = unbuilt/raw land, 1 = house, 2 = building, 3 = hotel, 4 = landmark
@@ -91,9 +92,13 @@ export interface PlayerState {
   inJail: boolean;
   jailTurns: number;
   jailCards: number; // get-out-of-jail-free cards held
+  // Which deck each held jail card came from (returned there when used).
+  jailCardDecks?: ('chance' | 'chest')[];
   isBankrupt: boolean;
   isConnected: boolean;
   consecutiveDoubles: number;
+  // Times this player has passed / landed on GO. Building on land needs >= 1.
+  lapsCompleted: number;
 }
 
 export type GamePhase =
@@ -103,6 +108,7 @@ export type GamePhase =
   | 'BUY_OFFER'
   | 'FORCE_BUY_OFFER'
   | 'DEBT'
+  | 'AUCTION'
   | 'TURN_ENDED'
   | 'GAME_OVER';
 
@@ -129,13 +135,74 @@ export interface DebtOffer {
   amount: number;
   creditorId: string | null;
   reason: string;
+  // Debt owed to several players at once ("pay each player $50"):
+  // the amount is split between them when paid.
+  splits?: { playerId: string; amount: number }[];
+}
+
+// Player-to-player trade proposal. `give*` flows from -> to, `get*` flows
+// to -> from. Only unbuilt properties can change hands.
+export interface TradeOffer {
+  id: string;
+  fromId: string;
+  toId: string;
+  giveMoney: number;
+  giveProps: number[];
+  getMoney: number;
+  getProps: number[];
+  createdAt: number;
 }
 
 // A drawn Chance / Community Chest card, broadcast for the info modal.
 export interface CardDraw {
+  id: number; // increasing per draw (animations key on it)
   deck: 'chance' | 'chest';
   title: string;
   text: string;
+  drawerId: string;
+  // Extra line for dice-based cards, e.g. "Rolled 4 + 3: pay 10 x 7 = $70".
+  detail?: string;
+}
+
+// ---------------------------------------------------------------- Bank
+// Every money movement, for the bank statement. null = the Bank.
+export interface BankTxn {
+  id: number;
+  ts: number;
+  fromId: string | null;
+  toId: string | null;
+  amount: number;
+  reason: string;
+}
+
+// The Bank owns the limited building supply (real Monopoly: 32 houses,
+// 12 hotels) and keeps a ledger of the latest transactions.
+export interface BankState {
+  houses: number;
+  hotels: number;
+  ledger: BankTxn[];
+  nextTxnId: number;
+}
+
+// Bank auction of a property the landing player declined / could not afford.
+export interface AuctionState {
+  tileIndex: number;
+  highBid: number;
+  highBidderId: string | null;
+  endsAt: number; // timestamp ms
+  bidders: string[]; // players who placed at least one bid
+}
+
+// The last dice move, so clients can animate walk -> landing -> follow-up
+// (e.g. walk onto Chance, show the card, then travel to the card target).
+export interface MoveRecord {
+  seq: number;
+  playerId: string;
+  from: number;
+  landed: number; // tile the dice walk ends on
+  to: number; // final tile after the landing resolved (card / go-to-jail)
+  // The follow-up move (landed -> to) paid the GO salary.
+  passedGo?: boolean;
 }
 
 export interface GameState {
@@ -151,6 +218,10 @@ export interface GameState {
   buyOffer: BuyOffer | null;
   forceBuyOffer: ForceBuyOffer | null;
   debt: DebtOffer | null;
+  trades: TradeOffer[];
+  lastMove: MoveRecord | null;
+  bank: BankState;
+  auction: AuctionState | null;
   winnerId: string | null;
   victoryType: VictoryType | null;
   lastActionText: string;

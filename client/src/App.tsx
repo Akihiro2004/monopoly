@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { useGameStore, initSocketListeners } from './store/gameStore.js';
 import { socket, loadSession, clearSession, saveSession } from './net/socket.js';
 import { HomeScreen } from './ui/HomeScreen.js';
@@ -7,11 +7,19 @@ import { GameHUD } from './ui/GameHUD.js';
 import { BuyPropertyModal } from './ui/BuyPropertyModal.js';
 import { ForceBuyModal } from './ui/ForceBuyModal.js';
 import { CardModal } from './ui/CardModal.js';
-import { DebtModal } from './ui/DebtModal.js';
+import { DebtPlanner } from './ui/debt/DebtPlanner.js';
 import { VictoryOverlay } from './ui/VictoryOverlay.js';
 import { ToastContainer } from './ui/ToastContainer.js';
-import { MonopolyScene } from './three/Scene.js';
+// The 3D engine (three.js + scene) is its own chunk: menus load fast, and the
+// lobby preloads it so the board appears instantly when the game starts.
+const MonopolyScene = lazy(() => import('./three/Scene.js'));
+const preloadScene = () => import('./three/Scene.js');
 import { useIsMobile } from './hooks/useIsMobile.js';
+import { Logo, Sky } from './ui/common/Sky.js';
+import { IncomingTradeModal } from './ui/trade/IncomingTradeModal.js';
+import { AuctionModal } from './ui/bank/AuctionModal.js';
+import { GoBanner } from './ui/game/GoBanner.js';
+import { RotateOverlay } from './ui/common/RotateOverlay.js';
 
 export function App() {
   const roomState = useGameStore((s) => s.roomState);
@@ -65,6 +73,11 @@ export function App() {
 
   // Keep the persisted session in sync while in a room so a reload always
   // knows which room + display name to rejoin with.
+  // In a room: fetch the 3D chunk in the background while players get ready.
+  useEffect(() => {
+    if (roomState) preloadScene();
+  }, [roomState]);
+
   useEffect(() => {
     if (!roomState) return;
     const mySeat = roomState.seats.find(
@@ -80,12 +93,13 @@ export function App() {
     return (
       <div className={rootClass}>
         <div className="menu-screen">
-          <div className="menu-bg" />
+          <Sky />
           <div className="splash">
-            <span className="brand-mark" />
-            <h1>Monopoly 3D</h1>
-            <div className="spinner" />
-            <p>Rejoining your game…</p>
+            <Logo />
+            <div className="splash-card paper">
+              <div className="spinner" />
+              <p>Rejoining your game…</p>
+            </div>
           </div>
         </div>
         <ToastContainer />
@@ -96,7 +110,11 @@ export function App() {
   return (
     <div className={rootClass}>
       {/* 3D Monopoly Canvas (rendered when in playing/finished state) */}
-      {roomState?.status === 'playing' && <MonopolyScene />}
+      {roomState?.status === 'playing' && (
+        <Suspense fallback={<div className="scene-loading"><div className="spinner" /><p>Setting up the board…</p></div>}>
+          <MonopolyScene />
+        </Suspense>
+      )}
 
       {/* Screen 1: Home / Room Creation & Joining */}
       {!roomState && <HomeScreen />}
@@ -108,10 +126,13 @@ export function App() {
       {roomState && roomState.status === 'playing' && (
         <>
           <GameHUD />
+          <GoBanner />
           <BuyPropertyModal />
           <ForceBuyModal />
           <CardModal />
-          <DebtModal />
+          <DebtPlanner />
+          <IncomingTradeModal />
+          <AuctionModal />
         </>
       )}
 
@@ -120,6 +141,7 @@ export function App() {
 
       {/* Global Notifications */}
       <ToastContainer />
+      <RotateOverlay />
     </div>
   );
 }

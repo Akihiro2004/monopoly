@@ -1,49 +1,94 @@
-import React from 'react';
-import { Text } from '@react-three/drei';
-import { TEXT_FONT } from './fonts.js';
-import { BOARD_TILES, TileDef } from '@monopoly/shared';
+import React, { useEffect, useMemo, useState } from 'react';
+import * as THREE from 'three';
+import { BOARD_TILES, BuildLevel } from '@monopoly/shared';
 import { BOARD_COORDINATES } from './boardCoords.js';
 import { useGameStore } from '../store/gameStore.js';
 import { BuildingMesh } from './BuildingMesh.js';
 import { CenterBoard } from './CenterBoard.js';
+import { BoardTextures, loadBoardTextures } from './tileTextures.js';
+import { playerHex } from '../ui/theme.js';
 
-const GROUP_COLORS: Record<string, string> = {
-  brown: '#8B4513',
-  lightblue: '#87CEEB',
-  pink: '#FF69B4',
-  orange: '#FFA500',
-  red: '#FF0000',
-  yellow: '#FFD700',
-  green: '#008000',
-  darkblue: '#0000CD',
-  railroad: '#4B5563',
-  utility: '#9CA3AF',
-  special: '#D1D5DB'
-};
+const FRAME_H = 0.55;
+const FRAME_Y = -0.02;
+const RAIL = 0.45;
+const OUTER = 21.5;
+const INNER = 20.6;
 
-// Owner tint for buildings / ownership stripe (matches lobby token colors)
-const PLAYER_HEX: Record<string, string> = {
-  red: '#ef4444',
-  blue: '#3b82f6',
-  green: '#10b981',
-  yellow: '#f59e0b',
-  purple: '#8b5cf6',
-  orange: '#f97316'
-};
+const EDGE = new THREE.MeshStandardMaterial({ color: '#cfe3c6', roughness: 0.8 });
+const BLANK = new THREE.MeshStandardMaterial({ color: '#e4f1dd', roughness: 0.75 });
 
-const FRAME_H = 0.6; // frame rail height
-const FRAME_Y = -0.05; // rail center, so rails rest on the table and rise past the tiles
-const RAIL = 0.4; // rail thickness
-const OUTER = 21.4; // outer board size
-const INNER = 20.6; // inner size, flush with the white tile-ring base
+// One tile; memoized so a game update only re-renders tiles that changed.
+const Tile = React.memo(function Tile({
+  index,
+  materials,
+  ownerHex,
+  level,
+  mortgaged
+}: {
+  index: number;
+  materials: THREE.Material[];
+  ownerHex?: string;
+  level: BuildLevel;
+  mortgaged: boolean;
+}) {
+  const coord = BOARD_COORDINATES[index];
+  const [w, h, d] = coord.size;
+  return (
+    <group position={coord.position} rotation={coord.rotation}>
+      <mesh receiveShadow material={materials}>
+        <boxGeometry args={[w * 0.985, h, d * 0.985]} />
+      </mesh>
+
+      {/* Ownership plate on the outer edge, in the owner's color */}
+      {ownerHex && (
+        <group position={[0, h / 2 + 0.02, d * 0.455]}>
+          <mesh castShadow>
+            <boxGeometry args={[w * 0.9, 0.05, d * 0.07]} />
+            <meshStandardMaterial color="#2b1d10" roughness={0.6} />
+          </mesh>
+          <mesh position={[0, 0.03, 0]}>
+            <boxGeometry args={[w * 0.84, 0.03, d * 0.045]} />
+            <meshStandardMaterial color={ownerHex} roughness={0.35} metalness={0.1} />
+          </mesh>
+        </group>
+      )}
+
+      {/* Buildings stand on the color band (inner edge) */}
+      {ownerHex && (
+        <BuildingMesh level={level} mortgaged={mortgaged} tileIndex={index} position={[0, h / 2, -d * 0.36]} color={ownerHex} />
+      )}
+    </group>
+  );
+});
 
 export const Board3D: React.FC = () => {
   const gameState = useGameStore((s) => s.gameState);
+  const [textures, setTextures] = useState<BoardTextures | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    loadBoardTextures().then((t) => alive && setTextures(t));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // One material set per tile: painted top, plain sides (box face order:
+  // +x, -x, +y, -y, +z, -z).
+  const tileMaterials = useMemo(
+    () =>
+      BOARD_TILES.map((t) => {
+        const top = textures
+          ? new THREE.MeshStandardMaterial({ map: textures.tiles[t.index], roughness: 0.7 })
+          : BLANK;
+        return [EDGE, EDGE, top, EDGE, EDGE, EDGE];
+      }),
+    [textures]
+  );
 
   return (
     <group>
-      {/* Blue board frame: four rails forming a raised border (a solid slab
-          would swallow the tiles sitting inside it) */}
+      {/* Chunky dark frame around the board */}
       {(
         [
           [0, -(OUTER - RAIL) / 2, OUTER, RAIL],
@@ -54,105 +99,30 @@ export const Board3D: React.FC = () => {
       ).map(([x, z, sx, sz], i) => (
         <mesh key={`frame-${i}`} receiveShadow castShadow position={[x, FRAME_Y, z]}>
           <boxGeometry args={[sx, FRAME_H, sz]} />
-          <meshStandardMaterial color="#2563eb" roughness={0.55} />
+          <meshStandardMaterial color="#3a2415" roughness={0.55} />
         </mesh>
       ))}
 
-      {/* White tile-ring base */}
+      {/* Base slab under the tiles */}
       <mesh receiveShadow position={[0, 0, 0]}>
-        <boxGeometry args={[20.6, 0.3, 20.6]} />
-        <meshStandardMaterial color="#f8fafc" roughness={0.7} />
+        <boxGeometry args={[INNER, 0.3, INNER]} />
+        <meshStandardMaterial color="#2b1d10" roughness={0.8} />
       </mesh>
 
-      {/* Center art: logo banner + card decks */}
-      <CenterBoard />
+      <CenterBoard texture={textures?.center ?? null} />
 
-      {/* 40 Tiles */}
       {BOARD_COORDINATES.map((coord) => {
-        const tile: TileDef = BOARD_TILES[coord.index];
         const prop = gameState?.properties[coord.index];
-        const isCorner = coord.index % 10 === 0;
-        const groupColor = GROUP_COLORS[tile.group] || '#D1D5DB';
-
-        // Color band on inner edge facing board center, price on outer edge
-        const bandZ = -coord.size[2] * 0.35;
-        const priceZ = coord.size[2] * 0.32;
-
-        // Check if tile has an owner
-        let ownerHex: string | undefined;
-        if (prop?.ownerId && gameState) {
-          const owner = gameState.players.find((p) => p.playerId === prop.ownerId);
-          if (owner) {
-            ownerHex = PLAYER_HEX[owner.color] || owner.color;
-          }
-        }
-
+        const owner = prop?.ownerId ? gameState?.players.find((p) => p.playerId === prop.ownerId) : undefined;
         return (
-          <group key={coord.index} position={coord.position} rotation={coord.rotation}>
-            {/* Tile Mesh */}
-            <mesh receiveShadow castShadow>
-              <boxGeometry args={coord.size} />
-              <meshStandardMaterial
-                color="#f8fafc"
-                roughness={0.4}
-              />
-            </mesh>
-
-            {/* Color Band for purchasable properties (inner edge, facing center) */}
-            {!isCorner && tile.price > 0 && (
-              <mesh position={[0, coord.size[1] / 2 + 0.01, bandZ]}>
-                <boxGeometry args={[coord.size[0] * 0.95, 0.02, coord.size[2] * 0.25]} />
-                <meshStandardMaterial color={groupColor} roughness={0.3} />
-              </mesh>
-            )}
-
-            {/* Tile Label */}
-            <Text
-              font={TEXT_FONT}
-              position={[0, coord.size[1] / 2 + 0.03, 0]}
-              rotation={[-Math.PI / 2, 0, 0]}
-              fontSize={0.24}
-              color="#0f172a"
-              maxWidth={coord.size[0] * 0.9}
-              textAlign="center"
-              anchorX="center"
-              anchorY="middle"
-            >
-              {tile.name}
-            </Text>
-
-            {/* Price text on the outer edge */}
-            {tile.price > 0 && (
-              <Text
-                font={TEXT_FONT}
-                position={[0, coord.size[1] / 2 + 0.03, priceZ]}
-                rotation={[-Math.PI / 2, 0, 0]}
-                fontSize={0.2}
-                color="#475569"
-                anchorX="center"
-                anchorY="middle"
-              >
-                ${tile.price}
-              </Text>
-            )}
-
-            {/* Ownership stripe on the outer edge in the owner's color */}
-            {ownerHex && (
-              <mesh position={[0, coord.size[1] / 2 + 0.01, coord.size[2] * 0.44]}>
-                <boxGeometry args={[coord.size[0] * 0.95, 0.025, coord.size[2] * 0.1]} />
-                <meshStandardMaterial color={ownerHex} roughness={0.3} metalness={0.2} />
-              </mesh>
-            )}
-
-            {/* 3D Buildings/House preview attached to the inner edge ("ujung land") */}
-            {prop && prop.ownerId && (
-              <BuildingMesh
-                level={prop.buildLevel}
-                position={[0, coord.size[1] / 2, -coord.size[2] * 0.32]}
-                color={ownerHex}
-              />
-            )}
-          </group>
+          <Tile
+            key={coord.index}
+            index={coord.index}
+            materials={tileMaterials[coord.index]}
+            ownerHex={owner ? playerHex(owner.color) : undefined}
+            level={prop?.buildLevel ?? 0}
+            mortgaged={prop?.isMortgaged ?? false}
+          />
         );
       })}
     </group>

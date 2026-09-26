@@ -1,5 +1,6 @@
 import React from 'react';
 import { useGameStore } from '../store/gameStore.js';
+import { useIsMobile } from '../hooks/useIsMobile.js';
 import { AlertTriangle, CheckCircle2, Info, XCircle } from 'lucide-react';
 
 const ICONS = {
@@ -12,6 +13,11 @@ const ICONS = {
 export const ToastContainer: React.FC = () => {
   const toasts = useGameStore((s) => s.toasts);
   const removeToast = useGameStore((s) => s.removeToast);
+  const inGame = useGameStore((s) => s.roomState?.status === 'playing');
+  const isMobile = useIsMobile();
+
+  // Phones in-game use the compact ticker instead of a toast stack.
+  if (inGame && isMobile) return null;
 
   return (
     <div className="toast-stack" aria-live="polite">
