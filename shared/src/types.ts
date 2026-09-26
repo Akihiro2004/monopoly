@@ -40,7 +40,16 @@ export interface RoomState {
   seats: Seat[];
   winnerId: string | null;
   victoryType: VictoryType | null;
+  // Server feature level (see PROTOCOL_VERSION); older servers omit it.
+  protocol?: number;
 }
+
+/**
+ * Bumped when client and server must be updated together (new lobby
+ * settings, new events...). A client talking to an older server shows a
+ * "server needs an update" notice instead of silently broken controls.
+ */
+export const PROTOCOL_VERSION = 2;
 
 // Board & Tile types
 export type TileGroup =

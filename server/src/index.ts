@@ -7,6 +7,7 @@ import cors from 'cors';
 import compression from 'compression';
 import { Server } from 'socket.io';
 import {
+  PROTOCOL_VERSION,
   ClientToServerEvents,
   ServerToClientEvents
 } from '@monopoly/shared';
@@ -55,7 +56,7 @@ app.use(
 );
 
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, timestamp: Date.now() });
+  res.json({ ok: true, timestamp: Date.now(), protocol: PROTOCOL_VERSION });
 });
 
 app.get('*', (req, res) => {

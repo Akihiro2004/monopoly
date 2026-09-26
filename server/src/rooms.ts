@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { customAlphabet } from 'nanoid';
 import {
   BOARD_TILES,
+  PROTOCOL_VERSION,
   ForceBuyMode,
   LeaderboardEntry,
   PlayerColor,
@@ -548,10 +549,16 @@ export class RoomManager {
       roomId: room.roomId,
       hostPlayerId: room.hostPlayerId,
       status: room.status,
-      settings: room.settings,
+      // Always complete, whatever older code created or saved the room.
+      settings: {
+        ...room.settings,
+        forceBuyMode: room.settings.forceBuyMode ?? 'developed',
+        randomEvents: room.settings.randomEvents ?? true
+      },
       seats: room.seats,
       winnerId: room.engine?.state.winnerId ?? null,
-      victoryType: room.engine?.state.victoryType ?? null
+      victoryType: room.engine?.state.victoryType ?? null,
+      protocol: PROTOCOL_VERSION
     };
   }
 
