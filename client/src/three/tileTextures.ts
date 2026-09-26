@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { BOARD_TILES, COUNTRY_NAMES, SIDE_NAMES, TileDef } from '@monopoly/shared';
+import { TIERS, currentTier, usePerfStore } from '../store/perfStore.js';
 
 // Canvas-painted board art (classic Monopoly look): crisp text and icons on
 // every tile instead of floating 3D text. Canvas top edge = the tile's inner
@@ -31,7 +32,7 @@ function canvas(w: number, h: number) {
 function toTexture(c: HTMLCanvasElement): THREE.CanvasTexture {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 8;
+  t.anisotropy = TIERS[currentTier(usePerfStore.getState())].anisotropy;
   t.needsUpdate = true;
   return t;
 }

@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import { Server } from 'socket.io';
 import {
   ClientToServerEvents,
@@ -19,11 +20,24 @@ const PORT = parseInt(process.env.PORT || '5000', 10);
 
 const app = express();
 app.use(cors());
+// gzip everything (JS, CSS, glTF, SVG): big win over a Cloudflare tunnel / 4G.
+app.use(compression());
 app.use(express.json());
 
-// Serve static build from client/dist (for local play / single-origin tunnel)
+// Serve static build from client/dist (for local play / single-origin tunnel).
+// Hashed build assets never change: cache them for a year. Models / icons for
+// a week. index.html and the service worker must always be re-checked.
 const clientDistPath = path.resolve(__dirname, '../../client/dist');
-app.use(express.static(clientDistPath));
+app.use(
+  express.static(clientDistPath, {
+    setHeaders(res, filePath) {
+      const rel = path.relative(clientDistPath, filePath).split(path.sep).join('/');
+      if (rel.startsWith('assets/')) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      else if (rel.startsWith('models/') || rel.startsWith('icons/')) res.setHeader('Cache-Control', 'public, max-age=604800');
+      else res.setHeader('Cache-Control', 'no-cache');
+    }
+  })
+);
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, timestamp: Date.now() });
@@ -32,7 +46,7 @@ app.get('/api/health', (req, res) => {
 app.get('*', (req, res) => {
   res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
     if (err) {
-      res.status(200).send('Monopoly 3D server is running. Build the client to view the UI.');
+      res.status(200).send('TMpoly server is running. Build the client to view the UI.');
     }
   });
 });
@@ -63,5 +77,5 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Monopoly 3D Server running on http://localhost:${PORT}`);
+  console.log(`TMpoly Server running on http://localhost:${PORT}`);
 });

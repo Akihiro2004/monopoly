@@ -4,7 +4,7 @@ import { Logo } from '../common/Sky.js';
 import { ActionPanel } from './ActionPanel.js';
 import { PlayerList } from './Players.js';
 import { SidePanel } from './SidePanel.js';
-import { DiceReadout, FullscreenButton, MuteButton, TurnIdentity } from './TurnHeader.js';
+import { DiceReadout, GraphicsButton, FullscreenButton, MuteButton, TurnIdentity } from './TurnHeader.js';
 import { useTurn } from './useTurn.js';
 
 // Desktop: the board fills the window; everything else floats over it.
@@ -34,6 +34,7 @@ export const DesktopHUD: React.FC = () => {
       </header>
 
       <div className="d-controls">
+        <GraphicsButton />
         <MuteButton />
         <FullscreenButton />
       </div>

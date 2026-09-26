@@ -28,8 +28,11 @@ export const GoBurst: React.FC = () => {
     [celebration?.id] // new random fountain each time
   );
 
+  // Only celebrations that happen while the board is on screen: never replay
+  // an old one when a game starts or the page rejoins.
+  const seenAtMount = useRef(celebration?.id);
   useEffect(() => {
-    if (celebration) t.current = 0;
+    if (celebration && celebration.id !== seenAtMount.current) t.current = 0;
   }, [celebration]);
 
   const dummy = useMemo(() => new THREE.Object3D(), []);
@@ -42,7 +45,7 @@ export const GoBurst: React.FC = () => {
       ring.current.visible = false;
       return;
     }
-    t.current += dt;
+    t.current += Math.min(dt, 0.05);
     mesh.visible = true;
     ring.current.visible = true;
     seeds.forEach((s, i) => {

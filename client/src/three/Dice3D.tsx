@@ -37,8 +37,9 @@ const SingleDie: React.FC<DieProps> = ({ position, targetValue, rollTrigger }) =
     }
   }, [rollTrigger]);
 
-  useFrame((_, delta) => {
+  useFrame((_, rawDelta) => {
     if (!meshRef.current) return;
+    const delta = Math.min(rawDelta, 0.05);
 
     if (isRolling.current) {
       animTime.current += delta;

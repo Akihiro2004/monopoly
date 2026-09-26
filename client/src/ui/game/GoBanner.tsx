@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { GO_SALARY } from '@monopoly/shared';
 import { useGameStore } from '../../store/gameStore.js';
 import { PlayerAvatar } from '../common/PlayerAvatar.js';
@@ -10,9 +10,10 @@ export const GoBanner: React.FC = () => {
   const game = useGameStore((s) => s.gameState);
   const myPlayerId = useGameStore((s) => s.myPlayerId);
   const [shownId, setShownId] = useState<number | null>(null);
+  const seenAtMount = useRef(celebration?.id);
 
   useEffect(() => {
-    if (!celebration) return;
+    if (!celebration || celebration.id === seenAtMount.current) return;
     setShownId(celebration.id);
     const t = setTimeout(() => setShownId((v) => (v === celebration.id ? null : v)), 2600);
     return () => clearTimeout(t);

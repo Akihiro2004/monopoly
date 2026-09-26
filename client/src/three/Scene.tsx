@@ -1,9 +1,10 @@
-import React, { Suspense, useEffect, useMemo } from 'react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import { Canvas, useThree } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
+import { OrbitControls, PerformanceMonitor, PerspectiveCamera } from '@react-three/drei';
 import type { PerspectiveCamera as PerspectiveCameraImpl, Vector3 } from 'three';
 import { useGameStore } from '../store/gameStore.js';
+import { TIERS, usePerfStore, useTier } from '../store/perfStore.js';
 import { useIsMobile, useMediaQuery } from '../hooks/useIsMobile.js';
 import { Board3D } from './Board3D.js';
 import { Tokens3D } from './Tokens3D.js';
@@ -82,6 +83,7 @@ const CameraRig: React.FC<Insets> = (ins) => {
   const camera = useThree((s) => s.camera) as PerspectiveCameraImpl;
   const controls = useThree((s) => s.controls) as unknown as ControlsLike | null;
   const { width: w, height: h } = useThree((s) => s.size);
+  const invalidate = useThree((s) => s.invalidate);
 
   const bandW = Math.max(160, w - ins.left - ins.right);
   const bandH = Math.max(120, h - ins.top - ins.bottom);
@@ -107,25 +109,86 @@ const CameraRig: React.FC<Insets> = (ins) => {
     } else {
       camera.lookAt(0, 0.4, fit.tz);
     }
-  }, [fit, elevDeg, camera, controls]);
+    invalidate();
+  }, [fit, elevDeg, camera, controls, invalidate]);
 
   useEffect(() => {
     if (fit.pad > 0 || fit.offX > 0 || fit.fullW !== w) camera.setViewOffset(fit.fullW, fit.fullH, fit.offX, fit.pad, w, h);
     else camera.clearViewOffset();
+    invalidate();
     return () => camera.clearViewOffset();
-  }, [camera, w, h, fit]);
+  }, [camera, w, h, fit, invalidate]);
 
   return null;
 };
+
+// Renders on demand: full frame rate while something moves (token walk,
+// dice, coins, camera drag, a fresh game update), a gentle idle rate on
+// strong devices, and nothing at all on weak ones when the board is still.
+const FrameDriver: React.FC<{ idleFps: number }> = ({ idleFps }) => {
+  const invalidate = useThree((s) => s.invalidate);
+  const bump = usePerfStore((s) => s.bump);
+
+  // Anything that changes the scene wakes the loop up for a moment.
+  useEffect(
+    () =>
+      useGameStore.subscribe((s, prev) => {
+        if (
+          s.gameState !== prev.gameState ||
+          s.diceRoll !== prev.diceRoll ||
+          s.goCelebration !== prev.goCelebration ||
+          s.isWalking !== prev.isWalking
+        ) {
+          bump(s.goCelebration !== prev.goCelebration ? 3000 : 2500);
+          invalidate();
+        }
+      }),
+    [bump, invalidate]
+  );
+
+  useEffect(() => {
+    let raf = 0;
+    let last = 0;
+    const loop = (now: number) => {
+      raf = requestAnimationFrame(loop);
+      const busy = useGameStore.getState().isWalking || now < usePerfStore.getState().activeUntil;
+      if (busy) {
+        invalidate();
+        last = now;
+      } else if (idleFps > 0 && now - last >= 1000 / idleFps) {
+        invalidate();
+        last = now;
+      }
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [idleFps, invalidate]);
+
+  return null;
+};
+
+// Keeps the loop awake while the player drags / pinches the camera.
+function wakeOnInput(el: HTMLElement) {
+  const wake = () => usePerfStore.getState().bump(1500);
+  el.addEventListener('pointerdown', wake);
+  el.addEventListener('pointermove', (e) => e.buttons && wake());
+  el.addEventListener('wheel', wake, { passive: true });
+}
 
 export const MonopolyScene: React.FC = () => {
   const gameState = useGameStore((s) => s.gameState);
   const isMobile = useIsMobile();
   const panelCollapsed = useGameStore((s) => s.panelCollapsed);
   const wideDesktop = useMediaQuery('(min-width: 1281px)');
-  // HUD chrome floating over the canvas, in CSS px. Desktop: player cards on
-  // the left, the collapsible panel on the right, turn banner + roll button.
-  // Mobile: status bar on top, action + tab bar at the bottom.
+  const tier = useTier();
+  const q = TIERS[tier];
+  const pref = usePerfStore((s) => s.pref);
+  const degrade = usePerfStore((s) => s.degrade);
+  // Bumped to rebuild the WebGL canvas after the browser drops the context
+  // (common on phones when memory runs low or the app is backgrounded).
+  const [glKey, setGlKey] = useState(0);
+  const [lost, setLost] = useState(false);
+
   // Symmetric left/right so the board (and the ROLL button under it) sit on
   // the screen's center line.
   const side = isMobile ? 0 : Math.max(260, panelCollapsed ? 96 : (wideDesktop ? 390 : 340) + 30);
@@ -135,7 +198,36 @@ export const MonopolyScene: React.FC = () => {
 
   return (
     <div className="canvas-container">
-      <Canvas shadows dpr={isMobile ? [1, 2] : [1, 1.75]}>
+      {lost && <div className="gl-lost">Reloading the board…</div>}
+      <Canvas
+        key={`${glKey}:${q.antialias}`}
+        frameloop="demand"
+        shadows={q.shadows}
+        dpr={q.dpr}
+        gl={{ antialias: q.antialias, powerPreference: tier === 'high' ? 'high-performance' : 'default', stencil: false }}
+        onCreated={({ gl }) => {
+          const canvas = gl.domElement;
+          wakeOnInput(canvas);
+          canvas.addEventListener('webglcontextlost', (e) => {
+            e.preventDefault();
+            // The renderer also drops the context on purpose when this canvas
+            // is replaced (quality change): only a canvas still on the page
+            // that lost its context is a real crash worth rebuilding.
+            setTimeout(() => {
+              if (!canvas.isConnected) return;
+              setLost(true);
+              setTimeout(() => {
+                setLost(false);
+                setGlKey((k) => k + 1);
+              }, 1200);
+            }, 0);
+          });
+        }}
+      >
+        <FrameDriver idleFps={q.idleFps} />
+        {pref === 'auto' && (
+          <PerformanceMonitor flipflops={2} onDecline={() => degrade()} />
+        )}
         <Suspense fallback={null}>
           <PerspectiveCamera makeDefault position={[0, 15, 19]} fov={FOV} />
           <OrbitControls
@@ -151,15 +243,15 @@ export const MonopolyScene: React.FC = () => {
           <CameraRig {...insets} />
 
           {/* Sunny daylight: sky/grass bounce light + one warm sun */}
-          <hemisphereLight args={['#dff3ff', '#7cbf52', 1.1]} />
+          <hemisphereLight args={['#dff3ff', '#7cbf52', q.shadows ? 1.1 : 1.35]} />
           <ambientLight intensity={0.25} />
           <directionalLight
             position={[16, 28, 12]}
             intensity={2.2}
             color="#fff1d6"
-            castShadow
-            shadow-mapSize-width={isMobile ? 1024 : 2048}
-            shadow-mapSize-height={isMobile ? 1024 : 2048}
+            castShadow={q.shadows}
+            shadow-mapSize-width={q.shadowMap}
+            shadow-mapSize-height={q.shadowMap}
             shadow-bias={-0.0004}
             shadow-normalBias={0.02}
             shadow-camera-near={1}
@@ -170,12 +262,10 @@ export const MonopolyScene: React.FC = () => {
             shadow-camera-bottom={-16}
           />
 
-          <Environment />
+          <Environment rings={q.townRings} clouds={q.clouds} />
 
-          {/* Monopoly Board Mesh with procedural tiles */}
           <Board3D />
 
-          {/* Players 3D Tokens */}
           {gameState && (
             <Tokens3D
               players={gameState.players}
@@ -185,10 +275,11 @@ export const MonopolyScene: React.FC = () => {
 
           <GoBurst />
 
-          {/* Animated Dice in center of board */}
           <Dice3D />
         </Suspense>
       </Canvas>
     </div>
   );
 };
+
+export default MonopolyScene;

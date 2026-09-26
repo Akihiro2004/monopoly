@@ -92,7 +92,7 @@ const KayBuilding: React.FC<{ id: string; color: string; landmark?: boolean }> =
 const Crown: React.FC<{ y: number; color: string }> = ({ y, color }) => {
   const ring = useRef<THREE.Mesh>(null);
   useFrame((_, dt) => {
-    if (ring.current) ring.current.rotation.z += dt * 0.8;
+    if (ring.current) ring.current.rotation.z += Math.min(dt, 0.1) * 0.8;
   });
   return (
     <group position={[-0.25, y, 0]}>
@@ -127,7 +127,7 @@ export const BuildingMesh: React.FC<BuildingProps> = ({ level, position, color =
 
   useFrame((_, dt) => {
     if (!group.current || t.current >= 1) return;
-    t.current = Math.min(1, t.current + dt * 2.2);
+    t.current = Math.min(1, t.current + Math.min(dt, 0.05) * 2.2);
     const x = t.current;
     const s = 1 + Math.sin(x * Math.PI * 1.5) * (1 - x) * 0.6;
     group.current.scale.setScalar(Math.max(0.01, x < 0.25 ? x * 4 : s));

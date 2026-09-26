@@ -267,6 +267,7 @@ const AnimatedToken: React.FC<{
 }> = ({ player, isCurrent, offset }) => {
   const groupRef = useRef<THREE.Group>(null);
   const facingRef = useRef<THREE.Group>(null);
+  const scratch = useRef(new THREE.Vector3());
   const snapped = useRef(false);
   const visualTile = useRef(player.position);
   const pathQueue = useRef<PathItem[]>([]);
@@ -293,7 +294,7 @@ const AnimatedToken: React.FC<{
     let path: PathItem[];
     if (fresh) {
       lastSeq.current = move.seq;
-      path = walkSteps(from, move.landed);
+      path = walkSteps(from, move.landed).map((st) => (st.kind === 'step' && st.tile === 0 ? { ...st, passGo: true } : st));
       if (move.landed !== move.to) {
         // Card moves that wrap around the board (or land on GO) pay the salary.
         const passGo = move.to !== 10 && (move.to === 0 || move.to < move.landed);
@@ -325,9 +326,10 @@ const AnimatedToken: React.FC<{
 
   useFrame((state, delta) => {
     if (!groupRef.current) return;
+    // Reuses one vector: no allocations in the frame loop.
     const place = (tile: number) => {
       const c = getTileCenter(tile);
-      return new THREE.Vector3(c[0] + offset[0], c[1] + 0.07 + offset[1], c[2] + offset[2]);
+      return scratch.current.set(c[0] + offset[0], c[1] + 0.07 + offset[1], c[2] + offset[2]);
     };
 
     if (!snapped.current) {
@@ -339,7 +341,7 @@ const AnimatedToken: React.FC<{
 
     // Waiting for the dice tumble, or pausing on the landing tile
     if (waitTimer.current > 0) {
-      waitTimer.current -= delta;
+      waitTimer.current -= Math.min(delta, 0.1);
       const p = place(visualTile.current);
       const hover = isCurrent ? 0.08 + Math.sin(state.clock.elapsedTime * 5) * 0.04 : 0;
       groupRef.current.position.set(p.x, p.y + hover, p.z);
@@ -374,7 +376,7 @@ const AnimatedToken: React.FC<{
         isStepping.current = true;
       }
 
-      stepTimer.current += delta;
+      stepTimer.current += Math.min(delta, 0.05);
       const progress = Math.min(1, stepTimer.current / stepDuration.current);
       const eased = next.kind === 'glide' ? 0.5 - Math.cos(progress * Math.PI) / 2 : progress;
       const arc = Math.sin(progress * Math.PI) * (next.kind === 'glide' ? 2.2 : 0.35);
@@ -386,7 +388,7 @@ const AnimatedToken: React.FC<{
         visualTile.current = next.tile;
         isStepping.current = false;
         audioManager.playStep();
-        if ((next.kind === 'step' && next.tile === 0) || (next.kind === 'glide' && next.passGo)) {
+        if (next.passGo) {
           useGameStore.getState().celebrateGo(player.playerId);
         }
         if (pathQueue.current.length === 0) finishWalk();

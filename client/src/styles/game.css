@@ -1274,3 +1274,45 @@ button.deed-chip:active:not(:disabled) {
 .layout-mobile .go-amount {
   font-size: 1.6rem;
 }
+
+.scene-loading,
+.gl-lost {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-weight: 900;
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--sky-top), var(--sky-bottom));
+}
+
+.gfx-btn {
+  position: relative;
+}
+
+.gfx-tag {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 5px;
+  border-radius: 6px;
+  background: var(--paper);
+  border: 1.5px solid var(--ink);
+  font-size: 0.55rem;
+  font-weight: 900;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.gfx-low .gfx-tag {
+  background: #c9f5d4;
+}
+
+.gfx-high .gfx-tag {
+  background: var(--gold);
+}

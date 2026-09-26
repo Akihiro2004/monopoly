@@ -30,7 +30,6 @@ MODELS.forEach((m) => useGLTF.preload(url(m)));
 const CELL = 3.2; // world units per kit tile
 const GROUND_Y = -1.3;
 const ROAD_RING = 5; // ring index (in cells) of the road around the plaza
-const OUTER_RING = 10;
 
 interface Placement {
   model: ModelName;
@@ -48,7 +47,7 @@ function rng(seed: number) {
   };
 }
 
-function layout(): Placement[] {
+function layout(OUTER_RING: number): Placement[] {
   const rand = rng(20260925);
   const out: Placement[] = [];
   for (let i = -OUTER_RING; i <= OUTER_RING; i++) {
@@ -130,56 +129,70 @@ const Instances: React.FC<{ model: ModelName; items: Placement[] }> = ({ model, 
   return <instancedMesh ref={ref} args={[geometry, material, items.length]} frustumCulled={false} />;
 };
 
-const Town: React.FC = () => {
+const Town: React.FC<{ rings: number }> = ({ rings }) => {
   const groups = useMemo(() => {
     const map = new Map<ModelName, Placement[]>();
-    for (const p of layout()) {
+    for (const p of layout(rings)) {
       if (!map.has(p.model)) map.set(p.model, []);
       map.get(p.model)!.push(p);
     }
     return [...map.entries()];
-  }, []);
+  }, [rings]);
   return (
     <group>
       {groups.map(([model, items]) => (
-        <Instances key={model} model={model} items={items} />
+        <Instances key={`${model}:${items.length}`} model={model} items={items} />
       ))}
     </group>
   );
 };
 
-// Puffy low-poly clouds drifting around the scene.
+// Puffy low-poly clouds drifting around the scene: every puff is one
+// instance of a single mesh (1 draw call for the whole sky).
 const Clouds: React.FC = () => {
   const ref = useRef<THREE.Group>(null);
-  const clouds = useMemo(() => {
+  const mesh = useRef<THREE.InstancedMesh>(null);
+  const puffs = useMemo(() => {
     const rand = rng(77);
-    return Array.from({ length: 9 }, (_, i) => {
+    const out: { p: THREE.Vector3; r: number }[] = [];
+    for (let i = 0; i < 9; i++) {
       const a = (i / 9) * Math.PI * 2 + rand() * 0.4;
       const d = 48 + rand() * 30;
-      return {
-        pos: [Math.cos(a) * d, 20 + rand() * 12, Math.sin(a) * d] as [number, number, number],
-        puffs: Array.from({ length: 4 + Math.floor(rand() * 3) }, () => ({
-          p: [(rand() - 0.5) * 9, rand() * 2, (rand() - 0.5) * 4] as [number, number, number],
+      const base = new THREE.Vector3(Math.cos(a) * d, 20 + rand() * 12, Math.sin(a) * d);
+      const n = 4 + Math.floor(rand() * 3);
+      for (let j = 0; j < n; j++) {
+        out.push({
+          p: base.clone().add(new THREE.Vector3((rand() - 0.5) * 9, rand() * 2, (rand() - 0.5) * 4)),
           r: 2.2 + rand() * 2.2
-        }))
-      };
-    });
+        });
+      }
+    }
+    return out;
   }, []);
+
+  useLayoutEffect(() => {
+    const m = mesh.current;
+    if (!m) return;
+    const dummy = new THREE.Object3D();
+    puffs.forEach((pf, i) => {
+      dummy.position.copy(pf.p);
+      dummy.scale.setScalar(pf.r);
+      dummy.updateMatrix();
+      m.setMatrixAt(i, dummy.matrix);
+    });
+    m.instanceMatrix.needsUpdate = true;
+  }, [puffs]);
+
   useFrame((_, dt) => {
-    if (ref.current) ref.current.rotation.y += dt * 0.006;
+    if (ref.current) ref.current.rotation.y += Math.min(dt, 0.1) * 0.006;
   });
+
   return (
     <group ref={ref}>
-      {clouds.map((c, i) => (
-        <group key={i} position={c.pos}>
-          {c.puffs.map((p, j) => (
-            <mesh key={j} position={p.p}>
-              <icosahedronGeometry args={[p.r, 1]} />
-              <meshStandardMaterial color="#ffffff" roughness={1} flatShading emissive="#ffffff" emissiveIntensity={0.25} />
-            </mesh>
-          ))}
-        </group>
-      ))}
+      <instancedMesh ref={mesh} args={[undefined, undefined, puffs.length]} frustumCulled={false}>
+        <icosahedronGeometry args={[1, 1]} />
+        <meshStandardMaterial color="#ffffff" roughness={1} flatShading emissive="#ffffff" emissiveIntensity={0.25} />
+      </instancedMesh>
     </group>
   );
 };
@@ -200,7 +213,7 @@ function skyTexture(): THREE.CanvasTexture {
   return t;
 }
 
-export const Environment: React.FC = () => {
+export const Environment: React.FC<{ rings: number; clouds: boolean }> = ({ rings, clouds }) => {
   const scene = useThree((s) => s.scene);
 
   useEffect(() => {
@@ -233,9 +246,9 @@ export const Environment: React.FC = () => {
       </mesh>
 
       <React.Suspense fallback={null}>
-        <Town />
+        <Town rings={rings} />
       </React.Suspense>
-      <Clouds />
+      {clouds && <Clouds />}
     </group>
   );
 };

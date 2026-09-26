@@ -175,6 +175,10 @@ export const useGameStore = create<GameStore>((set) => ({
       activity: [],
       snoozedTrades: [],
       ticker: null,
+      goCelebration: null,
+      isWalking: false,
+      walkPaused: false,
+      buyOffer: null,
       winner: null,
     }),
 }));

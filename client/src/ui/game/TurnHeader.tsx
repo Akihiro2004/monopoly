@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Maximize2, Minimize2, Volume2, VolumeX } from 'lucide-react';
+import { Gauge, Maximize2, Minimize2, Volume2, VolumeX } from 'lucide-react';
+import { GraphicsPref, usePerfStore, useTier } from '../../store/perfStore.js';
 import { audioManager } from '../../sound/audioManager.js';
 import { PipDie } from '../PipDie.js';
 import { PlayerAvatar } from '../common/PlayerAvatar.js';
@@ -60,6 +61,23 @@ export const FullscreenButton: React.FC = () => {
   return (
     <button className="icon-btn" onClick={toggle} aria-label={full ? 'Exit full screen' : 'Full screen'} title={full ? 'Exit full screen' : 'Full screen'}>
       {full ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+    </button>
+  );
+};
+
+const NEXT: Record<GraphicsPref, GraphicsPref> = { auto: 'low', low: 'high', high: 'auto' };
+const PREF_LABEL: Record<GraphicsPref, string> = { auto: 'Auto', low: 'Smooth', high: 'Pretty' };
+
+// Graphics quality: Auto (adapts to the device), Smooth (fastest), Pretty.
+export const GraphicsButton: React.FC = () => {
+  const pref = usePerfStore((s) => s.pref);
+  const setPref = usePerfStore((s) => s.setPref);
+  const tier = useTier();
+  const title = `Graphics: ${PREF_LABEL[pref]}${pref === 'auto' ? ` (${tier})` : ''}. Click to change.`;
+  return (
+    <button className={`icon-btn gfx-btn gfx-${pref}`} onClick={() => setPref(NEXT[pref])} aria-label={title} title={title}>
+      <Gauge size={18} />
+      <span className="gfx-tag">{PREF_LABEL[pref]}</span>
     </button>
   );
 };
