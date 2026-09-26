@@ -20,6 +20,7 @@ import { Logo, Sky } from './ui/common/Sky.js';
 import { IncomingTradeModal } from './ui/trade/IncomingTradeModal.js';
 import { AuctionModal } from './ui/bank/AuctionModal.js';
 import { GoBanner } from './ui/game/GoBanner.js';
+import { EventBanner } from './ui/game/EventBanner.js';
 import { GoBuildModal } from './ui/game/GoBuildModal.js';
 import { RotateOverlay } from './ui/common/RotateOverlay.js';
 import { ConnectionBanner, ReplacedOverlay } from './ui/session/SessionOverlays.js';
@@ -166,6 +167,7 @@ export function App() {
           <GameHUD />
           <ConnectionBanner />
           <GoBanner />
+          <EventBanner />
           <BuyPropertyModal />
           <ForceBuyModal />
           <CardModal />

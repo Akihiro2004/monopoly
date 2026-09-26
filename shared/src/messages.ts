@@ -102,6 +102,9 @@ export interface ServerToClientEvents {
   'game:card': (draw: CardDraw) => void;
   'game:forceBuyOffer': (offer: ForceBuyOffer) => void;
   'game:toast': (payload: { text: string; type?: 'info' | 'success' | 'warning' | 'danger' }) => void;
+  // A random board-wide event fired: shown as a big centered banner, not a
+  // corner toast, and held on screen long enough to actually read.
+  'game:randomEvent': (payload: { text: string; type?: 'info' | 'success' | 'warning' | 'danger' }) => void;
   'game:ended': (payload: { winnerId: string; victoryType: VictoryType }) => void;
   'chat:message': (message: ChatMessage) => void;
   // This seat was opened in another tab / device.

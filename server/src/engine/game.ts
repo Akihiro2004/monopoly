@@ -61,6 +61,9 @@ export interface GameEngineOptions {
   randomEvents?: boolean;
   onStateChange?: (state: GameState) => void;
   onToast?: (toast: { text: string; type?: 'info' | 'success' | 'warning' | 'danger' }) => void;
+  // A random event fired: shown as its own big banner client-side, in
+  // addition to the normal toast / activity log line.
+  onRandomEvent?: (toast: { text: string; type?: 'info' | 'success' | 'warning' | 'danger' }) => void;
   onCard?: (draw: CardDraw) => void;
   // Dice the server rolled for a player whose time ran out.
   onDice?: (dice: { d1: number; d2: number; doubles: boolean }) => void;
@@ -891,7 +894,7 @@ export class MonopolyGameEngine {
   // Bank spontaneously auctions off a random unowned property.
   private eventPropertyLottery(unownedTiles: number[]): void {
     const tileIndex = unownedTiles[Math.floor(Math.random() * unownedTiles.length)];
-    this.emitToast(`Random event! The Bank puts ${BOARD_TILES[tileIndex].name} up for auction.`, 'warning');
+    this.emitRandomEvent(`Random event! The Bank puts ${BOARD_TILES[tileIndex].name} up for auction.`, 'warning');
     this.startAuction(tileIndex);
   }
 
@@ -903,7 +906,7 @@ export class MonopolyGameEngine {
       factor: 0.5,
       expiresAtTurn: this.state.turnNumber + RANDOM_EVENT_DURATION_TURNS
     };
-    this.emitToast(
+    this.emitRandomEvent(
       `Random event! Market Crash — rent is halved board-wide for the next ${RANDOM_EVENT_DURATION_TURNS} turns.`,
       'warning'
     );
@@ -917,7 +920,7 @@ export class MonopolyGameEngine {
       factor: 0.5,
       expiresAtTurn: this.state.turnNumber + RANDOM_EVENT_DURATION_TURNS
     };
-    this.emitToast(
+    this.emitRandomEvent(
       `Random event! Building Boom — house/hotel upgrades are 50% off for the next ${RANDOM_EVENT_DURATION_TURNS} turns.`,
       'success'
     );
@@ -932,7 +935,7 @@ export class MonopolyGameEngine {
       record(this.state, null, p.playerId, bonus, 'Random event: Bank Bonus');
       parts.push(`${p.name} +$${bonus}`);
     }
-    this.emitToast(`Random event! Bank Bonus — ${parts.join(', ')}.`, 'success');
+    this.emitRandomEvent(`Random event! Bank Bonus — ${parts.join(', ')}.`, 'success');
   }
 
   // Catch-up mechanic: the richest player pays 10% of their cash straight
@@ -945,7 +948,7 @@ export class MonopolyGameEngine {
     richest.money -= tax;
     poorest.money += tax;
     record(this.state, richest.playerId, poorest.playerId, tax, 'Random event: Wealth Tax');
-    this.emitToast(`Random event! Wealth Tax — ${richest.name} pays $${tax} to ${poorest.name}.`, 'warning');
+    this.emitRandomEvent(`Random event! Wealth Tax — ${richest.name} pays $${tax} to ${poorest.name}.`, 'warning');
   }
 
   // Chaos mechanic: two random property owners each swap a random deed.
@@ -961,7 +964,7 @@ export class MonopolyGameEngine {
     const bTile = bTiles[Math.floor(Math.random() * bTiles.length)];
     this.state.properties[aTile].ownerId = b.playerId;
     this.state.properties[bTile].ownerId = a.playerId;
-    this.emitToast(
+    this.emitRandomEvent(
       `Random event! Property Swap Storm — ${a.name} and ${b.name} swap ${BOARD_TILES[aTile].name} and ${BOARD_TILES[bTile].name}!`,
       'warning'
     );
@@ -1006,6 +1009,13 @@ export class MonopolyGameEngine {
   private emitToast(text: string, type: 'info' | 'success' | 'warning' | 'danger' = 'info'): void {
     this.state.lastActionText = text;
     this.options.onToast?.({ text, type });
+  }
+
+  // Random events still land in the toast / activity log like anything
+  // else, but also get their own big, hard-to-miss banner client-side.
+  private emitRandomEvent(text: string, type: 'info' | 'success' | 'warning' | 'danger' = 'info'): void {
+    this.emitToast(text, type);
+    this.options.onRandomEvent?.({ text, type });
   }
 
   private notify(): void {
