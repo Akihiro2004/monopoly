@@ -11,6 +11,7 @@ import { Tokens3D } from './Tokens3D.js';
 import { Dice3D } from './Dice3D.js';
 import { Environment } from './Environment.js';
 import { GoBurst } from './GoBurst.js';
+import { DECK_POS, setDeckProjector } from './deckAnchor.js';
 
 const FOV = 45;
 
@@ -137,6 +138,7 @@ const FrameDriver: React.FC<{ idleFps: number }> = ({ idleFps }) => {
           s.gameState !== prev.gameState ||
           s.diceRoll !== prev.diceRoll ||
           s.goCelebration !== prev.goCelebration ||
+          s.cardDraw !== prev.cardDraw ||
           s.isWalking !== prev.isWalking
         ) {
           bump(s.goCelebration !== prev.goCelebration ? 3000 : 2500);
@@ -164,6 +166,23 @@ const FrameDriver: React.FC<{ idleFps: number }> = ({ idleFps }) => {
     return () => cancelAnimationFrame(raf);
   }, [idleFps, invalidate]);
 
+  return null;
+};
+
+// Lets the card animation start from the real on-screen deck position.
+const DeckAnchor: React.FC = () => {
+  const camera = useThree((s) => s.camera);
+  const gl = useThree((s) => s.gl);
+  useEffect(() => {
+    const v = new THREE.Vector3();
+    setDeckProjector((deck) => {
+      v.set(...DECK_POS[deck]).project(camera);
+      if (v.z > 1) return null;
+      const rect = gl.domElement.getBoundingClientRect();
+      return { x: rect.left + ((v.x + 1) / 2) * rect.width, y: rect.top + ((1 - v.y) / 2) * rect.height };
+    });
+    return () => setDeckProjector(null);
+  }, [camera, gl]);
   return null;
 };
 
@@ -225,6 +244,7 @@ export const MonopolyScene: React.FC = () => {
         }}
       >
         <FrameDriver idleFps={q.idleFps} />
+        <DeckAnchor />
         {pref === 'auto' && (
           <PerformanceMonitor flipflops={2} onDecline={() => degrade()} />
         )}

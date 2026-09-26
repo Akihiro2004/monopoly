@@ -27,6 +27,15 @@ import { resolveLanding } from './resolve.js';
 import { createBank, record } from './bank.js';
 import { checkVictory } from './victory.js';
 
+// Fisher-Yates: a fair shuffle (sort(() => random) is biased).
+function shuffle<T>(list: T[]): T[] {
+  for (let i = list.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  return list;
+}
+
 export interface GameEngineOptions {
   specialVictory: boolean;
   onStateChange?: (state: GameState) => void;
@@ -59,7 +68,8 @@ export class MonopolyGameEngine {
       isBankrupt: false,
       isConnected: true,
       consecutiveDoubles: 0,
-      lapsCompleted: 0
+      lapsCompleted: 0,
+      jailCardDecks: []
     }));
 
     const properties: Record<number, PropertyState> = {};
@@ -73,8 +83,8 @@ export class MonopolyGameEngine {
       };
     }
 
-    this.chanceDeck = [...CHANCE_CARDS].sort(() => Math.random() - 0.5);
-    this.chestDeck = [...CHEST_CARDS].sort(() => Math.random() - 0.5);
+    this.chanceDeck = shuffle([...CHANCE_CARDS]);
+    this.chestDeck = shuffle([...CHEST_CARDS]);
 
     this.state = {
       roomId,
@@ -99,13 +109,14 @@ export class MonopolyGameEngine {
     };
   }
 
-  private recordMove(player: PlayerState, from: number, landed: number, to: number): void {
+  private recordMove(player: PlayerState, from: number, landed: number, to: number, passedGo = false): void {
     this.state.lastMove = {
       seq: (this.state.lastMove?.seq ?? 0) + 1,
       playerId: player.playerId,
       from,
       landed,
-      to
+      to,
+      passedGo
     };
   }
 
@@ -180,6 +191,7 @@ export class MonopolyGameEngine {
     player.position = newPos;
     (this.state as any).phase = 'RESOLVING';
 
+    const lapsBeforeLanding = player.lapsCompleted;
     const res = resolveLanding(
       this.state,
       player,
@@ -187,7 +199,7 @@ export class MonopolyGameEngine {
       this.chestDeck,
       (draw: CardDraw) => this.options.onCard?.(draw)
     );
-    this.recordMove(player, oldPos, newPos, player.position);
+    this.recordMove(player, oldPos, newPos, player.position, player.lapsCompleted > lapsBeforeLanding);
     if (res.toast) {
       this.emitToast(res.toast, 'info');
     }
@@ -385,10 +397,20 @@ export class MonopolyGameEngine {
       throw new Error('No jail cards');
     }
     player.jailCards--;
+    this.returnJailCard(player);
     player.inJail = false;
     player.jailTurns = 0;
     this.emitToast(`${player.name} used a Get Out of Jail Free card.`, 'success');
     this.notify();
+  }
+
+  // A used (or forfeited) Get Out of Jail Free card goes back under its deck.
+  private returnJailCard(player: PlayerState): void {
+    const deckType = player.jailCardDecks?.shift() ?? 'chance';
+    const deck = deckType === 'chance' ? this.chanceDeck : this.chestDeck;
+    const source = deckType === 'chance' ? CHANCE_CARDS : CHEST_CARDS;
+    const card = source.find((c) => c.action.type === 'getOutOfJail');
+    if (card && !deck.includes(card)) deck.push(card);
   }
 
   public build(tileIndex: number): void {
@@ -433,7 +455,8 @@ export class MonopolyGameEngine {
     this.state.auction = null;
     this.state.debt = null;
 
-    const { raised, paid } = applyBankruptcy(this.state, player, debt.creditorId, debt.amount);
+    while ((player.jailCardDecks?.length ?? 0) > 0) this.returnJailCard(player);
+    const { raised, paid } = applyBankruptcy(this.state, player, debt.creditorId, debt.amount, debt.splits);
     const creditor = debt.creditorId
       ? this.state.players.find((p) => p.playerId === debt.creditorId)
       : null;
@@ -602,7 +625,17 @@ export class MonopolyGameEngine {
     const creditor = debt.creditorId
       ? this.state.players.find((p) => p.playerId === debt.creditorId)
       : null;
-    if (creditor && !creditor.isBankrupt) {
+    if (debt.splits?.length) {
+      for (const sp of debt.splits) {
+        const to = this.state.players.find((p) => p.playerId === sp.playerId);
+        if (to && !to.isBankrupt) {
+          to.money += sp.amount;
+          record(this.state, debtor.playerId, to.playerId, sp.amount, `Debt: ${debt.reason}`);
+        } else {
+          record(this.state, debtor.playerId, null, sp.amount, `Debt: ${debt.reason}`);
+        }
+      }
+    } else if (creditor && !creditor.isBankrupt) {
       creditor.money += debt.amount;
       record(this.state, debtor.playerId, creditor.playerId, debt.amount, `Debt: ${debt.reason}`);
     } else {
@@ -610,9 +643,11 @@ export class MonopolyGameEngine {
     }
     this.state.debt = null;
     this.state.phase = 'TURN_ENDED';
-    const msg = creditor
-      ? `${debtor.name} paid off $${debt.amount} debt to ${creditor.name}.`
-      : `${debtor.name} paid off $${debt.amount} debt to the bank.`;
+    const msg = debt.splits?.length
+      ? `${debtor.name} paid off $${debt.amount} (${debt.reason}).`
+      : creditor
+        ? `${debtor.name} paid off $${debt.amount} debt to ${creditor.name}.`
+        : `${debtor.name} paid off $${debt.amount} debt to the bank.`;
     this.state.lastActionText = msg;
     this.emitToast(msg, 'success');
   }

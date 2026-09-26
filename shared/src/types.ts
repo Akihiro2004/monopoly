@@ -92,6 +92,8 @@ export interface PlayerState {
   inJail: boolean;
   jailTurns: number;
   jailCards: number; // get-out-of-jail-free cards held
+  // Which deck each held jail card came from (returned there when used).
+  jailCardDecks?: ('chance' | 'chest')[];
   isBankrupt: boolean;
   isConnected: boolean;
   consecutiveDoubles: number;
@@ -133,6 +135,9 @@ export interface DebtOffer {
   amount: number;
   creditorId: string | null;
   reason: string;
+  // Debt owed to several players at once ("pay each player $50"):
+  // the amount is split between them when paid.
+  splits?: { playerId: string; amount: number }[];
 }
 
 // Player-to-player trade proposal. `give*` flows from -> to, `get*` flows
@@ -150,9 +155,13 @@ export interface TradeOffer {
 
 // A drawn Chance / Community Chest card, broadcast for the info modal.
 export interface CardDraw {
+  id: number; // increasing per draw (animations key on it)
   deck: 'chance' | 'chest';
   title: string;
   text: string;
+  drawerId: string;
+  // Extra line for dice-based cards, e.g. "Rolled 4 + 3: pay 10 x 7 = $70".
+  detail?: string;
 }
 
 // ---------------------------------------------------------------- Bank
@@ -192,6 +201,8 @@ export interface MoveRecord {
   from: number;
   landed: number; // tile the dice walk ends on
   to: number; // final tile after the landing resolved (card / go-to-jail)
+  // The follow-up move (landed -> to) paid the GO salary.
+  passedGo?: boolean;
 }
 
 export interface GameState {

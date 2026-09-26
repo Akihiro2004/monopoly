@@ -229,7 +229,7 @@ export const DebtPlanner: React.FC = () => {
   const canEverCover = debtor.money + maxRaise >= debt.amount;
   const steps = planSteps(props, plan);
   const bankruptRaised = debtor.money + maxRaise;
-  const creditorGets = creditor ? Math.min(debt.amount, bankruptRaised) : 0;
+  const creditorGets = creditor || debt.splits?.length ? Math.min(debt.amount, bankruptRaised) : 0;
 
   const cashPct = Math.min(100, (debtor.money / debt.amount) * 100);
   const planPct = Math.min(100 - cashPct, (planned / debt.amount) * 100);
@@ -281,7 +281,7 @@ export const DebtPlanner: React.FC = () => {
         <div>
           <small>Payment due · {debt.reason}</small>
           <strong className="tnum">{money(debt.amount)}</strong>
-          <span>to {creditor ? creditor.name : 'the Bank'}</span>
+          <span>to {debt.splits?.length ? 'each other player' : creditor ? creditor.name : 'the Bank'}</span>
         </div>
       </div>
 
@@ -344,7 +344,12 @@ export const DebtPlanner: React.FC = () => {
       <div className="planner-bankrupt">
         <p>
           Bankruptcy sells everything to the Bank for {money(bankruptRaised)}
-          {creditor ? `; ${creditor.name} gets ${money(creditorGets)}` : ''}. You are out of the game.
+          {debt.splits?.length
+            ? `; the other players share ${money(creditorGets)}`
+            : creditor
+              ? `; ${creditor.name} gets ${money(creditorGets)}`
+              : ''}
+          . You are out of the game.
         </p>
         <button className={`btn btn-sm btn-block ${confirmBankrupt ? 'btn-danger' : 'btn-danger-soft'}`} onClick={bankrupt} disabled={running}>
           <FlagIcon size={15} /> {confirmBankrupt ? 'Tap again to go bankrupt' : 'Declare bankruptcy'}

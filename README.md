@@ -19,10 +19,11 @@ Southeast Asia (Malaysia: Kuala Lumpur, Penang · Indonesia: Jakarta, Bali, Yogy
 5. **Trading**: trade cash and/or unbuilt deeds with any player at any time (propose, accept, decline, cancel). A trade can settle your own debt.
 6. **Debt & Bankruptcy**: cannot pay rent, tax or a card? The **debt planner** opens with every property you own: pick exactly which levels to sell and what to mortgage (or let Auto-plan choose what costs you the least rent), see the rent tables and a live cash-vs-debt meter, peek at the board, or offer a trade, then run the plan. The debt auto-pays once covered. Declaring bankruptcy **sells everything back to the bank**: the creditor receives only the owed amount (capped at what the sale raised), and properties return to the bank unowned.
 7. **Passing GO** plays a coin-fountain animation on the GO tile and a +$200 banner.
-   **Chance & Community Chest**: the card is revealed once your token has actually arrived; "Advance to…" cards move you there and resolve that tile (buy / rent / force-buy).
+   **Chance & Community Chest**: the classic 16 + 16 cards (mapped onto the world board: Advance to New York / London / Beijing / GO, nearest Airport with double rent, nearest Utility at 10x a fresh roll, Go back 3, repairs per house / hotel, pay each player, birthday, bank error...). Decks are shuffled; drawn cards go under the deck, and Get Out of Jail Free is kept until used, then returned to its deck. The card is drawn once your token arrives: the top card lifts off the 3D deck, flies to you and flips over. Card moves resolve the tile you land on.
 8. **Victory**: last player standing, or (toggleable) **Triple Victory** (3 complete color sets) / **Line Victory** (every property on one side).
 9. **3D board in a little town**: hand-painted tiles, animated classic tokens (car, top hat, Scottie dog, battleship, thimble, boot), houses → townhouse → hotel → domed Landmark, rolling dice, and a sunny diorama.
 10. **Desktop & phone**: floating player cards, a collapsible side panel (Assets / Trade / Log / Chat) and a big ROLL button on PC; a portrait-first layout with a tab bar on phones. **Installable** as an app (Add to Home Screen / Install), locked to portrait when installed.
+11. **Runs smoothly anywhere**: the 3D scene only renders while something moves, graphics adapt to the device (Auto / Smooth / Pretty button, automatic step-down when FPS drops), the 3D engine loads in the background while you are in the lobby, and the server gzips and caches everything.
 
 ## How to Run Locally
 

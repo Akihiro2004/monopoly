@@ -94,19 +94,35 @@ export function applyBankruptcy(
   gameState: GameState,
   tenant: PlayerState,
   creditorId: string | null,
-  debtAmount: number
+  debtAmount: number,
+  splits?: { playerId: string; amount: number }[]
 ): { raised: number; paid: number } {
   const raised = tenant.money + liquidationValue(gameState, tenant.playerId);
-  const creditor = creditorId ? gameState.players.find((p) => p.playerId === creditorId) : null;
-  const paid = creditor && !creditor.isBankrupt ? Math.min(debtAmount, raised) : 0;
-  if (creditor) {
-    creditor.money += paid;
-    record(gameState, null, creditor.playerId, paid, `Bankruptcy payout from ${tenant.name}`);
+  let paid = 0;
+  if (splits?.length) {
+    // Several creditors: share what the sale raised in proportion to the debt.
+    const share = Math.min(1, raised / Math.max(1, debtAmount));
+    for (const sp of splits) {
+      const to = gameState.players.find((p) => p.playerId === sp.playerId);
+      if (!to || to.isBankrupt) continue;
+      const amt = Math.floor(sp.amount * share);
+      to.money += amt;
+      paid += amt;
+      record(gameState, null, to.playerId, amt, `Bankruptcy payout from ${tenant.name}`);
+    }
+  } else {
+    const creditor = creditorId ? gameState.players.find((p) => p.playerId === creditorId) : null;
+    paid = creditor && !creditor.isBankrupt ? Math.min(debtAmount, raised) : 0;
+    if (creditor) {
+      creditor.money += paid;
+      record(gameState, null, creditor.playerId, paid, `Bankruptcy payout from ${tenant.name}`);
+    }
   }
 
   tenant.money = 0;
   tenant.isBankrupt = true;
   tenant.jailCards = 0;
+  tenant.jailCardDecks = [];
 
   Object.values(gameState.properties).forEach((p) => {
     if (p.ownerId === tenant.playerId) {

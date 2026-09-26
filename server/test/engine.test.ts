@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { MonopolyGameEngine } from '../src/engine/game.js';
-import { CardDraw, Seat } from '@monopoly/shared';
+import { CardDraw, CHANCE_CARDS, CHEST_CARDS, Seat } from '@monopoly/shared';
 
 describe('Monopoly Game Engine (LINE Get Rich rules)', () => {
   let seats: Seat[];
@@ -259,10 +259,10 @@ describe('Monopoly Game Engine (LINE Get Rich rules)', () => {
     });
     engine.rollDice(1, 1); // tile 2 = Community Chest
 
-    expect(engine.state.players[0].position).not.toBe(0);
     expect(draws.length).toBe(1);
     expect(draws[0].deck).toBe('chest');
-    expect(draws[0].title).toBe('COMMUNITY CHEST');
+    expect(draws[0].title.length).toBeGreaterThan(0);
+    expect(draws[0].drawerId).toBe('p1');
     expect(draws[0].text.length).toBeGreaterThan(0);
   });
 
@@ -499,5 +499,95 @@ describe('Monopoly Game Engine (LINE Get Rich rules)', () => {
     engine.declareBankruptcy();
     expect(engine.state.bank.houses).toBe(32);
     expect(engine.state.bank.hotels).toBe(12);
+  });
+
+  describe('original Chance / Community Chest cards', () => {
+    const card = (list: typeof CHANCE_CARDS, id: string) => list.find((c) => c.id === id)!;
+    const rig = (engine: MonopolyGameEngine, deck: 'chance' | 'chest', id: string) => {
+      const list = deck === 'chance' ? CHANCE_CARDS : CHEST_CARDS;
+      (engine as any)[deck === 'chance' ? 'chanceDeck' : 'chestDeck'] = [card(list, id), ...list.filter((c) => c.id !== id)];
+    };
+
+    it('has the 16 + 16 classic cards', () => {
+      expect(CHANCE_CARDS).toHaveLength(16);
+      expect(CHEST_CARDS).toHaveLength(16);
+    });
+
+    it('nearest airport: moves forward (collecting GO) and pays double rent', () => {
+      const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+      engine.state.properties[5].ownerId = 'p2';
+      rig(engine, 'chance', 'ch_airport1');
+      engine.state.players[0].position = 34;
+      engine.rollDice(1, 1); // 36 = Chance -> nearest airport = 5 (passes GO)
+      const [p1, p2] = engine.state.players;
+      expect(p1.position).toBe(5);
+      expect(p1.money).toBe(1500 + 200 - 50);
+      expect(p2.money).toBe(1550);
+      expect(engine.state.lastMove?.passedGo).toBe(true);
+    });
+
+    it('nearest utility owned by another player: pays 10x a fresh roll', () => {
+      const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+      engine.state.properties[12].ownerId = 'p2';
+      rig(engine, 'chance', 'ch_utility');
+      engine.state.players[0].position = 5;
+      engine.rollDice(1, 1); // 7 = Chance -> 12
+      const paid = 1500 - engine.state.players[0].money;
+      expect(engine.state.players[0].position).toBe(12);
+      expect(paid).toBeGreaterThanOrEqual(20);
+      expect(paid).toBeLessThanOrEqual(120);
+      expect(paid % 10).toBe(0);
+    });
+
+    it('go back 3 spaces resolves the new tile and does not pay GO', () => {
+      const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+      rig(engine, 'chance', 'ch_back3');
+      engine.state.players[0].position = 5;
+      engine.rollDice(1, 1); // 7 -> back to 4 = Income Tax $200
+      expect(engine.state.players[0].position).toBe(4);
+      expect(engine.state.players[0].money).toBe(1300);
+    });
+
+    it('repairs charge per house and per hotel', () => {
+      const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+      engine.state.properties[1].ownerId = 'p1';
+      engine.state.properties[1].buildLevel = 2; // 2 houses
+      engine.state.properties[3].ownerId = 'p1';
+      engine.state.properties[3].buildLevel = 3; // 1 hotel
+      rig(engine, 'chest', 'cc_street');
+      engine.rollDice(1, 1); // 2 = Community Chest
+      expect(engine.state.players[0].money).toBe(1500 - (2 * 40 + 115));
+    });
+
+    it('chairman pays every player; if unaffordable the debt is split between them', () => {
+      const three = [...seats, { ...seats[1], seatIndex: 2, playerId: 'p3', displayName: 'Cara', color: 'green' as const, tokenType: 'dog' as const }];
+      const engine = new MonopolyGameEngine('room123', three, { specialVictory: false });
+      rig(engine, 'chance', 'ch_chairman');
+      engine.state.players[0].position = 5;
+      engine.state.players[0].money = 60;
+      engine.rollDice(1, 1);
+      expect(engine.state.phase).toBe('DEBT');
+      expect(engine.state.debt?.amount).toBe(100);
+      engine.state.players[0].money = 150;
+      engine.state.properties[39].ownerId = 'p1';
+      engine.mortgage(39, true); // raises cash -> debt auto-pays, split 50/50
+      expect(engine.state.debt).toBeNull();
+      expect(engine.state.players[1].money).toBe(1550);
+      expect(engine.state.players[2].money).toBe(1550);
+    });
+
+    it('Get Out of Jail Free is kept until used, then goes back under its deck', () => {
+      const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+      rig(engine, 'chest', 'cc_jailfree');
+      engine.rollDice(1, 1);
+      const p1 = engine.state.players[0];
+      expect(p1.jailCards).toBe(1);
+      expect((engine as any).chestDeck.some((c: any) => c.id === 'cc_jailfree')).toBe(false);
+      p1.inJail = true;
+      engine.state.phase = 'ROLLING';
+      engine.useJailCard();
+      expect(p1.jailCards).toBe(0);
+      expect((engine as any).chestDeck.at(-1).id).toBe('cc_jailfree');
+    });
   });
 });

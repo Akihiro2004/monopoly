@@ -297,7 +297,7 @@ const AnimatedToken: React.FC<{
       path = walkSteps(from, move.landed).map((st) => (st.kind === 'step' && st.tile === 0 ? { ...st, passGo: true } : st));
       if (move.landed !== move.to) {
         // Card moves that wrap around the board (or land on GO) pay the salary.
-        const passGo = move.to !== 10 && (move.to === 0 || move.to < move.landed);
+        const passGo = !!move.passedGo;
         path.push({ kind: 'pause', seconds: LANDING_PAUSE }, { kind: 'glide', tile: move.to, passGo });
       }
       waitTimer.current = DICE_WAIT;

@@ -1,4 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { useGameStore } from '../store/gameStore.js';
 import * as THREE from 'three';
 
 // A stack of cards with a colored top card and a painted "?"/chest mark.
@@ -10,7 +12,7 @@ const CardDeck: React.FC<{
 }> = ({ position, rotation = [0, 0, 0], color, mark }) => {
   const cardCount = 9;
   const cardH = 0.04;
-  const top = useMemo(() => {
+  const topArt = useMemo(() => {
     const c = document.createElement('canvas');
     c.width = 256;
     c.height = 340;
@@ -34,18 +36,43 @@ const CardDeck: React.FC<{
     return t;
   }, [color, mark]);
 
+  // When a card from this deck is drawn, the top card lifts off and vanishes
+  // (the 2D card animation takes over from the same spot on screen).
+  const lifted = useGameStore((s) => s.cardDraw?.deck === mark);
+  const top = useRef<THREE.Group>(null);
+  const t = useRef(0);
+  useFrame((_, dt) => {
+    const g = top.current;
+    if (!g) return;
+    const target = lifted ? 1 : 0;
+    if (t.current === target) return;
+    t.current = lifted ? Math.min(1, t.current + Math.min(dt, 0.05) * 4) : 0;
+    const k = t.current;
+    g.position.y = k * 1.4;
+    g.rotation.x = -k * 0.9;
+    g.scale.setScalar(1 - k * 0.6);
+    g.visible = k < 0.98;
+  });
+
   return (
     <group position={position} rotation={rotation}>
-      {Array.from({ length: cardCount }).map((_, i) => (
+      {Array.from({ length: cardCount - 1 }).map((_, i) => (
         <mesh key={i} castShadow receiveShadow position={[(i % 2) * 0.02, i * cardH, (i % 3) * 0.015]}>
           <boxGeometry args={[1.7, cardH, 2.3]} />
-          <meshStandardMaterial color={i === cardCount - 1 ? color : i % 2 ? '#fffaf0' : '#f2e6cc'} roughness={0.7} />
+          <meshStandardMaterial color={i % 2 ? '#fffaf0' : '#f2e6cc'} roughness={0.7} />
         </mesh>
       ))}
-      <mesh position={[0.02, cardCount * cardH - cardH / 2 + 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[1.66, 2.26]} />
-        <meshStandardMaterial map={top} roughness={0.6} />
-      </mesh>
+      {/* the drawable top card */}
+      <group ref={top} position={[0, (cardCount - 1) * cardH, 0]}>
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={[1.7, cardH, 2.3]} />
+          <meshStandardMaterial color={color} roughness={0.7} />
+        </mesh>
+        <mesh position={[0.0, cardH / 2 + 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[1.66, 2.26]} />
+          <meshStandardMaterial map={topArt} roughness={0.6} />
+        </mesh>
+      </group>
     </group>
   );
 };
