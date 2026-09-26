@@ -107,17 +107,9 @@ export function resolveLanding(
     const opponent = gameState.players.find((p) => p.playerId === prop.ownerId);
     if (!opponent) return { needsForceBuyChoice: false, toast: '' };
 
-    // Check force-buy eligibility
-    const fbCheck = canForceBuy(tileIndex, player, prop, forceBuyMode);
-    if (fbCheck.eligible) {
-      gameState.phase = 'FORCE_BUY_OFFER';
-      gameState.forceBuyOffer = createForceBuyOffer(tileIndex, player, prop);
-      const msg = `${player.name} landed on ${opponent.name}'s ${tile.name}. Force-buy offer: $${fbCheck.price}.`;
-      gameState.lastActionText = msg;
-      return { needsForceBuyChoice: true, toast: msg };
-    }
-
-    // Not eligible for force-buy: pay rent
+    // Rent is always due first. Force-buying (when eligible) is an option on
+    // top of that, not instead of it: taking over the deed costs rent + the
+    // takeover price, not just the takeover price.
     const diceTotal = gameState.dice[0] + gameState.dice[1];
     let rent = calculateRent(gameState, tileIndex, diceTotal);
     if (tile.type === 'utility' && opts.utilityRoll !== undefined && !prop.isMortgaged) {
@@ -138,9 +130,21 @@ export function resolveLanding(
       return { needsForceBuyChoice: false, toast: debtMsg };
     }
 
-    const msg = `${player.name} paid $${result.paid} rent to ${opponent.name} for ${tile.name}.`;
-    gameState.lastActionText = msg;
-    return { needsForceBuyChoice: false, toast: msg };
+    const rentMsg = `${player.name} paid $${result.paid} rent to ${opponent.name} for ${tile.name}.`;
+
+    // Check force-buy eligibility against what's left after rent -- the
+    // takeover price is due on top of it, not instead of it.
+    const fbCheck = canForceBuy(tileIndex, player, prop, forceBuyMode);
+    if (fbCheck.eligible) {
+      gameState.phase = 'FORCE_BUY_OFFER';
+      gameState.forceBuyOffer = createForceBuyOffer(tileIndex, player, prop);
+      const msg = `${rentMsg} Force-buy offer: $${fbCheck.price} on top of the rent.`;
+      gameState.lastActionText = msg;
+      return { needsForceBuyChoice: true, toast: msg };
+    }
+
+    gameState.lastActionText = rentMsg;
+    return { needsForceBuyChoice: false, toast: rentMsg };
   }
 
   return { needsForceBuyChoice: false, toast: `Landed on ${tile.name}` };

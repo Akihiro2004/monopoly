@@ -52,14 +52,18 @@ export function upgradeOptionFor(game: GameState, me: PlayerState | undefined, t
   };
 }
 
-// Every property `me` could build on right now, from a GO building spree.
+// Every property `me` owns that could in principle take another level, from
+// a GO building spree -- including ones a rule currently blocks (mortgaged
+// sibling in the set, bank out of supply, not yet past GO...). Those are
+// still listed, disabled, with the reason shown: silently dropping them made
+// the spree look broken ("some of my land just isn't in the list").
 function goBuildOptionsFor(game: GameState, me: PlayerState | undefined): UpgradeOption[] {
   if (!me || me.position !== GO_TILE_INDEX) return [];
   const options: UpgradeOption[] = [];
   for (const tile of BOARD_TILES) {
     if (game.properties[tile.index]?.ownerId !== me.playerId) continue;
     const option = upgradeOptionFor(game, me, tile.index);
-    if (option && !option.blocked) options.push(option);
+    if (option) options.push(option);
   }
   return options;
 }

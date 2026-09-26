@@ -46,14 +46,15 @@ export const GoBuildModal: React.FC = () => {
               key={opt.prop.tileIndex}
               className={`btn btn-lg btn-block go-build-row ${opt.nextLevel === 4 ? 'btn-purple landmark' : 'btn-blue'}`}
               onClick={() => build(opt.prop.tileIndex)}
-              disabled={!opt.affordable}
+              disabled={!opt.affordable || !!opt.blocked}
+              title={opt.blocked ?? undefined}
             >
               {opt.nextLevel === 4 ? <Castle size={20} /> : <ArrowUpCircle size={20} />}
               <span className="btn-stack">
                 <span>
                   {opt.tile.name} &rarr; {LEVEL_NAMES[opt.nextLevel]}
                 </span>
-                <small className="tnum">{money(opt.cost)}</small>
+                <small className="tnum">{opt.blocked || money(opt.cost)}</small>
               </span>
             </button>
           ))}

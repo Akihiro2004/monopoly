@@ -99,6 +99,42 @@ describe('Monopoly Game Engine (LINE Get Rich rules)', () => {
     expect(engine.state.forceBuyOffer?.price).toBe(220); // (60 + 50)*2
   });
 
+  it('charges rent immediately on landing, then the takeover price on top when force-buying', () => {
+    const engine = new MonopolyGameEngine('room123', seats, { specialVictory: true });
+    engine.state.properties[3].ownerId = 'p2';
+    engine.state.properties[3].buildLevel = 1; // rent 20, takeover (60 + 50)*2 = 220
+
+    engine.rollDice(1, 2); // lands on tile 3
+
+    // Rent is already paid the moment the token lands, before any force-buy
+    // decision is made.
+    expect(engine.state.phase).toBe('FORCE_BUY_OFFER');
+    expect(engine.state.players[0].money).toBe(1500 - 20);
+    expect(engine.state.players[1].money).toBe(1500 + 20);
+
+    engine.respondToForceBuy(true);
+
+    // Accepting costs the takeover price on top of the rent already paid.
+    expect(engine.state.players[0].money).toBe(1500 - 20 - 220);
+    expect(engine.state.players[1].money).toBe(1500 + 20 + 220);
+  });
+
+  it('declining a force-buy offer costs nothing further -- rent was already paid', () => {
+    const engine = new MonopolyGameEngine('room123', seats, { specialVictory: true });
+    engine.state.properties[3].ownerId = 'p2';
+    engine.state.properties[3].buildLevel = 1;
+
+    engine.rollDice(1, 2);
+    expect(engine.state.players[0].money).toBe(1500 - 20);
+
+    engine.respondToForceBuy(false);
+
+    expect(engine.state.properties[3].ownerId).toBe('p2');
+    expect(engine.state.players[0].money).toBe(1500 - 20);
+    expect(engine.state.players[1].money).toBe(1500 + 20);
+    expect(engine.state.phase).toBe('TURN_ENDED');
+  });
+
   it('force-buy mode "off" turns landing on a developed rival deed into plain rent', () => {
     const engine = new MonopolyGameEngine('room123', seats, { specialVictory: true, forceBuyMode: 'off' });
     engine.state.properties[3].ownerId = 'p2';

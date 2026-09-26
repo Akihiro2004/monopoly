@@ -26,7 +26,7 @@ import {
 } from '@monopoly/shared';
 import { executeForceBuy } from './forceBuy.js';
 import { buildProperty, sellBuilding, sellPropertyToBank, toggleMortgage } from './actions.js';
-import { applyBankruptcy, calculateRent, payRent } from './rent.js';
+import { applyBankruptcy } from './rent.js';
 import { resolveLanding } from './resolve.js';
 import { createBank, record } from './bank.js';
 import { checkVictory } from './victory.js';
@@ -383,27 +383,16 @@ export class MonopolyGameEngine {
     const player = this.getCurrentPlayer();
     const opponent = this.state.players.find((p) => p.playerId === offer.targetPlayerId);
 
+    // Rent for landing here was already charged in resolveLanding, before
+    // this offer was even made -- force-buying is on top of that, not
+    // instead of it, so nothing more is owed just for declining or failing.
     if (accept) {
       const res = executeForceBuy(this.state, offer.tileIndex);
-      if (res.success) {
-        this.emitToast(res.text, 'success');
-      } else {
-        this.emitToast(res.text, 'danger');
-        if (opponent) {
-          const rent = calculateRent(this.state, offer.tileIndex, this.state.dice[0] + this.state.dice[1]);
-          this.payRentOrDebt(player, opponent, rent, `rent for ${BOARD_TILES[offer.tileIndex].name}`);
-        }
-      }
+      this.emitToast(res.text, res.success ? 'success' : 'danger');
     } else {
       this.state.forceBuyOffer = null;
       if (opponent) {
-        const rent = calculateRent(this.state, offer.tileIndex, this.state.dice[0] + this.state.dice[1]);
-        const result = payRent(this.state, player, opponent, rent, `Rent for ${BOARD_TILES[offer.tileIndex].name}`);
-        if (result.debt !== undefined) {
-          this.enterDebt(player, result.debt, opponent.playerId, `rent for ${BOARD_TILES[offer.tileIndex].name}`);
-        } else {
-          this.emitToast(`${player.name} declined force-buy. Paid $${result.paid} rent to ${opponent.name}.`, 'info');
-        }
+        this.emitToast(`${player.name} declined the $${offer.price} force-buy on ${BOARD_TILES[offer.tileIndex].name}.`, 'info');
       }
     }
 
@@ -710,24 +699,6 @@ export class MonopolyGameEngine {
     if (trade.fromId !== playerId) throw new Error('Only the sender can cancel this trade');
     this.state.trades = this.state.trades.filter((t) => t.id !== tradeId);
     this.notify();
-  }
-
-  /**
-   * Pays rent when affordable, otherwise parks the shortfall as DEBT
-   * so the debtor can sell buildings / mortgage before paying.
-   */
-  private payRentOrDebt(
-    debtor: PlayerState,
-    creditor: PlayerState,
-    amount: number,
-    reason: string
-  ): void {
-    const result = payRent(this.state, debtor, creditor, amount, reason.charAt(0).toUpperCase() + reason.slice(1));
-    if (result.debt !== undefined) {
-      this.enterDebt(debtor, result.debt, creditor.playerId, reason);
-    } else {
-      this.emitToast(`${debtor.name} paid $${result.paid} rent to ${creditor.name}.`, 'info');
-    }
   }
 
   private enterDebt(
