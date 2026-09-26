@@ -18,6 +18,17 @@ const config = {
 
 export const firebaseEnabled = !!(config.apiKey && config.projectId);
 
+function describeAuthError(code: string): string {
+  switch (code) {
+    case 'auth/unauthorized-domain':
+      return "This site isn't allowed to sign in with Google yet (domain not authorized).";
+    case 'auth/network-request-failed':
+      return 'Sign-in failed: no network connection.';
+    default:
+      return `Google sign-in failed (${code}).`;
+  }
+}
+
 export interface AccountState {
   status: 'off' | 'loading' | 'ready' | 'error';
   uid: string | null;
@@ -40,6 +51,30 @@ type AuthModule = typeof import('firebase/auth');
 let authMod: AuthModule | null = null;
 let auth: import('firebase/auth').Auth | null = null;
 
+// Set right before navigating away for sign-in, so that when the redirect
+// lands back here we can tell "no pending sign-in" (normal page load) apart
+// from "a sign-in just silently failed to complete" (worth telling the user
+// about -- some browsers block the cross-origin storage the redirect
+// handshake needs, e.g. Safari ITP, Chrome/Brave tracking protection,
+// in-app webviews).
+const SIGNIN_PENDING_KEY = 'tmpoly_signin_pending';
+function takeSignInPending(): boolean {
+  try {
+    const was = sessionStorage.getItem(SIGNIN_PENDING_KEY) === '1';
+    sessionStorage.removeItem(SIGNIN_PENDING_KEY);
+    return was;
+  } catch {
+    return false;
+  }
+}
+function markSignInPending(): void {
+  try {
+    sessionStorage.setItem(SIGNIN_PENDING_KEY, '1');
+  } catch {
+    /* ignore */
+  }
+}
+
 export async function initAccount(): Promise<void> {
   if (!firebaseEnabled) {
     connectSocket();
@@ -54,18 +89,39 @@ export async function initAccount(): Promise<void> {
     // Finish a Google sign-in that redirected away and came back. Popups
     // are blocked outright by some browsers / in-app webviews and get
     // silently killed by Cross-Origin-Opener-Policy in others, so sign-in
-    // goes through a full-page redirect instead -- it always works.
+    // goes through a full-page redirect instead.
+    const wasPending = takeSignInPending();
     try {
-      await mod.getRedirectResult(auth);
+      const result = await mod.getRedirectResult(auth);
+      if (wasPending && !result) {
+        // We navigated away to sign in and came back, but Firebase has
+        // nothing to complete: the redirect handshake was silently dropped
+        // rather than erroring out.
+        useGameStore
+          .getState()
+          .addToast(
+            "Sign-in didn't go through -- this browser is blocking Google sign-in (private window, tracking protection, or an in-app browser). Try a normal window or a different browser.",
+            'warning'
+          );
+      }
     } catch (e) {
       const err = e as { code?: string };
       if (err.code === 'auth/credential-already-in-use') {
-        // This Google account is already linked to a different uid: sign
-        // into that existing account instead of the (still anonymous) one.
+        // This Google account is already linked to a different uid.
+        // credentialFromError reliably extracts a usable credential for
+        // POPUP-flow errors only; for a redirect-flow error like this one it
+        // routinely comes back null, in which case the only real recovery
+        // is to sign in to that existing account directly.
         const cred = mod.GoogleAuthProvider.credentialFromError(e as import('firebase/auth').AuthError);
-        if (cred) await mod.signInWithCredential(auth, cred);
+        if (cred) {
+          await mod.signInWithCredential(auth, cred);
+        } else {
+          markSignInPending();
+          await mod.signInWithRedirect(auth, new mod.GoogleAuthProvider());
+          return; // page is navigating away
+        }
       } else {
-        console.warn('Google sign-in redirect failed', e);
+        useGameStore.getState().addToast(err.code ? describeAuthError(err.code) : 'Google sign-in failed', 'danger');
       }
     }
 
@@ -120,6 +176,7 @@ export async function signInWithGoogle(): Promise<void> {
   const provider = new authMod.GoogleAuthProvider();
   useAccount.setState({ busy: true });
   try {
+    markSignInPending();
     const current = auth.currentUser;
     if (current?.isAnonymous) {
       await authMod.linkWithRedirect(current, provider);
@@ -128,6 +185,7 @@ export async function signInWithGoogle(): Promise<void> {
     }
     // The page navigates away now; nothing after this line runs.
   } catch (e) {
+    takeSignInPending();
     useAccount.setState({ busy: false });
     throw e;
   }
