@@ -2,7 +2,8 @@ import React from 'react';
 import { socket, clearSession } from '../net/socket.js';
 import { useGameStore } from '../store/gameStore.js';
 import { TokenType, PlayerColor } from '@monopoly/shared';
-import { Check, ChevronLeft, Copy, Play, Share2, Trophy, Users, Palette, Shapes } from 'lucide-react';
+import { Check, ChevronLeft, Copy, Play, Share2, Timer, Trophy, Users, Palette, Shapes } from 'lucide-react';
+import { LeaderboardButton } from './session/Leaderboard.js';
 import { TOKENS, COLORS } from './lobbyConstants.js';
 import { LobbySeats } from './LobbySeats.js';
 import { Logo, Sky } from './common/Sky.js';
@@ -70,6 +71,15 @@ export const LobbyScreen: React.FC = () => {
     socket.emit('room:start');
   };
 
+  const handleTurnTimer = (seconds: number) => {
+    if (!isHost) return;
+    socket.emit('room:setTurnTimer', { seconds });
+  };
+
+  const handleKick = (playerId: string) => {
+    socket.emit('room:kick', { playerId });
+  };
+
   const handleLeave = () => {
     socket.emit('room:leave');
     clearSession();
@@ -86,7 +96,9 @@ export const LobbyScreen: React.FC = () => {
           <span>Leave</span>
         </button>
         <Logo size="sm" />
-        <span className="lobby-appbar-spacer" />
+        <span className="lobby-appbar-spacer">
+          <LeaderboardButton className="btn-sm" />
+        </span>
       </header>
 
       <div className="lobby-layout">
@@ -121,7 +133,12 @@ export const LobbyScreen: React.FC = () => {
                 <span>/{roomState.settings.maxPlayers || 6}</span>
               </span>
             </div>
-            <LobbySeats seats={roomState.seats} myPlayerId={myPlayerId} maxPlayers={roomState.settings.maxPlayers || 6} />
+            <LobbySeats
+              seats={roomState.seats}
+              myPlayerId={myPlayerId}
+              maxPlayers={roomState.settings.maxPlayers || 6}
+              onKick={isHost ? handleKick : undefined}
+            />
           </section>
         </div>
 
@@ -197,7 +214,32 @@ export const LobbyScreen: React.FC = () => {
                 title={isHost ? 'Toggle special victories' : 'Only the host can change this'}
               />
             </div>
+            <div className="setting-row">
+              <span className="setting-icon">
+                <Timer size={18} />
+              </span>
+              <div className="setting-copy">
+                <strong>Turn timer</strong>
+                <span>Time per decision before the game plays it for you.</span>
+              </div>
+            </div>
+            <div className="segmented small timer-choice" role="radiogroup" aria-label="Turn timer">
+              {[0, 60, 90, 120].map((sec) => (
+                <button
+                  key={sec}
+                  role="radio"
+                  aria-checked={roomState.settings.turnTimeoutSec === sec}
+                  className={roomState.settings.turnTimeoutSec === sec ? 'active' : ''}
+                  onClick={() => handleTurnTimer(sec)}
+                  disabled={!isHost}
+                  title={isHost ? undefined : 'Only the host can change this'}
+                >
+                  {sec === 0 ? 'Off' : `${sec}s`}
+                </button>
+              ))}
+            </div>
           </section>
+
 
           <div className="lobby-actions">
             {isHost ? (

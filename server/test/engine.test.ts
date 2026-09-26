@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { MonopolyGameEngine } from '../src/engine/game.js';
 import { CardDraw, CHANCE_CARDS, CHEST_CARDS, Seat } from '@monopoly/shared';
 
@@ -390,11 +390,16 @@ describe('Monopoly Game Engine (LINE Get Rich rules)', () => {
     expect(engine.state.trades).toHaveLength(0);
   });
 
-  it('rejects trading built properties, unaffordable cash, and supports decline / cancel', () => {
+  it('trades built properties with their buildings; rejects unaffordable cash; supports decline / cancel', () => {
     const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
     engine.state.properties[1].ownerId = 'p1';
-    engine.state.properties[1].buildLevel = 1;
-    expect(() => engine.proposeTrade('p1', { toId: 'p2', giveMoney: 0, giveProps: [1], getMoney: 0, getProps: [] })).toThrow(/Sell the buildings/);
+    engine.state.properties[1].buildLevel = 2;
+    const built = engine.proposeTrade('p1', { toId: 'p2', giveMoney: 0, giveProps: [1], getMoney: 50, getProps: [] });
+    engine.respondToTrade(built.id, 'p2', true);
+    expect(engine.state.properties[1].ownerId).toBe('p2');
+    expect(engine.state.properties[1].buildLevel).toBe(2);
+    engine.state.players[0].money = 1500;
+    engine.state.players[1].money = 1500;
     expect(() => engine.proposeTrade('p1', { toId: 'p2', giveMoney: 99999, giveProps: [], getMoney: 0, getProps: [] })).toThrow(/does not have/);
 
     const t1 = engine.proposeTrade('p1', { toId: 'p2', giveMoney: 10, giveProps: [], getMoney: 0, getProps: [] });
@@ -499,6 +504,237 @@ describe('Monopoly Game Engine (LINE Get Rich rules)', () => {
     engine.declareBankruptcy();
     expect(engine.state.bank.houses).toBe(32);
     expect(engine.state.bank.hotels).toBe(12);
+  });
+
+  it('counter-offers go back and forth and can be accepted', () => {
+    const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+    engine.state.properties[1].ownerId = 'p1';
+    engine.state.properties[39].ownerId = 'p2';
+    const first = engine.proposeTrade('p1', { toId: 'p2', giveMoney: 100, giveProps: [1], getMoney: 0, getProps: [39] });
+    expect(first.round).toBe(1);
+    expect(() => engine.counterTrade(first.id, 'p1', { toId: 'p2', giveMoney: 0, giveProps: [], getMoney: 0, getProps: [] })).toThrow(/receiving player/);
+    // Unchanged terms are refused.
+    expect(() =>
+      engine.counterTrade(first.id, 'p2', { toId: 'p1', giveMoney: 0, giveProps: [39], getMoney: 100, getProps: [1] })
+    ).toThrow(/Change something/);
+
+    // Bob wants $300 instead of $100.
+    const counter = engine.counterTrade(first.id, 'p2', {
+      toId: 'p1',
+      giveMoney: 0,
+      giveProps: [39],
+      getMoney: 300,
+      getProps: [1],
+      message: 'Make it 300'
+    });
+    expect(engine.state.trades).toHaveLength(1);
+    expect(counter).toMatchObject({ fromId: 'p2', toId: 'p1', round: 2, getMoney: 300, message: 'Make it 300' });
+    expect(counter.history?.[0]).toMatchObject({ fromId: 'p1', giveMoney: 100 });
+    expect(engine.state.trades.some((t) => t.id === first.id)).toBe(false);
+
+    engine.respondToTrade(counter.id, 'p1', true);
+    expect(engine.state.properties[39].ownerId).toBe('p1');
+    expect(engine.state.properties[1].ownerId).toBe('p2');
+    expect(engine.state.players[0].money).toBe(1200);
+    expect(engine.state.players[1].money).toBe(1800);
+  });
+
+  it('a negotiation stops after 10 rounds', () => {
+    const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+    let t = engine.proposeTrade('p1', { toId: 'p2', giveMoney: 1, giveProps: [], getMoney: 0, getProps: [] });
+    for (let r = 2; r <= 10; r++) {
+      const by = t.toId;
+      t = engine.counterTrade(t.id, by, { toId: t.fromId, giveMoney: r, giveProps: [], getMoney: 0, getProps: [] });
+    }
+    expect(t.round).toBe(10);
+    expect(() => engine.counterTrade(t.id, t.toId, { toId: t.fromId, giveMoney: 99, giveProps: [], getMoney: 0, getProps: [] })).toThrow(
+      /long enough/
+    );
+  });
+
+  describe('selling and mortgages (classic rules)', () => {
+    it('any player can sell buildings at any time, straight down to a chosen level', () => {
+      const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+      // Bob (not the current player) owns Baltic (buildCost 50) with a Hotel.
+      engine.state.properties[3].ownerId = 'p2';
+      engine.state.properties[3].buildLevel = 3;
+      engine.sell(3, 'p2', 1);
+      expect(engine.state.properties[3].buildLevel).toBe(1);
+      expect(engine.state.players[1].money).toBe(1500 + 25 * 2);
+      expect(() => engine.sell(3, 'p1')).toThrow(/do not own/i);
+    });
+
+    it('sells a whole deed back to the Bank (buildings half + land at mortgage value)', () => {
+      const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+      engine.state.properties[3].ownerId = 'p1';
+      engine.state.properties[3].buildLevel = 2;
+      engine.state.bank.houses = 30;
+      engine.sellProperty(3, 'p1');
+      expect(engine.state.properties[3].ownerId).toBeNull();
+      expect(engine.state.properties[3].buildLevel).toBe(0);
+      expect(engine.state.players[0].money).toBe(1500 + 50 + 30);
+      expect(engine.state.bank.houses).toBe(32);
+
+      // A mortgaged deed just cancels the loan.
+      engine.state.properties[1].ownerId = 'p1';
+      engine.state.properties[1].isMortgaged = true;
+      engine.sellProperty(1, 'p1');
+      expect(engine.state.properties[1].ownerId).toBeNull();
+      expect(engine.state.properties[1].isMortgaged).toBe(false);
+      expect(engine.state.players[0].money).toBe(1580);
+    });
+
+    it('mortgages only bare land: no buildings anywhere in the color set', () => {
+      const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+      engine.state.properties[1].ownerId = 'p1';
+      engine.state.properties[3].ownerId = 'p1';
+      engine.state.properties[3].buildLevel = 1;
+      expect(() => engine.mortgage(1, true, 'p1')).toThrow(/Sell the buildings in this color set/);
+      engine.sell(3, 'p1');
+      engine.mortgage(1, true, 'p1');
+      expect(engine.state.properties[1].isMortgaged).toBe(true);
+      expect(engine.state.players[0].money).toBe(1500 + 25 + 30);
+    });
+
+    it('lifting a mortgage costs the value plus 10% interest', () => {
+      const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+      engine.state.properties[39].ownerId = 'p1'; // price 400 -> mortgage 200
+      engine.mortgage(39, true, 'p1');
+      expect(engine.state.players[0].money).toBe(1700);
+      engine.mortgage(39, false, 'p1');
+      expect(engine.state.players[0].money).toBe(1700 - 220);
+      expect(engine.state.properties[39].isMortgaged).toBe(false);
+    });
+
+    it('no rent on a mortgaged deed; the rest of a full set still pays double', () => {
+      const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+      engine.state.properties[1].ownerId = 'p2';
+      engine.state.properties[3].ownerId = 'p2';
+      engine.state.properties[1].isMortgaged = true;
+      engine.rollDice(1, 2); // Alice lands on 3
+      expect(engine.state.players[0].money).toBe(1500 - 4 * 2);
+    });
+
+    it('cannot build in a color set while any of its deeds is mortgaged', () => {
+      const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+      engine.state.properties[1].ownerId = 'p1';
+      engine.state.properties[3].ownerId = 'p1';
+      engine.state.properties[1].isMortgaged = true;
+      engine.state.players[0].position = 3;
+      engine.state.players[0].lapsCompleted = 1;
+      expect(() => engine.build(3)).toThrow(/Lift the mortgage on/);
+    });
+
+    it('mortgaged deeds can be traded; the receiver pays 10% interest and it stays mortgaged', () => {
+      const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
+      engine.state.properties[39].ownerId = 'p1';
+      engine.state.properties[39].isMortgaged = true;
+      const t = engine.proposeTrade('p1', { toId: 'p2', giveMoney: 0, giveProps: [39], getMoney: 100, getProps: [] });
+      engine.respondToTrade(t.id, 'p2', true);
+      expect(engine.state.properties[39].ownerId).toBe('p2');
+      expect(engine.state.properties[39].isMortgaged).toBe(true);
+      expect(engine.state.players[1].money).toBe(1500 - 100 - 20);
+      expect(engine.state.players[0].money).toBe(1600);
+    });
+  });
+
+  describe('surrender, turn timer and persistence', () => {
+    const three = () => [
+      ...seats,
+      { ...seats[1], seatIndex: 2, playerId: 'p3', displayName: 'Cara', color: 'green' as const, tokenType: 'dog' as const, isHost: false }
+    ];
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('surrender on your own turn returns everything to the Bank and passes the turn', () => {
+      const engine = new MonopolyGameEngine('room123', three(), { specialVictory: false });
+      engine.state.properties[1].ownerId = 'p1';
+      engine.state.properties[1].buildLevel = 2;
+      engine.state.bank.houses = 30;
+      engine.surrender('p1');
+      const alice = engine.state.players[0];
+      expect(alice.isBankrupt).toBe(true);
+      expect(alice.surrendered).toBe(true);
+      expect(engine.state.properties[1].ownerId).toBeNull();
+      expect(engine.state.bank.houses).toBe(32);
+      expect(engine.getCurrentPlayer().playerId).toBe('p2');
+      expect(engine.state.phase).toBe('ROLLING');
+    });
+
+    it('surrender off-turn keeps the turn; the last one standing wins', () => {
+      const engine = new MonopolyGameEngine('room123', three(), { specialVictory: false });
+      engine.surrender('p3');
+      expect(engine.getCurrentPlayer().playerId).toBe('p1');
+      expect(engine.state.phase).toBe('ROLLING');
+      engine.surrender('p1');
+      expect(engine.state.phase).toBe('GAME_OVER');
+      expect(engine.state.winnerId).toBe('p2');
+      expect(() => engine.surrender('p2')).toThrow(/game is over/i);
+    });
+
+    it('surrendering in debt pays the creditor from the sale', () => {
+      const engine = new MonopolyGameEngine('room123', three(), { specialVictory: false });
+      engine.state.phase = 'DEBT';
+      engine.state.debt = { amount: 400, creditorId: 'p2', reason: 'rent' };
+      engine.state.players[0].money = 100;
+      engine.state.properties[39].ownerId = 'p1'; // mortgage value 200
+      engine.surrender('p1');
+      expect(engine.state.players[1].money).toBe(1500 + 300);
+      expect(engine.state.debt).toBeNull();
+      expect(engine.getCurrentPlayer().playerId).toBe('p2');
+    });
+
+    it('the turn timer plays the turn when it runs out', () => {
+      vi.useFakeTimers();
+      const dice: number[] = [];
+      const engine = new MonopolyGameEngine('room123', seats, {
+        specialVictory: false,
+        turnTimerSec: 30,
+        onDice: (d) => dice.push(d.d1 + d.d2)
+      });
+      engine.checkAndApplyVictory();
+      (engine as unknown as { notify: () => void }).notify();
+      expect(engine.state.turnDeadline).toBeGreaterThan(Date.now());
+      vi.advanceTimersByTime(30_000);
+      expect(dice).toHaveLength(1);
+      expect(engine.state.players[0].timeouts).toBe(1);
+      engine.markActive('p1');
+      expect(engine.state.players[0].timeouts).toBe(0);
+    });
+
+    it('an offline player is auto-played on a short clock and removed after 3 missed turns', () => {
+      vi.useFakeTimers();
+      const engine = new MonopolyGameEngine('room123', three(), { specialVictory: false });
+      engine.setConnected('p1', false);
+      expect(engine.state.turnDeadline).not.toBeNull();
+      const alice = engine.state.players[0];
+      // Keep it Alice's turn: the auto-played decisions all belong to her.
+      for (let i = 0; i < 3 && !alice.isBankrupt; i++) {
+        engine.state.currentPlayerIndex = 0;
+        engine.state.phase = 'TURN_ENDED';
+        engine.state.doubles = false;
+        (engine as unknown as { turnKey: string }).turnKey = '';
+        (engine as unknown as { notify: () => void }).notify();
+        vi.advanceTimersByTime(20_000);
+      }
+      expect(alice.isBankrupt).toBe(true);
+      expect(alice.surrendered).toBe(true);
+    });
+
+    it('snapshot / restore rebuilds the same game (decks included)', () => {
+      const engine = new MonopolyGameEngine('room123', seats, { specialVictory: true, turnTimerSec: 60 });
+      engine.rollDice(1, 2);
+      engine.respondToBuyOffer(true);
+      const snap = JSON.parse(JSON.stringify(engine.snapshot()));
+      engine.dispose();
+      const back = MonopolyGameEngine.restore(snap);
+      expect(back.state.properties[3].ownerId).toBe('p1');
+      expect(back.state.players.every((p) => !p.isConnected)).toBe(true);
+      expect(back.snapshot().chance).toEqual(snap.chance);
+      expect(back.options.turnTimerSec).toBe(60);
+      back.dispose();
+    });
   });
 
   describe('original Chance / Community Chest cards', () => {

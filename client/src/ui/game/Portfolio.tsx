@@ -1,6 +1,16 @@
 import React from 'react';
-import { BOARD_TILES, COLOR_GROUPS, PropertyState, TileGroup } from '@monopoly/shared';
-import { ArrowUpCircle, Banknote, Castle, Landmark, Lock, MapPin, Undo2 } from 'lucide-react';
+import {
+  BOARD_TILES,
+  COLOR_GROUPS,
+  PropertyState,
+  TileGroup,
+  buildingRefund,
+  mortgageBlockReason,
+  mortgageValue,
+  unmortgageCost as liftCost
+} from '@monopoly/shared';
+import { ArrowUpCircle, Banknote, Castle, ChevronRight, Landmark, Lock, MapPin, Undo2 } from 'lucide-react';
+import { useGameStore } from '../../store/gameStore.js';
 import { socket } from '../../net/socket.js';
 import { audioManager } from '../../sound/audioManager.js';
 import { useTurn } from './useTurn.js';
@@ -24,8 +34,11 @@ interface PortfolioProps {
 
 export const Portfolio: React.FC<PortfolioProps> = ({ hideSummary, liquidOnly }) => {
   const turn = useTurn();
+  const setInfoTile = useGameStore((s) => s.setInfoTile);
   if (!turn || !turn.me) return null;
-  const { game, me, canManage, upgrade } = turn;
+  const { game, me, upgrade } = turn;
+  // Selling and mortgaging are allowed at any time (not only on your turn).
+  const canManage = !me.isBankrupt && game.phase !== 'GAME_OVER';
 
   let props = ownedBy(game, me.playerId);
   if (liquidOnly) props = props.filter((p) => !p.isMortgaged);
@@ -97,12 +110,13 @@ export const Portfolio: React.FC<PortfolioProps> = ({ hideSummary, liquidOnly })
                 const buildable = tile.buildCost > 0;
                 const standingHere = upgrade?.prop.tileIndex === p.tileIndex;
                 const canSell = canManage && buildable && p.buildLevel > 0 && !p.isMortgaged;
+                const mortgageBlock = mortgageBlockReason(game, me.playerId, p.tileIndex);
                 const canMortgage = canManage && p.buildLevel === 0 && !p.isMortgaged;
-                const unmortgageCost = Math.floor((tile.price / 2) * 1.1);
+                const unmortgageCost = liftCost(p.tileIndex);
                 const canUnmortgage = canManage && p.isMortgaged && !liquidOnly;
                 return (
                   <li key={p.tileIndex} className={`deed-row ${p.isMortgaged ? 'mortgaged' : ''} ${standingHere ? 'here' : ''}`}>
-                    <div className="deed-main">
+                    <button className="deed-main" onClick={() => setInfoTile(p.tileIndex)} title="Details, rent table and selling options">
                       <span className="deed-name">
                         <span className="truncate">{tile.name}</span>
                         {p.forceBought && <Lock size={12} className="deed-lock" aria-label="Landmark locked (force-bought)" />}
@@ -119,8 +133,9 @@ export const Portfolio: React.FC<PortfolioProps> = ({ hideSummary, liquidOnly })
                           <span>{tile.type === 'railroad' ? 'Airport' : 'Utility'}</span>
                         )}
                         {!p.isMortgaged && <span className="deed-rent tnum">Rent {rentLabel(game, p)}</span>}
+                        <ChevronRight size={13} className="deed-more" />
                       </span>
-                    </div>
+                    </button>
                     <div className="deed-actions">
                       {standingHere && upgrade && !liquidOnly && (
                         <button
@@ -134,15 +149,20 @@ export const Portfolio: React.FC<PortfolioProps> = ({ hideSummary, liquidOnly })
                         </button>
                       )}
                       {canSell && (
-                        <button className="mini-btn" onClick={() => sell(p.tileIndex)} title={`Sell one level for ${money(Math.floor(tile.buildCost / 2))}`}>
+                        <button className="mini-btn" onClick={() => sell(p.tileIndex)} title={`Sell one level for ${money(buildingRefund(p.tileIndex, 1))}`}>
                           <Banknote size={14} />
-                          <span className="tnum">+{money(Math.floor(tile.buildCost / 2))}</span>
+                          <span className="tnum">+{money(buildingRefund(p.tileIndex, 1))}</span>
                         </button>
                       )}
                       {canMortgage && (
-                        <button className="mini-btn" onClick={() => mortgage(p.tileIndex, true)} title={`Mortgage for ${money(Math.floor(tile.price / 2))}`}>
+                        <button
+                          className="mini-btn"
+                          onClick={() => mortgage(p.tileIndex, true)}
+                          disabled={!!mortgageBlock}
+                          title={mortgageBlock ?? `Mortgage for ${money(mortgageValue(p.tileIndex))}`}
+                        >
                           <Landmark size={14} />
-                          <span className="tnum">+{money(Math.floor(tile.price / 2))}</span>
+                          <span className="tnum">+{money(mortgageValue(p.tileIndex))}</span>
                         </button>
                       )}
                       {canUnmortgage && (
@@ -150,7 +170,7 @@ export const Portfolio: React.FC<PortfolioProps> = ({ hideSummary, liquidOnly })
                           className="mini-btn"
                           onClick={() => mortgage(p.tileIndex, false)}
                           disabled={me.money < unmortgageCost}
-                          title={`Pay off mortgage for ${money(unmortgageCost)}`}
+                          title={`Lift the mortgage for ${money(unmortgageCost)} (value + 10% interest)`}
                         >
                           <Undo2 size={14} />
                           <span className="tnum">{money(unmortgageCost)}</span>

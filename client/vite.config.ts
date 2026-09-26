@@ -4,6 +4,8 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [react()],
+  // Shared .env at the repo root (VITE_* values reach the client).
+  envDir: path.resolve(__dirname, '..'),
   resolve: {
     alias: {
       '@monopoly/shared': path.resolve(__dirname, '../shared/src'),

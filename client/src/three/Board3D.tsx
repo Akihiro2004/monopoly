@@ -1,11 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { BOARD_TILES, BuildLevel } from '@monopoly/shared';
 import { BOARD_COORDINATES } from './boardCoords.js';
 import { useGameStore } from '../store/gameStore.js';
 import { BuildingMesh } from './BuildingMesh.js';
 import { CenterBoard } from './CenterBoard.js';
-import { BoardTextures, loadBoardTextures } from './tileTextures.js';
+import { BAND_HEX, BoardTextures, loadBoardTextures } from './tileTextures.js';
 import { playerHex } from '../ui/theme.js';
 
 const FRAME_H = 0.55;
@@ -34,7 +35,16 @@ const Tile = React.memo(function Tile({
   const coord = BOARD_COORDINATES[index];
   const [w, h, d] = coord.size;
   return (
-    <group position={coord.position} rotation={coord.rotation}>
+    <group
+      position={coord.position}
+      rotation={coord.rotation}
+      onClick={(e) => {
+        // Ignore the end of an orbit drag.
+        if (e.delta > 8) return;
+        e.stopPropagation();
+        useGameStore.getState().setInfoTile(index);
+      }}
+    >
       <mesh receiveShadow material={materials}>
         <boxGeometry args={[w * 0.985, h, d * 0.985]} />
       </mesh>
@@ -55,11 +65,49 @@ const Tile = React.memo(function Tile({
 
       {/* Buildings stand on the color band (inner edge) */}
       {ownerHex && (
-        <BuildingMesh level={level} mortgaged={mortgaged} tileIndex={index} position={[0, h / 2, -d * 0.36]} color={ownerHex} />
+        <BuildingMesh
+          level={level}
+          mortgaged={mortgaged}
+          tileIndex={index}
+          position={[0, h / 2, -d * 0.36]}
+          color={ownerHex}
+          base={BAND_HEX[BOARD_TILES[index].group]}
+        />
       )}
     </group>
   );
 });
+
+// Gold frame around the tile the player is looking at (tile info / planner).
+const FocusMarker: React.FC = () => {
+  const tile = useGameStore((s) => s.focusTile);
+  const ring = useRef<THREE.Group>(null);
+  useFrame(({ clock }) => {
+    if (ring.current) ring.current.position.y = 0.1 + Math.sin(clock.elapsedTime * 4) * 0.03;
+  });
+  if (tile === null) return null;
+  const coord = BOARD_COORDINATES[tile];
+  const [w, h, d] = coord.size;
+  const t = 0.09;
+  const bars: [number, number, number, number][] = [
+    [0, -d / 2, w + t, t],
+    [0, d / 2, w + t, t],
+    [-w / 2, 0, t, d + t],
+    [w / 2, 0, t, d + t]
+  ];
+  return (
+    <group position={coord.position} rotation={coord.rotation}>
+      <group ref={ring} position={[0, h / 2 + 0.1, 0]}>
+        {bars.map(([x, z, sx, sz], i) => (
+          <mesh key={i} position={[x, 0, z]}>
+            <boxGeometry args={[sx, 0.06, sz]} />
+            <meshStandardMaterial color="#ffc629" emissive="#ffb300" emissiveIntensity={0.8} />
+          </mesh>
+        ))}
+      </group>
+    </group>
+  );
+};
 
 export const Board3D: React.FC = () => {
   const gameState = useGameStore((s) => s.gameState);
@@ -110,6 +158,7 @@ export const Board3D: React.FC = () => {
       </mesh>
 
       <CenterBoard texture={textures?.center ?? null} />
+      <FocusMarker />
 
       {BOARD_COORDINATES.map((coord) => {
         const prop = gameState?.properties[coord.index];

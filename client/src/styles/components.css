@@ -498,6 +498,32 @@
   top: calc(18px + var(--safe-top));
 }
 
+/* In game: small notes in the bottom-left corner, newest at the bottom,
+   out of the way of the board and the turn banner. */
+.app-root:not(.screen-menu) .toast-stack {
+  top: auto;
+  bottom: 24px;
+  left: 16px;
+  transform: none;
+  width: min(340px, calc(100vw - 32px));
+  align-items: flex-start;
+  justify-content: flex-end;
+}
+
+.app-root:not(.screen-menu) .toast {
+  padding: 8px 12px;
+  font-size: 0.84rem;
+  box-shadow: 0 3px 0 var(--ink);
+  animation: toast-in 0.3s var(--ease-out);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+}
+
 .toast {
   pointer-events: auto;
   display: flex;

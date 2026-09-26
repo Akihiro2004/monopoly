@@ -113,6 +113,7 @@ const UTILITIES = [12, 28];
 export function rentLabel(game: GameState, p: PropertyState): string {
   const tile = BOARD_TILES[p.tileIndex];
   if (!tile || !p.ownerId) return '';
+  if (p.isMortgaged) return 'No rent';
   const ownsActive = (idx: number) =>
     game.properties[idx]?.ownerId === p.ownerId && !game.properties[idx]?.isMortgaged;
   if (tile.type === 'railroad') {

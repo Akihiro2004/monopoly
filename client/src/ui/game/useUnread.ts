@@ -1,21 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../../store/gameStore.js';
 
-// Counts chat messages from others that arrived while the chat was hidden.
+// Counts chat messages from other players that arrived while the chat was
+// hidden (a running counter, so the history cap never hides new messages).
 export function useUnreadChat(visible: boolean): number {
-  const messages = useGameStore((s) => s.chatMessages);
-  const [unread, setUnread] = useState(0);
-  const seen = useRef(messages.length);
+  const received = useGameStore((s) => s.chatFromOthers);
+  const seen = useRef(received);
+  const [, force] = useState(0);
 
   useEffect(() => {
-    if (visible) {
-      seen.current = messages.length;
-      setUnread(0);
-    } else if (messages.length > seen.current) {
-      setUnread((u) => u + (messages.length - seen.current));
-      seen.current = messages.length;
+    if (visible && seen.current !== received) {
+      seen.current = received;
+      force((n) => n + 1);
     }
-  }, [messages.length, visible]);
+  }, [visible, received]);
 
-  return unread;
+  // A counter reset (new room) drops the baseline too.
+  if (received < seen.current) seen.current = received;
+  return visible ? 0 : received - seen.current;
 }

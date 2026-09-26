@@ -12,6 +12,25 @@ export function registerGameHandlers(
   socket: Socket<ClientToServerEvents, ServerToClientEvents>,
   roomManager: RoomManager
 ) {
+  // Any action by a player resets their missed-turn streak (turn timer).
+  socket.onAny((event: string) => {
+    if (!/^(game|auction|trade):/.test(event)) return;
+    const info = roomManager.getPlayerBySocket(socket.id);
+    if (info) roomManager.getRoom(info.roomId)?.engine?.markActive(info.playerId);
+  });
+
+  socket.on('game:surrender', () => {
+    const info = roomManager.getPlayerBySocket(socket.id);
+    if (!info) return;
+    const room = roomManager.getRoom(info.roomId);
+    if (!room || !room.engine) return;
+    try {
+      room.engine.surrender(info.playerId);
+    } catch (e: any) {
+      socket.emit('error', { message: e.message });
+    }
+  });
+
   socket.on('game:roll', () => {
     const info = roomManager.getPlayerBySocket(socket.id);
     if (!info) return;
@@ -85,19 +104,27 @@ export function registerGameHandlers(
     }
   });
 
-  socket.on('game:sell', ({ tileIndex }) => {
+  socket.on('game:sell', ({ tileIndex, toLevel }) => {
     const info = roomManager.getPlayerBySocket(socket.id);
     if (!info) return;
     const room = roomManager.getRoom(info.roomId);
     if (!room || !room.engine) return;
 
-    const cur = room.engine.getCurrentPlayer();
-    if (cur.playerId !== info.playerId) {
-      return socket.emit('error', { message: 'Can only sell on your turn' });
+    try {
+      room.engine.sell(tileIndex, info.playerId, toLevel);
+    } catch (e: any) {
+      socket.emit('error', { message: e.message });
     }
+  });
+
+  socket.on('game:sellProperty', ({ tileIndex }) => {
+    const info = roomManager.getPlayerBySocket(socket.id);
+    if (!info) return;
+    const room = roomManager.getRoom(info.roomId);
+    if (!room || !room.engine) return;
 
     try {
-      room.engine.sell(tileIndex);
+      room.engine.sellProperty(tileIndex, info.playerId);
     } catch (e: any) {
       socket.emit('error', { message: e.message });
     }
@@ -128,7 +155,7 @@ export function registerGameHandlers(
     if (!room || !room.engine) return;
 
     try {
-      room.engine.mortgage(tileIndex, mortgage);
+      room.engine.mortgage(tileIndex, mortgage, info.playerId);
     } catch (e: any) {
       socket.emit('error', { message: e.message });
     }
@@ -204,6 +231,10 @@ export function registerGameHandlers(
 
   socket.on('trade:cancel', ({ tradeId }) => {
     withEngine((engine, playerId) => engine.cancelTrade(tradeId, playerId));
+  });
+
+  socket.on('trade:counter', ({ tradeId, proposal }) => {
+    withEngine((engine, playerId) => engine.counterTrade(tradeId, playerId, proposal ?? ({} as never)));
   });
 
   socket.on('chat:send', ({ text }) => {

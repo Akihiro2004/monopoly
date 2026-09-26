@@ -17,6 +17,10 @@ export function buildBlockReason(state: GameState, player: PlayerState, tileInde
     return `You must stand on ${tile.name} to upgrade it. Build right after landing on your own property.`;
   }
   if (prop.isMortgaged) return 'Cannot build on a mortgaged property';
+  const mortgagedInSet = (COLOR_GROUPS[tile.group] ?? []).find((i) => state.properties[i]?.isMortgaged);
+  if (mortgagedInSet !== undefined) {
+    return `Lift the mortgage on ${BOARD_TILES[mortgagedInSet].name} before building in this color set`;
+  }
   if (prop.buildLevel >= 4) return `${tile.name} is already a Landmark`;
   if (prop.buildLevel === 0 && player.lapsCompleted < 1) {
     return 'Pass GO once before you start building houses';
@@ -64,9 +68,10 @@ export function supplyBlockReason(state: GameState, level: number): string | nul
 }
 
 /** Why a property cannot be traded (null = tradeable). */
+// Deeds change hands together with their buildings (house rule: no need to
+// sell down first); mortgaged deeds can be traded too (see tradeMortgageFees).
 export function tradeBlockReason(prop: PropertyState | undefined, ownerId: string): string | null {
   if (!prop || prop.ownerId !== ownerId) return 'Property is not owned by that player';
-  if (prop.buildLevel > 0) return `Sell the buildings on ${BOARD_TILES[prop.tileIndex].name} before trading it`;
   return null;
 }
 
@@ -79,4 +84,55 @@ export function liquidationValue(state: GameState, playerId: string): number {
     const land = p.isMortgaged ? 0 : Math.floor(tile.price / 2);
     return sum + buildings + land;
   }, 0);
+}
+
+// ------------------------------------------------------------------
+// Mortgages (classic rules)
+// ------------------------------------------------------------------
+
+/** Cash the Bank lends when a deed is mortgaged (half the price). */
+export function mortgageValue(tileIndex: number): number {
+  return Math.floor((BOARD_TILES[tileIndex]?.price ?? 0) / 2);
+}
+
+/** Lifting a mortgage: the mortgage value plus 10% interest. */
+export function unmortgageCost(tileIndex: number): number {
+  return mortgageValue(tileIndex) + mortgageTransferFee(tileIndex);
+}
+
+/** 10% interest a new owner pays when a mortgaged deed changes hands. */
+export function mortgageTransferFee(tileIndex: number): number {
+  return Math.ceil(mortgageValue(tileIndex) / 10);
+}
+
+/** Half the build cost back per building level sold to the Bank. */
+export function buildingRefund(tileIndex: number, levels: number): number {
+  return Math.floor((BOARD_TILES[tileIndex]?.buildCost ?? 0) / 2) * Math.max(0, levels);
+}
+
+/** Why `playerId` cannot mortgage `tileIndex` (null = allowed). */
+export function mortgageBlockReason(state: GameState, playerId: string, tileIndex: number): string | null {
+  const tile = BOARD_TILES[tileIndex];
+  const prop = state.properties[tileIndex];
+  if (!tile || !prop || prop.ownerId !== playerId) return 'You do not own this property';
+  if (prop.isMortgaged) return `${tile.name} is already mortgaged`;
+  // Only bare land: every building in the color set must be sold first.
+  const built = (COLOR_GROUPS[tile.group] ?? [tileIndex]).filter((i) => (state.properties[i]?.buildLevel ?? 0) > 0);
+  if (built.length) {
+    const names = built.map((i) => BOARD_TILES[i].name).join(', ');
+    return `Sell the buildings in this color set first (${names})`;
+  }
+  return null;
+}
+
+/** Cash received when selling a whole deed (and its buildings) to the Bank. */
+export function sellToBankValue(prop: PropertyState): number {
+  // A mortgaged deed returns nothing: the Bank keeps it to cancel the loan.
+  const land = prop.isMortgaged ? 0 : mortgageValue(prop.tileIndex);
+  return land + buildingRefund(prop.tileIndex, prop.buildLevel);
+}
+
+/** Fees `receiverId` pays for mortgaged deeds received in a trade. */
+export function tradeMortgageFees(state: GameState, props: number[]): number {
+  return props.reduce((sum, i) => sum + (state.properties[i]?.isMortgaged ? mortgageTransferFee(i) : 0), 0);
 }

@@ -1,6 +1,6 @@
-import React, { Suspense, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { Canvas, useThree } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, PerformanceMonitor, PerspectiveCamera } from '@react-three/drei';
 import type { PerspectiveCamera as PerspectiveCameraImpl, Vector3 } from 'three';
 import { useGameStore } from '../store/gameStore.js';
@@ -100,25 +100,84 @@ const CameraRig: React.FC<Insets> = (ins) => {
     [key]
   );
 
-  useEffect(() => {
-    const el = (elevDeg * Math.PI) / 180;
-    camera.position.set(0, fit.dist * Math.sin(el), fit.tz + fit.dist * Math.cos(el));
-    if (controls) {
-      controls.maxDistance = Math.max(40, fit.dist * 1.4);
-      controls.target.set(0, 0.4, fit.tz);
-      controls.update();
-    } else {
-      camera.lookAt(0, 0.4, fit.tz);
-    }
-    invalidate();
-  }, [fit, elevDeg, camera, controls, invalidate]);
+  // Glide to a new framing (panel opened / closed, planner docked) instead of
+  // jumping; the very first framing and window resizes apply instantly.
+  type Off = [number, number, number, number];
+  const applied = useRef<{ w: number; h: number; off: Off } | null>(null);
+  const anim = useRef<{
+    start: number;
+    fromPos: THREE.Vector3;
+    toPos: THREE.Vector3;
+    fromTarget: THREE.Vector3;
+    toTarget: THREE.Vector3;
+    fromOff: Off;
+    toOff: Off;
+  } | null>(null);
+
+  const setOffset = (off: Off) => {
+    if (off[0] !== w || off[1] !== h || off[2] !== 0 || off[3] !== 0) camera.setViewOffset(off[0], off[1], off[2], off[3], w, h);
+    else camera.clearViewOffset();
+  };
 
   useEffect(() => {
-    if (fit.pad > 0 || fit.offX > 0 || fit.fullW !== w) camera.setViewOffset(fit.fullW, fit.fullH, fit.offX, fit.pad, w, h);
-    else camera.clearViewOffset();
+    const el = (elevDeg * Math.PI) / 180;
+    const toPos = new THREE.Vector3(0, fit.dist * Math.sin(el), fit.tz + fit.dist * Math.cos(el));
+    const toTarget = new THREE.Vector3(0, 0.4, fit.tz);
+    const toOff: Off = [fit.fullW, fit.fullH, fit.offX, fit.pad];
+    if (controls) controls.maxDistance = Math.max(40, fit.dist * 1.4);
+    const prev = applied.current;
+    applied.current = { w, h, off: toOff };
+
+    if (!prev || prev.w !== w || prev.h !== h) {
+      anim.current = null;
+      camera.position.copy(toPos);
+      if (controls) {
+        controls.target.copy(toTarget);
+        controls.update();
+      } else {
+        camera.lookAt(toTarget);
+      }
+      setOffset(toOff);
+      invalidate();
+      return;
+    }
+    anim.current = {
+      start: performance.now(),
+      fromPos: camera.position.clone(),
+      toPos,
+      fromTarget: controls ? controls.target.clone() : toTarget.clone(),
+      toTarget,
+      fromOff: prev.off,
+      toOff
+    };
+    usePerfStore.getState().bump(800);
     invalidate();
-    return () => camera.clearViewOffset();
-  }, [camera, w, h, fit, invalidate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fit, elevDeg, camera, controls, invalidate, w, h]);
+
+  useEffect(() => () => camera.clearViewOffset(), [camera]);
+  useEffect(() => {
+    if (import.meta.env.DEV) (window as unknown as { __cam: unknown }).__cam = { camera, controls, fit };
+  }, [camera, controls, fit]);
+
+  useFrame(() => {
+    const a = anim.current;
+    if (!a) return;
+    const raw = Math.min(1, (performance.now() - a.start) / 550);
+    const k = raw < 0.5 ? 4 * raw * raw * raw : 1 - Math.pow(-2 * raw + 2, 3) / 2; // ease in-out
+    camera.position.lerpVectors(a.fromPos, a.toPos, k);
+    if (controls) {
+      controls.target.lerpVectors(a.fromTarget, a.toTarget, k);
+      controls.update();
+    } else {
+      camera.lookAt(a.toTarget);
+    }
+    const off = a.fromOff.map((v, i) => v + (a.toOff[i] - v) * k) as Off;
+    setOffset(raw >= 1 ? a.toOff : off);
+    // Keep frames coming until the glide lands, however slow the device is.
+    if (raw >= 1) anim.current = null;
+    else invalidate();
+  });
 
   return null;
 };
@@ -139,6 +198,7 @@ const FrameDriver: React.FC<{ idleFps: number }> = ({ idleFps }) => {
           s.diceRoll !== prev.diceRoll ||
           s.goCelebration !== prev.goCelebration ||
           s.cardDraw !== prev.cardDraw ||
+          s.focusTile !== prev.focusTile ||
           s.isWalking !== prev.isWalking
         ) {
           bump(s.goCelebration !== prev.goCelebration ? 3000 : 2500);

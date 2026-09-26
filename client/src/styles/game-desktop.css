@@ -296,7 +296,28 @@
   text-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
   -webkit-text-stroke: 1px var(--ink);
   transition: transform 0.1s ease, box-shadow 0.1s ease;
-  animation: roll-bob 1.6s ease-in-out infinite;
+}
+
+/* Calm idle: a soft halo that breathes (no movement) */
+.roll-btn::before {
+  content: '';
+  position: absolute;
+  inset: -22px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 198, 41, 0.55), transparent 65%);
+  z-index: -1;
+  animation: halo 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes halo {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.9;
+  }
 }
 
 .roll-btn svg {
@@ -308,8 +329,7 @@
 }
 
 .roll-btn:active {
-  animation: none;
-  transform: translateY(6px);
+  transform: translateY(6px) scale(0.94);
   box-shadow:
     inset 0 -6px 0 rgba(0, 0, 0, 0.2),
     0 2px 0 var(--ink),
@@ -317,13 +337,20 @@
     0 0 0 11px var(--ink);
 }
 
-@keyframes roll-bob {
-  0%,
-  100% {
-    transform: translateY(0) rotate(0);
+/* Press: squash, spring back, the dice icon spins, a burst pops out */
+.roll-btn.pressed {
+  animation: roll-press 0.42s var(--ease-spring);
+}
+
+@keyframes roll-press {
+  0% {
+    transform: translateY(6px) scale(0.86, 0.8);
   }
-  50% {
-    transform: translateY(-6px) rotate(-3deg);
+  45% {
+    transform: translateY(-6px) scale(1.12, 1.14);
+  }
+  100% {
+    transform: none;
   }
 }
 

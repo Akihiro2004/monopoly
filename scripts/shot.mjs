@@ -145,7 +145,7 @@ async function navigate(cdp, url) {
 async function main() {
   await fs.mkdir(OUT_DIR, { recursive: true });
 
-  server = spawn(process.execPath, ['server/dist/index.js'], { env: { ...process.env, PORT: String(PORT) }, stdio: 'ignore' });
+  server = spawn(process.execPath, ['server/dist/index.js'], { env: { ...process.env, PORT: String(PORT), PERSIST: 'off' }, stdio: 'ignore' });
   for (let i = 0; i < 40; i++) {
     try {
       const res = await fetch(APP);
@@ -198,7 +198,7 @@ async function main() {
   await navigate(bob, APP);
   await sleep(600);
   await bob.eval(setInput('input[name="player-name"]', 'Bob'));
-  await bob.eval(clickIf('.segmented button:nth-child(2)'));
+  await bob.eval(clickIf('.mode-tickets button:nth-child(2)'));
   await sleep(150);
   await bob.eval(setInput('input[name="room-code"]', roomCode));
   await sleep(150);

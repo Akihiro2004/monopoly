@@ -8,6 +8,7 @@ export type VictoryType = 'bankruptcy' | 'triple_victory' | 'line_victory';
 export interface RoomSettings {
   maxPlayers: number;
   specialVictory: boolean; // LINE Get Rich: Triple Victory & Line Victory enabled
+  // Seconds per decision before the server plays the turn (0 = off).
   turnTimeoutSec: number;
 }
 
@@ -99,6 +100,10 @@ export interface PlayerState {
   consecutiveDoubles: number;
   // Times this player has passed / landed on GO. Building on land needs >= 1.
   lapsCompleted: number;
+  // Left the game by surrendering (also counted as bankrupt).
+  surrendered?: boolean;
+  // Turns in a row the server had to play for this player (turn timer).
+  timeouts?: number;
 }
 
 export type GamePhase =
@@ -151,6 +156,23 @@ export interface TradeOffer {
   getMoney: number;
   getProps: number[];
   createdAt: number;
+  // Negotiation: 1 = first offer, +1 per counter-offer.
+  round?: number;
+  // Short note from the sender ("add $50 and it's yours").
+  message?: string;
+  // Earlier rounds, oldest first (terms as the sender of that round saw them).
+  history?: TradeTerms[];
+}
+
+/** One round of a negotiation: `fromId` gives `give*` and asks for `get*`. */
+export interface TradeTerms {
+  fromId: string;
+  toId: string;
+  giveMoney: number;
+  giveProps: number[];
+  getMoney: number;
+  getProps: number[];
+  message?: string;
 }
 
 // A drawn Chance / Community Chest card, broadcast for the info modal.
@@ -225,6 +247,8 @@ export interface GameState {
   winnerId: string | null;
   victoryType: VictoryType | null;
   lastActionText: string;
+  // When the current decision times out (ms timestamp), null = no timer.
+  turnDeadline?: number | null;
 }
 
 // Chat

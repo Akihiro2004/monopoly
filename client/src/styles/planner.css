@@ -556,3 +556,8 @@
 .planner-scroll > * {
   flex-shrink: 0;
 }
+
+/* Modals opened from / during the debt planner stack above it */
+.modal-backdrop.over-planner {
+  z-index: 170;
+}
