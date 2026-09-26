@@ -73,15 +73,15 @@ describe('Monopoly Game Engine (LINE Get Rich rules)', () => {
     expect(engine.state.phase).toBe('TURN_ENDED');
   });
 
-  it('auctions a property the lander cannot afford', () => {
+  it('landing on a property you cannot afford leaves it unowned (no forced auction)', () => {
     const engine = new MonopolyGameEngine('room123', seats, { specialVictory: true });
     engine.state.players[0].money = 10;
     engine.rollDice(1, 2);
 
     expect(engine.state.buyOffer).toBeNull();
-    expect(engine.state.phase).toBe('AUCTION');
-    engine.finishAuction();
+    expect(engine.state.phase).toBe('TURN_ENDED');
     expect(engine.state.properties[3].ownerId).toBeNull();
+    expect(engine.state.players[0].money).toBe(10);
   });
 
   it('triggers force-buy offer when landing on opponent developed property', () => {
@@ -215,6 +215,40 @@ describe('Monopoly Game Engine (LINE Get Rich rules)', () => {
 
     engine.build(1);
     expect(engine.state.properties[1].buildLevel).toBe(1);
+  });
+
+  it('landing exactly on GO allows building on any owned property', () => {
+    const engine = new MonopolyGameEngine('room123', seats, { specialVictory: true });
+    engine.state.properties[1].ownerId = 'p1';
+    engine.state.properties[3].ownerId = 'p1';
+    engine.state.players[0].position = 0; // standing on GO, not on either deed
+    engine.state.players[0].lapsCompleted = 1;
+
+    engine.build(3);
+    expect(engine.state.properties[3].buildLevel).toBe(1);
+    engine.build(1);
+    expect(engine.state.properties[1].buildLevel).toBe(1);
+  });
+
+  it('random board-wide events stay off unless explicitly enabled', () => {
+    const engine = new MonopolyGameEngine('room123', seats, { specialVictory: true });
+    engine.state.phase = 'TURN_ENDED';
+    const spy = vi.spyOn(Math, 'random').mockReturnValue(0); // would always fire if enabled
+    engine.endTurn();
+    spy.mockRestore();
+    expect(engine.state.phase).not.toBe('AUCTION');
+    expect(engine.state.activeEvent).toBeNull();
+  });
+
+  it('a random event can auction off an unowned property when enabled', () => {
+    const engine = new MonopolyGameEngine('room123', seats, { specialVictory: true, randomEvents: true });
+    engine.state.phase = 'TURN_ENDED';
+    const spy = vi.spyOn(Math, 'random').mockReturnValue(0);
+    engine.endTurn();
+    spy.mockRestore();
+    expect(engine.state.phase).toBe('AUCTION');
+    expect(engine.state.auction?.tileIndex).toBe(1);
+    expect(engine.state.auction?.highBid).toBe(60); // opens at the deed price
   });
 
   it('sells one building level for half the build cost and auto-pays debt when covered', () => {
@@ -424,24 +458,26 @@ describe('Monopoly Game Engine (LINE Get Rich rules)', () => {
     expect(engine.state.players[0].money).toBe(100);
   });
 
-  it('auction: highest bidder pays the Bank and takes the deed; bids are validated', () => {
+  it('auction: bidding opens at the deed price; highest bidder pays the Bank and takes the deed', () => {
     const engine = new MonopolyGameEngine('room123', seats, { specialVictory: false });
     engine.rollDice(1, 2);
     engine.respondToBuyOffer(false);
 
-    expect(() => engine.placeBid('p2', 5)).toThrow(/at least \$10/);
-    engine.placeBid('p2', 20);
-    expect(() => engine.placeBid('p1', 25)).toThrow(/at least \$30/);
-    engine.placeBid('p1', 30);
-    engine.placeBid('p2', 45);
+    // Tile 3 (Penang) lists for $60: the auction can never sell it cheaper.
+    expect(engine.state.auction?.highBid).toBe(60);
+    expect(() => engine.placeBid('p2', 5)).toThrow(/at least \$70/);
+    engine.placeBid('p2', 70);
+    expect(() => engine.placeBid('p1', 75)).toThrow(/at least \$80/);
+    engine.placeBid('p1', 80);
+    engine.placeBid('p2', 95);
     expect(() => engine.placeBid('p1', 99999)).toThrow(/only have/);
     engine.finishAuction();
 
     expect(engine.state.properties[3].ownerId).toBe('p2');
-    expect(engine.state.players[1].money).toBe(1455);
+    expect(engine.state.players[1].money).toBe(1405);
     expect(engine.state.phase).toBe('TURN_ENDED');
     const txn = engine.state.bank.ledger.at(-1)!;
-    expect(txn).toMatchObject({ fromId: 'p2', toId: null, amount: 45 });
+    expect(txn).toMatchObject({ fromId: 'p2', toId: null, amount: 95 });
   });
 
   it('the Bank has a limited supply of houses and hotels', () => {

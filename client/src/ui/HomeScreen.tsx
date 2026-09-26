@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { socket, saveSession, loadSession, loadRecentSessions } from '../net/socket.js';
+import { socket, saveSession, loadSession, loadRecentSessions, saveLastName, loadLastName } from '../net/socket.js';
 import { useAccount } from '../net/account.js';
 import { ResumeCard } from './session/Resume.js';
 import { AccountChip } from './session/AccountChip.js';
@@ -52,13 +52,17 @@ type Mode = 'create' | 'join';
 export const HomeScreen: React.FC = () => {
   const saved = loadSession() ?? loadRecentSessions()[0] ?? null;
   const accountName = useAccount((s) => (s.anonymous ? null : s.name));
-  const [name, setName] = useState(saved?.name || '');
+  const [name, setName] = useState(saved?.name || loadLastName());
   const [joinCode, setJoinCode] = useState('');
   const [mode, setMode] = useState<Mode>('create');
 
   // Prefill the name from a Google account once it is known.
   useEffect(() => {
-    if (accountName && !name) setName(accountName.slice(0, 15));
+    if (accountName && !name) {
+      const trimmed = accountName.slice(0, 15);
+      setName(trimmed);
+      saveLastName(trimmed);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountName]);
   const [busy, setBusy] = useState(false);
@@ -187,7 +191,10 @@ export const HomeScreen: React.FC = () => {
                     autoComplete="nickname"
                     maxLength={15}
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(e) => {
+                      setName(e.target.value);
+                      saveLastName(e.target.value);
+                    }}
                   />
                 </span>
               </label>

@@ -58,10 +58,13 @@ export async function initAccount(): Promise<void> {
         return;
       }
       const token = await user.getIdToken();
+      // Google accounts usually have a displayName; fall back to the part of
+      // the email before "@" (e.g. "legendwijaya") when it's missing.
+      const name = user.displayName || (user.email ? user.email.split('@')[0] : null);
       useAccount.setState({
         status: 'ready',
         uid: user.uid,
-        name: user.displayName,
+        name,
         photo: user.photoURL,
         anonymous: user.isAnonymous
       });
@@ -101,7 +104,8 @@ export async function signInWithGoogle(): Promise<void> {
         // Name / photo arrive with the link; force a token refresh so the
         // server sees the new provider.
         await current.getIdToken(true);
-        useAccount.setState({ name: current.displayName, photo: current.photoURL, anonymous: false });
+        const name = current.displayName || (current.email ? current.email.split('@')[0] : null);
+        useAccount.setState({ name, photo: current.photoURL, anonymous: false });
         return;
       } catch (e) {
         // This Google account already exists: switch to it.

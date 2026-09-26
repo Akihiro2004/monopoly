@@ -7,6 +7,7 @@ import {
   PropertyState,
   buildBlockReason,
   buildingRefund,
+  effectiveBuildCost,
   mortgageBlockReason,
   mortgageValue,
   sellToBankValue,
@@ -77,15 +78,16 @@ export function buildProperty(
     return { success: false, text: blocked ?? 'Invalid property' };
   }
 
-  player.money -= tile.buildCost;
+  const cost = effectiveBuildCost(gameState, tileIndex);
+  player.money -= cost;
   movePieces(gameState, prop.buildLevel, prop.buildLevel + 1);
   prop.buildLevel = (prop.buildLevel + 1) as BuildLevel;
-  record(gameState, player.playerId, null, tile.buildCost, `Built on ${tile.name}`);
+  record(gameState, player.playerId, null, cost, `Built on ${tile.name}`);
 
   const levelNames = ['Land', 'House (Lv 1)', 'Building (Lv 2)', 'Hotel (Lv 3)', 'LANDMARK (Lv 4)'];
   const newLevelName = levelNames[prop.buildLevel];
 
-  const msg = `${player.name} upgraded ${tile.name} to ${newLevelName} for $${tile.buildCost}.`;
+  const msg = `${player.name} upgraded ${tile.name} to ${newLevelName} for $${cost}.`;
   gameState.lastActionText = msg;
   return { success: true, text: msg };
 }

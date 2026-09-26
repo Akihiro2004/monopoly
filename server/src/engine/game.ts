@@ -39,11 +39,26 @@ function shuffle<T>(list: T[]): T[] {
   return list;
 }
 
+// Between turns, there's a small chance something happens to the whole
+// board: a rough 1-in-6 roll, and never more than one event at a time.
+const RANDOM_EVENT_CHANCE = 1 / 6;
+const RANDOM_EVENT_DURATION_TURNS = 6;
+type RandomEventKind =
+  | 'property_lottery'
+  | 'market_crash'
+  | 'building_boom'
+  | 'bank_bonus'
+  | 'leaders_tax'
+  | 'property_swap';
+
 export interface GameEngineOptions {
   specialVictory: boolean;
   // Seconds per decision before the server plays for the current player
   // (0 / undefined = no turn timer).
   turnTimerSec?: number;
+  // Opt in to the occasional board-wide random events (Market Crash, Bank
+  // Bonus, ...). Off by default so unit tests stay deterministic.
+  randomEvents?: boolean;
   onStateChange?: (state: GameState) => void;
   onToast?: (toast: { text: string; type?: 'info' | 'success' | 'warning' | 'danger' }) => void;
   onCard?: (draw: CardDraw) => void;
@@ -113,6 +128,7 @@ export class MonopolyGameEngine {
       lastMove: null,
       bank: createBank(),
       auction: null,
+      activeEvent: null,
       winnerId: null,
       victoryType: null,
       lastActionText: 'Game started. Roll to begin.'
@@ -275,7 +291,9 @@ export class MonopolyGameEngine {
     this.state.phase = 'AUCTION';
     this.state.auction = {
       tileIndex,
-      highBid: 0,
+      // Bidding opens at the deed's listed price: the property can never
+      // sell for less than the Bank would have charged for it outright.
+      highBid: BOARD_TILES[tileIndex].price,
       highBidderId: null,
       endsAt: Date.now() + AUCTION_MS,
       bidders: []
@@ -805,11 +823,148 @@ export class MonopolyGameEngine {
     this.state.currentPlayerIndex = nextIdx;
     this.state.turnNumber++;
     this.state.phase = 'ROLLING';
+    this.expireActiveEvent();
 
     const nextPlayer = this.state.players[nextIdx];
     this.emitToast(`It is now ${nextPlayer.name}'s turn.`, 'info');
+    this.maybeTriggerRandomEvent();
     this.checkAndApplyVictory();
     this.notify();
+  }
+
+  // ------------------------------------------------------------------
+  // Random board-wide events
+  // ------------------------------------------------------------------
+
+  private expireActiveEvent(): void {
+    const event = this.state.activeEvent;
+    if (event && this.state.turnNumber > event.expiresAtTurn) {
+      this.state.activeEvent = null;
+    }
+  }
+
+  private maybeTriggerRandomEvent(): void {
+    if (!this.options.randomEvents) return;
+    // Never interrupt a decision already in progress (auction, debt, etc).
+    if (this.state.phase !== 'ROLLING') return;
+    if (Math.random() >= RANDOM_EVENT_CHANCE) return;
+
+    const active = this.state.players.filter((p) => !p.isBankrupt);
+    const unownedTiles = BOARD_TILES.filter(
+      (t) => t.price > 0 && this.state.properties[t.index]?.ownerId === null
+    ).map((t) => t.index);
+    const owners = active.filter((p) =>
+      Object.values(this.state.properties).some((prop) => prop.ownerId === p.playerId)
+    );
+
+    const eligible: RandomEventKind[] = [];
+    if (unownedTiles.length > 0) eligible.push('property_lottery');
+    if (!this.state.activeEvent) eligible.push('market_crash', 'building_boom');
+    if (active.length > 0) eligible.push('bank_bonus');
+    if (active.length >= 2) eligible.push('leaders_tax');
+    if (owners.length >= 2) eligible.push('property_swap');
+    if (eligible.length === 0) return;
+
+    const kind = eligible[Math.floor(Math.random() * eligible.length)];
+    switch (kind) {
+      case 'property_lottery':
+        this.eventPropertyLottery(unownedTiles);
+        break;
+      case 'market_crash':
+        this.eventMarketCrash();
+        break;
+      case 'building_boom':
+        this.eventBuildingBoom();
+        break;
+      case 'bank_bonus':
+        this.eventBankBonus(active);
+        break;
+      case 'leaders_tax':
+        this.eventLeadersTax(active);
+        break;
+      case 'property_swap':
+        this.eventPropertySwap(owners);
+        break;
+    }
+  }
+
+  // Bank spontaneously auctions off a random unowned property.
+  private eventPropertyLottery(unownedTiles: number[]): void {
+    const tileIndex = unownedTiles[Math.floor(Math.random() * unownedTiles.length)];
+    this.emitToast(`Random event! The Bank puts ${BOARD_TILES[tileIndex].name} up for auction.`, 'warning');
+    this.startAuction(tileIndex);
+  }
+
+  // Rent is halved everywhere for a few turns.
+  private eventMarketCrash(): void {
+    this.state.activeEvent = {
+      type: 'market_crash',
+      label: 'Market Crash: rent halved',
+      factor: 0.5,
+      expiresAtTurn: this.state.turnNumber + RANDOM_EVENT_DURATION_TURNS
+    };
+    this.emitToast(
+      `Random event! Market Crash — rent is halved board-wide for the next ${RANDOM_EVENT_DURATION_TURNS} turns.`,
+      'warning'
+    );
+  }
+
+  // Building costs are discounted for a few turns.
+  private eventBuildingBoom(): void {
+    this.state.activeEvent = {
+      type: 'building_boom',
+      label: 'Building Boom: 50% off construction',
+      factor: 0.5,
+      expiresAtTurn: this.state.turnNumber + RANDOM_EVENT_DURATION_TURNS
+    };
+    this.emitToast(
+      `Random event! Building Boom — house/hotel upgrades are 50% off for the next ${RANDOM_EVENT_DURATION_TURNS} turns.`,
+      'success'
+    );
+  }
+
+  // Everyone still playing gets a small surprise windfall from the Bank.
+  private eventBankBonus(active: PlayerState[]): void {
+    const parts: string[] = [];
+    for (const p of active) {
+      const bonus = 50 + Math.floor(Math.random() * 11) * 10; // $50..$150
+      p.money += bonus;
+      record(this.state, null, p.playerId, bonus, 'Random event: Bank Bonus');
+      parts.push(`${p.name} +$${bonus}`);
+    }
+    this.emitToast(`Random event! Bank Bonus — ${parts.join(', ')}.`, 'success');
+  }
+
+  // Catch-up mechanic: the richest player pays 10% of their cash straight
+  // to the poorest, so a runaway leader can't coast forever.
+  private eventLeadersTax(active: PlayerState[]): void {
+    const richest = [...active].sort((a, b) => b.money - a.money)[0];
+    const poorest = [...active].filter((p) => p.playerId !== richest.playerId).sort((a, b) => a.money - b.money)[0];
+    if (!richest || !poorest || richest.money <= 0) return;
+    const tax = Math.max(10, Math.round(richest.money * 0.1));
+    richest.money -= tax;
+    poorest.money += tax;
+    record(this.state, richest.playerId, poorest.playerId, tax, 'Random event: Wealth Tax');
+    this.emitToast(`Random event! Wealth Tax — ${richest.name} pays $${tax} to ${poorest.name}.`, 'warning');
+  }
+
+  // Chaos mechanic: two random property owners each swap a random deed.
+  private eventPropertySwap(owners: PlayerState[]): void {
+    const [a, b] = shuffle([...owners]).slice(0, 2);
+    const tilesOf = (playerId: string) =>
+      Object.entries(this.state.properties)
+        .filter(([, prop]) => prop.ownerId === playerId)
+        .map(([idx]) => Number(idx));
+    const aTiles = tilesOf(a.playerId);
+    const bTiles = tilesOf(b.playerId);
+    const aTile = aTiles[Math.floor(Math.random() * aTiles.length)];
+    const bTile = bTiles[Math.floor(Math.random() * bTiles.length)];
+    this.state.properties[aTile].ownerId = b.playerId;
+    this.state.properties[bTile].ownerId = a.playerId;
+    this.emitToast(
+      `Random event! Property Swap Storm — ${a.name} and ${b.name} swap ${BOARD_TILES[aTile].name} and ${BOARD_TILES[bTile].name}!`,
+      'warning'
+    );
   }
 
   public checkAndApplyVictory(): boolean {
@@ -889,7 +1044,7 @@ export class MonopolyGameEngine {
     }
     if (this.state.auction?.highBidderId === playerId) {
       this.state.auction.highBidderId = null;
-      this.state.auction.highBid = 0;
+      this.state.auction.highBid = BOARD_TILES[this.state.auction.tileIndex].price;
     }
 
     while ((player.jailCardDecks?.length ?? 0) > 0) this.returnJailCard(player);

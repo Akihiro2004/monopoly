@@ -1,0 +1,14 @@
+[Unit]
+Description=TMpoly Monopoly game server
+After=network.target
+
+[Service]
+Type=simple
+User=darrien
+WorkingDirectory=/home/darrien/projects/monopoly
+ExecStart=/usr/bin/npm start
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

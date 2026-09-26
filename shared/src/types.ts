@@ -206,6 +206,17 @@ export interface BankState {
   nextTxnId: number;
 }
 
+// Random board-wide event, rolled occasionally between turns. Only one is
+// active at a time; it clears itself once turnNumber passes expiresAtTurn.
+export type ActiveEventType = 'market_crash' | 'building_boom';
+
+export interface ActiveEvent {
+  type: ActiveEventType;
+  label: string; // shown to players, e.g. "Market Crash! Rent halved"
+  factor: number; // rent or build-cost multiplier while active
+  expiresAtTurn: number;
+}
+
 // Bank auction of a property the landing player declined / could not afford.
 export interface AuctionState {
   tileIndex: number;
@@ -244,6 +255,7 @@ export interface GameState {
   lastMove: MoveRecord | null;
   bank: BankState;
   auction: AuctionState | null;
+  activeEvent: ActiveEvent | null;
   winnerId: string | null;
   victoryType: VictoryType | null;
   lastActionText: string;

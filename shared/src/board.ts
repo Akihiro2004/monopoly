@@ -78,6 +78,7 @@ export const SIDES_PURCHASABLE: number[][] = [
 export const STARTING_MONEY = 1500;
 export const GO_SALARY = 200;
 export const JAIL_FINE = 50;
+export const GO_TILE_INDEX = 0;
 export const JAIL_TILE_INDEX = 10;
 export const GO_TO_JAIL_TILE_INDEX = 30;
 export const FORCE_BUY_TIMER_MS = 15000;

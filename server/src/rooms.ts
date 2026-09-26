@@ -362,7 +362,8 @@ export class RoomManager {
     room.status = 'playing';
     room.engine = new MonopolyGameEngine(room.roomId, room.seats, {
       specialVictory: room.settings.specialVictory,
-      turnTimerSec: room.settings.turnTimeoutSec
+      turnTimerSec: room.settings.turnTimeoutSec,
+      randomEvents: true
     });
     for (const seat of room.seats) {
       const p = room.engine.state.players.find((pl) => pl.playerId === seat.playerId);
@@ -622,7 +623,7 @@ export class RoomManager {
           hostPlayerId: s.hostPlayerId,
           settings: s.settings,
           seats: s.seats.map((seat) => ({ ...seat, isConnected: false })),
-          engine: s.engine ? MonopolyGameEngine.restore(s.engine) : null,
+          engine: s.engine ? MonopolyGameEngine.restore(s.engine, { randomEvents: true }) : null,
           status: s.status,
           createdAt: s.createdAt,
           tokens: s.tokens ?? {},

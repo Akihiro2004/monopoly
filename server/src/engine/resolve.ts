@@ -88,9 +88,9 @@ export function resolveLanding(
         return { needsForceBuyChoice: false, toast: msg };
       } else {
         gameState.buyOffer = null;
-        const msg = `${player.name} cannot afford ${tile.name} ($${tile.price}). The Bank puts it up for auction.`;
+        const msg = `${player.name} landed on ${tile.name} but can't afford the $${tile.price} asking price.`;
         gameState.lastActionText = msg;
-        return { needsForceBuyChoice: false, toast: msg, auctionTile: tileIndex };
+        return { needsForceBuyChoice: false, toast: msg };
       }
     }
 
