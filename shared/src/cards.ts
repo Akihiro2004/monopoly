@@ -3,6 +3,8 @@ export type CardType = 'chance' | 'chest';
 // Card actions (the classic US Monopoly decks, mapped onto the world board).
 export type CardAction =
   | { type: 'money'; amount: number; text: string } // + collect from Bank, - pay the Bank
+  // tileIndex is the classic World board index; other boards map it to the
+  // same city through BoardDef.cardTargets.
   | { type: 'moveTo'; tileIndex: number; text: string } // collect $200 if passing GO
   | { type: 'moveBack'; spaces: number; text: string }
   | { type: 'nearest'; kind: 'railroad' | 'utility'; text: string }

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { BOARD_TILES, JAIL_FINE } from '@monopoly/shared';
+import { JAIL_FINE } from '@monopoly/shared';
 import { ArrowUpCircle, Castle, Check, Dices, Footprints, Gavel, Info, KeyRound, Lock, RotateCcw, Zap } from 'lucide-react';
 import { socket } from '../../net/socket.js';
 import { audioManager } from '../../sound/audioManager.js';
@@ -8,6 +8,7 @@ import { PlayerAvatar } from '../common/PlayerAvatar.js';
 import { LEVEL_NAMES, money } from '../theme.js';
 import { useCountdown } from './useCountdown.js';
 import { useTurn } from './useTurn.js';
+import { currentBoard } from '../../board.js';
 
 const click = (fn: () => void) => () => {
   audioManager.playClick();
@@ -187,7 +188,7 @@ export const ActionPanel: React.FC<{ variant: 'desktop' | 'mobile' }> = ({ varia
         <div className="action-status auction-status">
           <Gavel size={18} className="status-icon" />
           <span>
-            Auction · {BOARD_TILES[a.tileIndex].name} · {a.highBid > 0 ? `${money(a.highBid)} (${leader?.playerId === myPlayerId ? 'you' : leader?.name})` : 'no bids'} ·{' '}
+            Auction · {currentBoard().tiles[a.tileIndex].name} · {a.highBid > 0 ? `${money(a.highBid)} (${leader?.playerId === myPlayerId ? 'you' : leader?.name})` : 'no bids'} ·{' '}
             {auctionLeft}s
           </span>
           {!me?.isBankrupt && (
@@ -204,7 +205,7 @@ export const ActionPanel: React.FC<{ variant: 'desktop' | 'mobile' }> = ({ varia
     text = phase === 'DEBT' ? 'Raise cash to cover your debt' : 'Make your choice…';
   } else if (game.forceBuyOffer) {
     const fb = game.forceBuyOffer;
-    const tile = BOARD_TILES[fb.tileIndex];
+    const tile = currentBoard().tiles[fb.tileIndex];
     if (fb.targetPlayerId === myPlayerId) {
       tone = 'danger';
       icon = <Zap size={18} className="status-icon" fill="currentColor" />;
@@ -213,7 +214,7 @@ export const ActionPanel: React.FC<{ variant: 'desktop' | 'mobile' }> = ({ varia
       text = `${current.name} is weighing a force-buy of ${tile.name}… ${forceLeft}s`;
     }
   } else if (game.buyOffer) {
-    const tile = BOARD_TILES[game.buyOffer.tileIndex];
+    const tile = currentBoard().tiles[game.buyOffer.tileIndex];
     text = `${current.name} is deciding on ${tile.name} (${money(game.buyOffer.price)})`;
   } else if (phase === 'DEBT' && game.debt) {
     text = `${current.name} owes ${money(game.debt.amount)} and is raising cash`;

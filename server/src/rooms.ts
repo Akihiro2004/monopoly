@@ -1,7 +1,9 @@
 import crypto from 'crypto';
 import { customAlphabet } from 'nanoid';
 import {
-  BOARD_TILES,
+  BOARD_IDS,
+  BoardId,
+  boardOf,
   PROTOCOL_VERSION,
   ForceBuyMode,
   LeaderboardEntry,
@@ -12,10 +14,13 @@ import {
   TokenType
 } from '@monopoly/shared';
 import { EngineSnapshot, MonopolyGameEngine } from './engine/game.js';
+import { pickBotName } from './bots/names.js';
+import type { BotDriver } from './bots/driver.js';
 
 // Room codes: 6 characters people can read out loud (no 0/O, 1/I/L, and no
 // '-' / '_', which the join box does not accept).
 const roomCode = customAlphabet('ABCDEFGHJKMNPQRSTUVWXYZ23456789', 6);
+const botId = customAlphabet('abcdefghijklmnopqrstuvwxyz0123456789', 10);
 
 const AVAILABLE_COLORS: PlayerColor[] = ['red', 'blue', 'green', 'yellow', 'purple', 'orange'];
 const AVAILABLE_TOKENS: TokenType[] = ['car', 'hat', 'dog', 'ship', 'thimble', 'boot'];
@@ -42,6 +47,8 @@ export interface RoomSession {
   finishedAt?: number;
   // Seats held by signed-in accounts (Firebase uid = playerId).
   accounts?: string[];
+  // Plays the bot seats while the game runs (not persisted).
+  bots?: BotDriver;
 }
 
 /** Everything persisted per room (engine as a snapshot). */
@@ -76,6 +83,7 @@ export interface MatchRecord {
     bankrupt: boolean;
     surrendered: boolean;
     account?: boolean;
+    bot?: boolean;
   }[];
 }
 
@@ -84,6 +92,7 @@ export function rankPlayers(matches: MatchRecord[], limit: number): LeaderboardE
   const by = new Map<string, LeaderboardEntry>();
   for (const m of matches) {
     for (const p of m.players) {
+      if (p.bot) continue; // bots don't take leaderboard spots
       // Accounts are one player everywhere; guests (a new id per browser tab)
       // are grouped by name.
       const key = p.account ? `a:${p.playerId}` : `g:${p.name.trim().toLowerCase()}`;
@@ -167,7 +176,8 @@ export class RoomManager {
         specialVictory: true,
         turnTimeoutSec: 90,
         forceBuyMode: 'developed',
-        randomEvents: true
+        randomEvents: true,
+        board: 'world'
       },
       seats: [hostSeat],
       engine: null,
@@ -351,6 +361,46 @@ export class RoomManager {
     return true;
   }
 
+  public setBoard(roomId: string, playerId: string, board: BoardId): boolean {
+    const room = this.rooms.get(roomId);
+    if (!room || room.status !== 'waiting' || room.hostPlayerId !== playerId) return false;
+    if (!BOARD_IDS.includes(board)) return false;
+    room.settings.board = board;
+    this.persist(roomId);
+    return true;
+  }
+
+  /** Host fills an open lobby seat with a computer player. */
+  public addBot(roomId: string, hostId: string): { ok: boolean; seat?: Seat; error?: string } {
+    const room = this.rooms.get(roomId);
+    if (!room) return { ok: false, error: 'Room not found' };
+    if (room.hostPlayerId !== hostId) return { ok: false, error: 'Only the host can add bots' };
+    if (room.status !== 'waiting') return { ok: false, error: 'Bots can only join before the game starts' };
+    if (room.seats.length >= room.settings.maxPlayers) return { ok: false, error: 'Room is full (max 6)' };
+
+    const seatIndex = room.seats.length;
+    const usedColors = new Set(room.seats.map((s) => s.color));
+    const usedTokens = new Set(room.seats.map((s) => s.tokenType));
+    const pick = <T>(all: T[], used: Set<T>) => {
+      const free = all.filter((x) => !used.has(x));
+      return free.length ? free[Math.floor(Math.random() * free.length)] : all[seatIndex % all.length];
+    };
+    const seat: Seat = {
+      seatIndex,
+      playerId: `bot-${botId()}`,
+      displayName: pickBotName(room.seats.map((s) => s.displayName)),
+      tokenType: pick(AVAILABLE_TOKENS, usedTokens),
+      color: pick(AVAILABLE_COLORS, usedColors),
+      isReady: true,
+      isConnected: true,
+      isHost: false,
+      isBot: true
+    };
+    room.seats.push(seat);
+    this.persist(roomId);
+    return { ok: true, seat };
+  }
+
   /** Host removes someone from the lobby (before the game starts). */
   public kick(roomId: string, hostId: string, targetId: string): { ok: boolean; sockets?: string[]; error?: string } {
     const room = this.rooms.get(roomId);
@@ -386,7 +436,8 @@ export class RoomManager {
       specialVictory: room.settings.specialVictory,
       turnTimerSec: room.settings.turnTimeoutSec,
       randomEvents: room.settings.randomEvents,
-      forceBuyMode: room.settings.forceBuyMode
+      forceBuyMode: room.settings.forceBuyMode,
+      boardId: room.settings.board ?? 'world'
     });
     for (const seat of room.seats) {
       const p = room.engine.state.players.find((pl) => pl.playerId === seat.playerId);
@@ -431,7 +482,7 @@ export class RoomManager {
     const worth = (id: string, money: number) =>
       Object.values(st.properties).reduce((sum, p) => {
         if (p.ownerId !== id) return sum;
-        const t = BOARD_TILES[p.tileIndex];
+        const t = boardOf(st).tiles[p.tileIndex];
         return sum + (p.isMortgaged ? Math.floor(t.price / 2) : t.price) + t.buildCost * p.buildLevel;
       }, money);
     return {
@@ -449,7 +500,8 @@ export class RoomManager {
         netWorth: p.isBankrupt ? 0 : worth(p.playerId, p.money),
         bankrupt: p.isBankrupt,
         surrendered: !!p.surrendered,
-        account: room.accounts?.includes(p.playerId) ?? false
+        account: room.accounts?.includes(p.playerId) ?? false,
+        ...(p.isBot ? { bot: true } : {})
       }))
     };
   }
@@ -521,12 +573,14 @@ export class RoomManager {
       room.seats.splice(seatIdx, 1);
       room.seats.forEach((s, i) => (s.seatIndex = i));
       delete room.tokens[info.playerId];
-      if (wasHost && room.seats.length > 0) {
-        room.seats[0].isHost = true;
-        room.seats[0].isReady = true;
-        room.hostPlayerId = room.seats[0].playerId;
+      // The host role passes to a person; a lobby of only bots closes.
+      const heir = room.seats.find((s) => !s.isBot);
+      if (wasHost && heir) {
+        heir.isHost = true;
+        heir.isReady = true;
+        room.hostPlayerId = heir.playerId;
       }
-      if (room.seats.length === 0) {
+      if (!heir) {
         this.deleteRoom(room.roomId);
         return { ok: true };
       }
@@ -553,7 +607,8 @@ export class RoomManager {
       settings: {
         ...room.settings,
         forceBuyMode: room.settings.forceBuyMode ?? 'developed',
-        randomEvents: room.settings.randomEvents ?? true
+        randomEvents: room.settings.randomEvents ?? true,
+        board: room.settings.board ?? 'world'
       },
       seats: room.seats,
       winnerId: room.engine?.state.winnerId ?? null,
@@ -570,7 +625,7 @@ export class RoomManager {
   public sweep(now = Date.now()): string[] {
     const removed: string[] = [];
     for (const room of this.rooms.values()) {
-      const anyoneHere = room.seats.some((s) => s.isConnected);
+      const anyoneHere = room.seats.some((s) => s.isConnected && !s.isBot);
       if (anyoneHere) room.lastSeenAt = now;
       const idle = now - room.lastSeenAt;
       const expired =
@@ -588,6 +643,7 @@ export class RoomManager {
   private deleteRoom(roomId: string): void {
     const room = this.rooms.get(roomId);
     room?.engine?.dispose();
+    room?.bots?.dispose();
     this.rooms.delete(roomId);
     for (const [sid, m] of [...this.socketToPlayer.entries()]) if (m.roomId === roomId) this.socketToPlayer.delete(sid);
     const t = this.saveTimers.get(roomId);
@@ -652,13 +708,14 @@ export class RoomManager {
         const settings: RoomSettings = {
           ...s.settings,
           forceBuyMode: s.settings.forceBuyMode ?? 'developed',
-          randomEvents: s.settings.randomEvents ?? true
+          randomEvents: s.settings.randomEvents ?? true,
+          board: s.settings.board ?? 'world'
         };
         const room: RoomSession = {
           roomId: s.roomId,
           hostPlayerId: s.hostPlayerId,
           settings,
-          seats: s.seats.map((seat) => ({ ...seat, isConnected: false })),
+          seats: s.seats.map((seat) => ({ ...seat, isConnected: !!seat.isBot })),
           engine: s.engine
             ? MonopolyGameEngine.restore(s.engine, {
                 randomEvents: settings.randomEvents,

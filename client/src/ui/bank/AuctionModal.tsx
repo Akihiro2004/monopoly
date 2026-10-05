@@ -1,5 +1,5 @@
 import React from 'react';
-import { AUCTION_MIN_INCREMENT, AUCTION_MS, BOARD_TILES } from '@monopoly/shared';
+import { AUCTION_MIN_INCREMENT, AUCTION_MS } from '@monopoly/shared';
 import { Gavel } from 'lucide-react';
 import { socket } from '../../net/socket.js';
 import { useGameStore } from '../../store/gameStore.js';
@@ -9,6 +9,7 @@ import { PlayerAvatar } from '../common/PlayerAvatar.js';
 import { TitleDeed } from '../common/TitleDeed.js';
 import { useCountdown } from '../game/useCountdown.js';
 import { auctionKey, money } from '../theme.js';
+import { currentBoard } from '../../board.js';
 
 const RING = 2 * Math.PI * 20;
 const STEPS = [AUCTION_MIN_INCREMENT, 50, 100];
@@ -35,7 +36,7 @@ export const AuctionModal: React.FC = () => {
   if (!me || me.isBankrupt) return null;
 
   const { auction } = game;
-  const tile = BOARD_TILES[auction.tileIndex];
+  const tile = currentBoard().tiles[auction.tileIndex];
   const leader = game.players.find((p) => p.playerId === auction.highBidderId);
   const iLead = auction.highBidderId === myPlayerId;
   const progress = Math.min(1, (left * 1000) / AUCTION_MS);

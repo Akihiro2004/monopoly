@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { GO_SALARY } from '@monopoly/shared';
+
 import { useGameStore } from '../../store/gameStore.js';
 import { PlayerAvatar } from '../common/PlayerAvatar.js';
 import { money } from '../theme.js';
+import { currentBoard } from '../../board.js';
 
 // "PASSED GO! +$200" sticker that pops over the board for a moment.
 export const GoBanner: React.FC = () => {
@@ -32,7 +33,7 @@ export const GoBanner: React.FC = () => {
           <span className="go-title">Passed GO!</span>
           <span className="go-sub">{player.playerId === myPlayerId ? 'You collect' : `${player.name} collects`}</span>
         </div>
-        <span className="go-amount tnum">+{money(GO_SALARY)}</span>
+        <span className="go-amount tnum">+{money(currentBoard().goSalary)}</span>
       </div>
       {Array.from({ length: 10 }).map((_, i) => (
         <span key={i} className="go-coin" style={{ '--i': i } as React.CSSProperties} />

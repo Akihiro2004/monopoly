@@ -1,7 +1,8 @@
 import React from 'react';
-import { ForceBuyMode, PlayerColor, RoomState, Seat, TokenType } from '@monopoly/shared';
-import { Check, ChevronLeft, Copy, Crown, Lock, Play, Share2, Shuffle, Swords, Timer, Trophy, UserPlus, X } from 'lucide-react';
-import { Logo, Sky } from '../common/Sky.js';
+import { BoardId, ForceBuyMode, PlayerColor, RoomState, Seat, TokenType } from '@monopoly/shared';
+import { Bot, Map as MapIcon, Check, ChevronLeft, Copy, Crown, Lock, Play, Share2, Shuffle, Swords, Timer, Trophy, UserPlus, X } from 'lucide-react';
+import { Logo } from '../common/Logo.js';
+import { MenuScene } from '../menu/MenuScene.js';
 import { PlayerAvatar } from '../common/PlayerAvatar.js';
 import { TOKENS, COLORS } from '../lobbyConstants.js';
 import { useGameStore } from '../../store/gameStore.js';
@@ -16,6 +17,8 @@ export interface LobbyActions {
   start: () => void;
   leave: () => void;
   kick: (playerId: string) => void;
+  addBot: () => void;
+  setBoard: (board: BoardId) => void;
   toggleSpecialVictory: () => void;
   setTurnTimer: (sec: number) => void;
   setForceBuyMode: (mode: ForceBuyMode) => void;
@@ -42,8 +45,8 @@ export const MobileLobby: React.FC<{
   const myToken = TOKENS.find((t) => t.type === me?.tokenType);
 
   return (
-    <div className="menu-screen lobby-screen m-lobby">
-      <Sky />
+    <div className="menu-screen mx lobby-screen m-lobby">
+      <MenuScene />
 
       <header className="m-lobby-bar">
         <button className="icon-btn" onClick={actions.leave} aria-label="Leave room" title="Leave room">
@@ -68,14 +71,14 @@ export const MobileLobby: React.FC<{
         <section className="m-card m-table">
           <div className="m-code-row">
             <button className="m-code" onClick={actions.copyCode} title="Copy room code">
-              <small>Room code</small>
+              <small>Table code</small>
               <b className="tnum">{room.roomId}</b>
             </button>
-            <button className="icon-btn m-code-btn gold" onClick={actions.copyCode} aria-label="Copy code">
+            <button className="mx-btn gold m-code-btn" onClick={actions.copyCode} aria-label="Copy code">
               <Copy size={18} />
             </button>
             {actions.share && (
-              <button className="icon-btn m-code-btn blue" onClick={actions.share} aria-label="Share invite">
+              <button className="mx-btn violet m-code-btn" onClick={actions.share} aria-label="Share invite">
                 <Share2 size={18} />
               </button>
             )}
@@ -90,6 +93,17 @@ export const MobileLobby: React.FC<{
           <ul className="m-seats">
             {Array.from({ length: max }, (_, i) => {
               const seat = room.seats[i];
+              if (!seat && isHost && i === room.seats.length) {
+                // The first open chair: the host can seat a bot there.
+                return (
+                  <li key={`e${i}`} className="m-seat empty add-bot">
+                    <button className="m-seat-empty" onClick={actions.addBot} aria-label="Add a bot" title="Add a bot">
+                      <Bot size={18} />
+                    </button>
+                    <small>Add bot</small>
+                  </li>
+                );
+              }
               if (!seat) {
                 return (
                   <li key={`e${i}`} className="m-seat empty" title="Open seat">
@@ -109,6 +123,10 @@ export const MobileLobby: React.FC<{
                     {seat.isHost ? (
                       <span className="m-seat-badge host" aria-label="Host">
                         <Crown size={11} strokeWidth={3} />
+                      </span>
+                    ) : seat.isBot ? (
+                      <span className="m-seat-badge bot" aria-label="Computer player" title="Computer player">
+                        <Bot size={11} strokeWidth={3} />
                       </span>
                     ) : ready ? (
                       <span className="m-seat-badge ready" aria-label="Ready">
@@ -172,6 +190,7 @@ export const MobileLobby: React.FC<{
                     aria-label={takenBy ? `${c.color}, taken by ${takenBy.displayName}` : c.color}
                   >
                     {active && <Check size={15} strokeWidth={3.5} />}
+                    {takenBy && <Lock size={13} strokeWidth={3} />}
                   </button>
                 );
               })}
@@ -184,6 +203,23 @@ export const MobileLobby: React.FC<{
           <div className="m-card-title">
             Game rules {!isHost && <span className="m-host-note">Set by the host</span>}
           </div>
+
+          <RuleRow icon={<MapIcon size={16} />} title="Board" sub={s.board === 'grand' ? '56 tiles, 12 countries, tolls & jackpot' : '40 tiles, 8 countries'} stacked>
+            <div className="m-seg" role="radiogroup" aria-label="Board">
+              {(['world', 'grand'] as BoardId[]).map((b) => (
+                <button
+                  key={b}
+                  role="radio"
+                  aria-checked={(s.board ?? 'world') === b}
+                  className={(s.board ?? 'world') === b ? 'active' : ''}
+                  onClick={() => actions.setBoard(b)}
+                  disabled={!isHost}
+                >
+                  {b === 'grand' ? 'Grand World' : 'World'}
+                </button>
+              ))}
+            </div>
+          </RuleRow>
 
           <RuleRow icon={<Trophy size={16} />} title="Special victories" sub="3 full sets or a whole side wins">
             <button
@@ -246,17 +282,14 @@ export const MobileLobby: React.FC<{
       <footer className="m-lobby-foot">
         <p className="lobby-hint">{isHost ? startHint : me?.isReady ? 'Waiting for the host to start.' : 'Pick your look, then ready up.'}</p>
         {isHost ? (
-          <button className="btn btn-primary btn-xl btn-block btn-start" onClick={actions.start} disabled={!canStart}>
-            <Play size={20} fill="currentColor" />
+          <button className="mx-cta gold btn-start" onClick={actions.start} disabled={!canStart}>
+            <Play size={22} fill="currentColor" />
             <span>Start game</span>
           </button>
         ) : (
-          <button
-            className={`btn btn-xl btn-block btn-ready ${me?.isReady ? 'btn-secondary is-ready' : 'btn-success'}`}
-            onClick={actions.toggleReady}
-          >
-            <Check size={20} strokeWidth={3} />
-            <span>{me?.isReady ? "I'm ready (tap to undo)" : 'Ready up'}</span>
+          <button className={`mx-cta btn-ready ${me?.isReady ? 'ghost is-ready' : 'green'}`} onClick={actions.toggleReady}>
+            <Check size={22} strokeWidth={3.2} />
+            <span>{me?.isReady ? 'Ready (tap to undo)' : 'Ready up'}</span>
           </button>
         )}
       </footer>

@@ -1,10 +1,4 @@
-import {
-  BOARD_TILES,
-  COLOR_GROUPS,
-  SIDES_PURCHASABLE,
-  GameState,
-  VictoryType
-} from '@monopoly/shared';
+import { GameState, SIDE_NAMES, VictoryType, boardOf } from '@monopoly/shared';
 
 export interface VictoryResult {
   hasWinner: boolean;
@@ -22,6 +16,7 @@ export interface VictoryResult {
  */
 export function checkVictory(gameState: GameState, specialVictoryEnabled: boolean): VictoryResult {
   const activePlayers = gameState.players.filter((p) => !p.isBankrupt);
+  const board = boardOf(gameState);
 
   // 1. Bankruptcy elimination
   if (activePlayers.length === 1 && gameState.players.length > 1) {
@@ -42,8 +37,7 @@ export function checkVictory(gameState: GameState, specialVictoryEnabled: boolea
     for (const player of activePlayers) {
       // Check Triple Victory (owns all properties of 3 distinct color groups)
       let completedColorGroups = 0;
-      for (const groupName of Object.keys(COLOR_GROUPS)) {
-        const tileIndices = COLOR_GROUPS[groupName];
+      for (const tileIndices of Object.values(board.groups)) {
         const ownsAll = tileIndices.every((idx) => {
           const prop = gameState.properties[idx];
           return prop && prop.ownerId === player.playerId && !prop.isMortgaged;
@@ -63,8 +57,8 @@ export function checkVictory(gameState: GameState, specialVictoryEnabled: boolea
       }
 
       // Check Line Victory (owns all purchasable properties on any 1 side of the board)
-      for (let sideIndex = 0; sideIndex < SIDES_PURCHASABLE.length; sideIndex++) {
-        const sideTiles = SIDES_PURCHASABLE[sideIndex];
+      for (let sideIndex = 0; sideIndex < board.sides.length; sideIndex++) {
+        const sideTiles = board.sides[sideIndex];
         const ownsWholeSide = sideTiles.every((idx) => {
           const prop = gameState.properties[idx];
           return prop && prop.ownerId === player.playerId && !prop.isMortgaged;
@@ -75,7 +69,7 @@ export function checkVictory(gameState: GameState, specialVictoryEnabled: boolea
             hasWinner: true,
             winnerId: player.playerId,
             victoryType: 'line_victory',
-            reason: `${player.name} wins with Line Victory: every property on Side ${sideIndex + 1}.`
+            reason: `${player.name} wins with Line Victory: every property in ${SIDE_NAMES[sideIndex] ?? `side ${sideIndex + 1}`}.`
           };
         }
       }

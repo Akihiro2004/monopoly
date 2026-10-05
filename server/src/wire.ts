@@ -1,6 +1,7 @@
 import { Server } from 'socket.io';
 import { ClientToServerEvents, GameState, ServerToClientEvents } from '@monopoly/shared';
 import { RoomManager } from './rooms.js';
+import { BotDriver } from './bots/driver.js';
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 
@@ -16,8 +17,13 @@ export function wireEngine(io: IO, roomManager: RoomManager, roomId: string): vo
   if (!room || !room.engine) return;
   let wasOver = room.engine.state.phase === 'GAME_OVER';
 
+  // Bot seats are played on the server by a driver that follows the game.
+  room.bots?.dispose();
+  room.bots = room.engine.state.players.some((p) => p.isBot) ? new BotDriver(room.engine) : undefined;
+
   room.engine.options.onStateChange = (state: GameState) => {
     io.to(roomId).emit('game:state', state);
+    room.bots?.onState();
     roomManager.onGameChanged(roomId);
     if (state.phase === 'GAME_OVER' && !wasOver && state.winnerId && state.victoryType) {
       wasOver = true;
@@ -37,4 +43,5 @@ export function wireEngine(io: IO, roomManager: RoomManager, roomId: string): vo
   room.engine.options.onDice = (dice) => {
     io.to(roomId).emit('game:dice', dice);
   };
+  room.bots?.onState();
 }

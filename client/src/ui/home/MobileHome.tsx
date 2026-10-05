@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { ResumableGame } from '@monopoly/shared';
 import {
   BookOpen,
+  Bot,
   ChevronRight,
   ClipboardPaste,
   Crown,
@@ -15,10 +16,10 @@ import {
   Share,
   Trophy,
   Users,
-  X,
-  Zap
+  X
 } from 'lucide-react';
-import { Logo, Sky } from '../common/Sky.js';
+import { Logo } from '../common/Logo.js';
+import { MenuScene } from '../menu/MenuScene.js';
 import { Modal } from '../common/Modal.js';
 import { MuteButton } from '../game/TurnHeader.js';
 import { AccountChip } from '../session/AccountChip.js';
@@ -72,9 +73,8 @@ export const MobileHome: React.FC = () => {
   const signedIn = showAccount && !acct.anonymous && acct.status === 'ready';
 
   return (
-    <div className="menu-screen mhome">
-      <Sky />
-      <div className="mhome-rays" aria-hidden="true" />
+    <div className="menu-screen mx mhome">
+      <MenuScene />
 
       <header className="mhome-hud">
         <button
@@ -113,19 +113,21 @@ export const MobileHome: React.FC = () => {
 
       <main className="mhome-stage">
         <div className="mhome-title">
-          <Logo />
-          <span className="mhome-ribbon">
+          <span className="mx-edition">
             <Crown size={13} strokeWidth={2.8} /> World Cities Edition
           </span>
+          <Logo />
+          <p className="mhome-headline">
+            Roll the dice. <span>Own the world.</span>
+          </p>
         </div>
 
         <div className="mhome-toys" aria-hidden="true">
           <span className="mhome-glow" />
           <Die3D className="d1" />
           <Die3D className="d2" />
-          <span className="mhome-coin c1">$</span>
-          <span className="mhome-coin c2">$</span>
-          <span className="mhome-bill">$500</span>
+          <span className="mx-coin c1">$</span>
+          <span className="mx-coin c2">$</span>
         </div>
 
         <ul className="mhome-facts">
@@ -136,7 +138,7 @@ export const MobileHome: React.FC = () => {
             <Users size={14} strokeWidth={2.8} /> 2–6 players
           </li>
           <li>
-            <Zap size={14} strokeWidth={2.8} /> Live
+            <Bot size={14} strokeWidth={2.8} /> Bots
           </li>
         </ul>
       </main>
@@ -171,7 +173,7 @@ export const MobileHome: React.FC = () => {
 
         <button
           type="button"
-          className="mhome-cta red btn-create"
+          className="mhome-cta gold btn-create"
           disabled={entry.busy}
           onClick={() => {
             if (needName()) return;
@@ -191,7 +193,7 @@ export const MobileHome: React.FC = () => {
 
         <button
           type="button"
-          className="mhome-cta blue btn-open-join"
+          className="mhome-cta violet btn-open-join"
           onClick={() => {
             if (needName()) return;
             open('join');
@@ -364,7 +366,7 @@ const JoinSheet: React.FC<{ entry: ReturnType<typeof useRoomEntry>; onClose: () 
             <ClipboardPaste size={16} strokeWidth={2.6} /> Paste code
           </button>
         )}
-        <button type="submit" className="mhome-cta blue btn-join slim" disabled={entry.busy || code.length < 6}>
+        <button type="submit" className="mhome-cta gold btn-join slim" disabled={entry.busy || code.length < 6}>
           <span className="mhome-cta-copy">
             <b>{entry.busy ? 'Joining…' : 'Join table'}</b>
           </span>

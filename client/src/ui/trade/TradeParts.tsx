@@ -1,9 +1,10 @@
 import React from 'react';
-import { BOARD_TILES, GameState, TradeOffer, tradeMortgageFees } from '@monopoly/shared';
+import { GameState, TradeOffer, tradeMortgageFees } from '@monopoly/shared';
 import { ArrowRight, Lock, MessageSquareText, Repeat2 } from 'lucide-react';
 import { PlayerAvatar } from '../common/PlayerAvatar.js';
 import { Flag } from '../common/Flag.js';
 import { GROUP_HEX, LEVEL_NAMES, money } from '../theme.js';
+import { currentBoard } from '../../board.js';
 
 export const DeedChip: React.FC<{
   tileIndex: number;
@@ -16,7 +17,7 @@ export const DeedChip: React.FC<{
   changed?: boolean;
   onClick?: () => void;
 }> = ({ tileIndex, selected, disabled, title, mortgaged, level = 0, changed, onClick }) => {
-  const tile = BOARD_TILES[tileIndex];
+  const tile = currentBoard().tiles[tileIndex];
   const Tag = onClick ? 'button' : 'span';
   return (
     <Tag

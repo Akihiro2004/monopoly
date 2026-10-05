@@ -1,10 +1,11 @@
 import React from 'react';
-import { BOARD_TILES, COLOR_GROUPS, GameState, PlayerState, TileGroup } from '@monopoly/shared';
-import { KeyRound, Lightbulb, Lock, Plane, WifiOff } from 'lucide-react';
+import { GameState, PlayerState, TileGroup } from '@monopoly/shared';
+import { Bot, KeyRound, Lightbulb, Lock, Plane, TrafficCone, WifiOff } from 'lucide-react';
 import { PlayerAvatar } from '../common/PlayerAvatar.js';
 import { GROUP_HEX, GROUP_LABEL, GROUP_ORDER, money, netWorth, ownedBy, playerHex } from '../theme.js';
 import { LowCashAlert, cashTier } from './LowCashAlert.js';
 import { useMoneyDelta } from './useMoneyDelta.js';
+import { currentBoard } from '../../board.js';
 
 interface PlayersProps {
   game: GameState;
@@ -54,6 +55,11 @@ const PlayerCard: React.FC<{ game: GameState; player: PlayerState; active: boole
         <div className="pcard-body">
           <span className="pcard-name">
             <span className="truncate">{p.name}</span>
+            {p.isBot && (
+              <span className="bot-mark" title="Computer player" aria-label="Computer player">
+                <Bot size={13} strokeWidth={2.4} />
+              </span>
+            )}
             {isMe && <span className="badge">You</span>}
           </span>
           <span className={`pcard-money money tnum cash-t${tier}`}>{p.isBankrupt ? (p.surrendered ? 'Surrendered' : 'Bankrupt') : money(p.money)}</span>
@@ -91,10 +97,10 @@ const PlayerCard: React.FC<{ game: GameState; player: PlayerState; active: boole
 const GroupChips: React.FC<{ game: GameState; playerId: string }> = ({ game, playerId }) => {
   const counts = new Map<TileGroup, number>();
   for (const d of ownedBy(game, playerId)) {
-    const g = BOARD_TILES[d.tileIndex].group;
+    const g = currentBoard().tiles[d.tileIndex].group;
     counts.set(g, (counts.get(g) ?? 0) + 1);
   }
-  const setSize = (g: TileGroup) => COLOR_GROUPS[g]?.length ?? (g === 'railroad' ? 4 : g === 'utility' ? 2 : 0);
+  const setSize = (g: TileGroup) => currentBoard().groups[g]?.length ?? (g === 'railroad' ? currentBoard().railroads.length : g === 'utility' ? currentBoard().utilities.length : g === 'toll' ? currentBoard().tolls.length : 0);
   return (
     <span className="gchips">
       {GROUP_ORDER.filter((g) => counts.has(g)).map((g) => {
@@ -103,12 +109,13 @@ const GroupChips: React.FC<{ game: GameState; playerId: string }> = ({ game, pla
         return (
           <span
             key={g}
-            className={`gchip ${full ? 'full' : ''} ${g === 'railroad' || g === 'utility' ? 'neutral' : ''}`}
+            className={`gchip ${full ? 'full' : ''} ${g === 'railroad' || g === 'utility' || g === 'toll' ? 'neutral' : ''}`}
             style={{ '--g': GROUP_HEX[g] } as React.CSSProperties}
             title={`${GROUP_LABEL[g]}: ${n}/${setSize(g)}${full ? ' (full set)' : ''}`}
           >
             {g === 'railroad' && <Plane size={9} />}
             {g === 'utility' && <Lightbulb size={9} />}
+            {g === 'toll' && <TrafficCone size={9} />}
             {n}
           </span>
         );

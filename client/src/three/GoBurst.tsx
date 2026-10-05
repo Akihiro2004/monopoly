@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../store/gameStore.js';
 import { getTileCenter } from './boardCoords.js';
+import { useBoard } from '../board.js';
 
 const COINS = 28;
 const DURATION = 2.2;
@@ -14,7 +15,8 @@ export const GoBurst: React.FC = () => {
   const coins = useRef<THREE.InstancedMesh>(null);
   const ring = useRef<THREE.Mesh>(null);
   const t = useRef(DURATION);
-  const center = useMemo(() => new THREE.Vector3(...getTileCenter(0)), []);
+  const board = useBoard();
+  const center = useMemo(() => new THREE.Vector3(...getTileCenter(board, 0)), [board]);
 
   const seeds = useMemo(
     () =>

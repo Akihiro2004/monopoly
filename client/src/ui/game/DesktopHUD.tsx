@@ -1,6 +1,6 @@
 import React from 'react';
 import { useGameStore } from '../../store/gameStore.js';
-import { Logo } from '../common/Sky.js';
+import { Logo } from '../common/Logo.js';
 import { ActionPanel } from './ActionPanel.js';
 import { PlayerList } from './Players.js';
 import { SidePanel } from './SidePanel.js';

@@ -1,12 +1,12 @@
 import {
-  BOARD_TILES,
-  COLOR_GROUPS,
   GameState,
+  boardOf,
   PlayerColor,
   PlayerState,
   PropertyState,
   TileGroup
 } from '@monopoly/shared';
+import { currentBoard } from '../board.js';
 
 // Player colors as display hex (the raw PlayerColor names are too saturated).
 export const PLAYER_HEX: Record<PlayerColor, string> = {
@@ -32,8 +32,13 @@ export const GROUP_HEX: Record<TileGroup, string> = {
   yellow: '#facc15',
   green: '#22c55e',
   darkblue: '#3b63f6',
+  teal: '#2dd4bf',
+  purple: '#a78bfa',
+  lime: '#a3e635',
+  crimson: '#e11d48',
   railroad: '#94a3b8',
   utility: '#a3a3a3',
+  toll: '#f59e0b',
   special: '#64748b'
 };
 
@@ -46,21 +51,32 @@ export const GROUP_LABEL: Record<TileGroup, string> = {
   yellow: 'France',
   green: 'Brazil',
   darkblue: 'United States',
+  teal: 'Thailand',
+  purple: 'South Korea',
+  lime: 'Italy',
+  crimson: 'Canada',
   railroad: 'Airports',
   utility: 'Utilities',
+  toll: 'Toll gates',
   special: 'Special'
 };
 
+// Board order of every group on either board (each board shows its own).
 export const GROUP_ORDER: TileGroup[] = [
   'brown',
   'lightblue',
+  'teal',
   'pink',
   'orange',
+  'purple',
   'red',
   'yellow',
+  'lime',
   'green',
+  'crimson',
   'darkblue',
   'railroad',
+  'toll',
   'utility'
 ];
 
@@ -89,7 +105,7 @@ export function ownedBy(game: GameState, playerId: string): PropertyState[] {
 
 // Value of one property if liquidated at face value (land + buildings).
 export function propertyValue(p: PropertyState): number {
-  const tile = BOARD_TILES[p.tileIndex];
+  const tile = currentBoard().tiles[p.tileIndex];
   if (!tile) return 0;
   const land = p.isMortgaged ? Math.floor(tile.price / 2) : tile.price;
   return land + tile.buildCost * p.buildLevel;
@@ -101,30 +117,33 @@ export function netWorth(game: GameState, player: PlayerState): number {
 
 // Number of complete color sets a player owns.
 export function completeSets(game: GameState, playerId: string): number {
-  return Object.values(COLOR_GROUPS).filter((idxs) =>
+  return Object.values(boardOf(game).groups).filter((idxs) =>
     idxs.every((i) => game.properties[i]?.ownerId === playerId)
   ).length;
 }
 
-const RAILROADS = [5, 15, 25, 35];
-const UTILITIES = [12, 28];
-
 // Rent label mirroring server/src/engine/rent.ts.
 export function rentLabel(game: GameState, p: PropertyState): string {
-  const tile = BOARD_TILES[p.tileIndex];
+  const board = boardOf(game);
+  const tile = board.tiles[p.tileIndex];
   if (!tile || !p.ownerId) return '';
   if (p.isMortgaged) return 'No rent';
   const ownsActive = (idx: number) =>
     game.properties[idx]?.ownerId === p.ownerId && !game.properties[idx]?.isMortgaged;
   if (tile.type === 'railroad') {
-    const n = RAILROADS.filter(ownsActive).length;
+    const n = board.railroads.filter(ownsActive).length;
     return money(25 * Math.pow(2, Math.max(0, n - 1)));
   }
   if (tile.type === 'utility') {
-    return UTILITIES.filter(ownsActive).length === 2 ? '10x dice' : '4x dice';
+    return board.utilities.filter(ownsActive).length >= 2 ? '10x dice' : '4x dice';
+  }
+  if (tile.type === 'toll') {
+    const n = board.tolls.filter(ownsActive).length;
+    const fees = tile.rentByLevel;
+    return `${money(fees[Math.min(Math.max(n, 1), fees.length) - 1] || fees[0])} toll`;
   }
   let rent = tile.rentByLevel[p.buildLevel] ?? tile.rentByLevel[0];
-  const group = COLOR_GROUPS[tile.group];
+  const group = board.groups[tile.group];
   if (p.buildLevel === 0 && group && group.every((i) => game.properties[i]?.ownerId === p.ownerId)) {
     rent *= 2;
   }
@@ -133,8 +152,15 @@ export function rentLabel(game: GameState, p: PropertyState): string {
 
 // Rows for a title deed card.
 export function rentSchedule(tileIndex: number): { label: string; value: string }[] {
-  const tile = BOARD_TILES[tileIndex];
+  const tile = currentBoard().tiles[tileIndex];
   if (!tile) return [];
+  if (tile.type === 'toll') {
+    return [
+      { label: '1 gate owned', value: money(tile.rentByLevel[0]) },
+      { label: 'Both gates owned', value: money(tile.rentByLevel[1]) },
+      { label: 'Charged to', value: 'Passing + landing' }
+    ];
+  }
   if (tile.type === 'railroad') {
     return [1, 2, 3, 4].map((n) => ({
       label: n === 1 ? '1 airport owned' : `${n} airports owned`,

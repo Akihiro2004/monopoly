@@ -11,6 +11,10 @@ export type VictoryType = 'bankruptcy' | 'triple_victory' | 'line_victory';
 // built or not.
 export type ForceBuyMode = 'off' | 'developed' | 'any';
 
+// Which board a game is played on: the classic 40-tile World board, or the
+// 56-tile Grand World board (3 countries per side, toll gates, jackpot).
+export type BoardId = 'world' | 'grand';
+
 export interface RoomSettings {
   maxPlayers: number;
   specialVictory: boolean; // LINE Get Rich: Triple Victory & Line Victory enabled
@@ -19,6 +23,8 @@ export interface RoomSettings {
   forceBuyMode: ForceBuyMode;
   // Occasional board-wide random events (Market Crash, Bank Bonus, ...).
   randomEvents: boolean;
+  // Older rooms omit it: the classic World board.
+  board?: BoardId;
 }
 
 export interface Seat {
@@ -30,6 +36,8 @@ export interface Seat {
   isReady: boolean;
   isConnected: boolean;
   isHost: boolean;
+  // Computer-controlled player, played by the server (see server/src/bots).
+  isBot?: boolean;
 }
 
 export interface RoomState {
@@ -49,20 +57,25 @@ export interface RoomState {
  * settings, new events...). A client talking to an older server shows a
  * "server needs an update" notice instead of silently broken controls.
  */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 4;
 
 // Board & Tile types
 export type TileGroup =
   | 'brown'
   | 'lightblue'
+  | 'teal'
   | 'pink'
   | 'orange'
+  | 'purple'
   | 'red'
   | 'yellow'
+  | 'lime'
   | 'green'
+  | 'crimson'
   | 'darkblue'
   | 'railroad'
   | 'utility'
+  | 'toll'
   | 'special';
 
 export type TileType =
@@ -75,10 +88,14 @@ export type TileType =
   | 'parking'
   | 'chance'
   | 'chest'
-  | 'tax';
+  | 'tax'
+  // Grand World: ownable toll gate, charged to everyone passing or landing.
+  | 'toll'
+  // Grand World: Lucky Draw, a random bonus (or a small fee).
+  | 'bonus';
 
 export interface TileDef {
-  index: number; // 0..39
+  index: number; // 0..board size - 1
   name: string;
   type: TileType;
   group: TileGroup;
@@ -111,7 +128,7 @@ export interface PlayerState {
   color: PlayerColor;
   tokenType: TokenType;
   money: number;
-  position: number; // 0..39
+  position: number; // 0..board size - 1
   inJail: boolean;
   jailTurns: number;
   jailCards: number; // get-out-of-jail-free cards held
@@ -130,6 +147,8 @@ export interface PlayerState {
   surrendered?: boolean;
   // Turns in a row the server had to play for this player (turn timer).
   timeouts?: number;
+  // Computer-controlled player (always connected, played by the server).
+  isBot?: boolean;
 }
 
 export type GamePhase =
@@ -270,7 +289,12 @@ export interface GameState {
   turnNumber: number;
   currentPlayerIndex: number; // index into players array
   players: PlayerState[];
-  properties: Record<number, PropertyState>; // key: tileIndex 0..39
+  properties: Record<number, PropertyState>; // key: tileIndex
+  // Board this game is played on (older saved games omit it: 'world').
+  boardId?: BoardId;
+  // Grand World: taxes and fines collected so far, paid out to whoever lands
+  // exactly on Free Parking.
+  jackpot?: number;
   dice: [number, number];
   doubles: boolean;
   doublesCount: number;

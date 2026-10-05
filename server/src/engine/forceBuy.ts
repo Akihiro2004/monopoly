@@ -1,5 +1,6 @@
 import {
-  BOARD_TILES,
+  BoardDef,
+  boardOf,
   FORCE_BUY_TIMER_MS,
   ForceBuyMode,
   GameState,
@@ -13,8 +14,8 @@ import { record } from './bank.js';
  * Calculates force-buy price for a property:
  * price = (tile.price + tile.buildCost * currentBuildLevel) * 2
  */
-export function calculateForceBuyPrice(tileIndex: number, buildLevel: number): number {
-  const tile = BOARD_TILES[tileIndex];
+export function calculateForceBuyPrice(board: BoardDef, tileIndex: number, buildLevel: number): number {
+  const tile = board.tiles[tileIndex];
   if (!tile) return 0;
   return (tile.price + tile.buildCost * buildLevel) * 2;
 }
@@ -28,6 +29,7 @@ export function calculateForceBuyPrice(tileIndex: number, buildLevel: number): n
  * - Buyer must have sufficient cash
  */
 export function canForceBuy(
+  board: BoardDef,
   tileIndex: number,
   buyer: PlayerState,
   property: PropertyState | undefined,
@@ -43,7 +45,7 @@ export function canForceBuy(
 
   // Only color-set properties can be force-bought. Railroads/airports and
   // utilities are never eligible, in any mode.
-  const tile = BOARD_TILES[tileIndex];
+  const tile = board.tiles[tileIndex];
   if (!tile || tile.type !== 'property') {
     return { eligible: false, price: 0, reason: 'Only properties can be force-bought' };
   }
@@ -67,7 +69,7 @@ export function canForceBuy(
     return { eligible: false, price: 0, reason: 'Landmarks cannot be bought from opponents' };
   }
 
-  const price = calculateForceBuyPrice(tileIndex, property.buildLevel);
+  const price = calculateForceBuyPrice(board, tileIndex, property.buildLevel);
   if (buyer.money < price) {
     return { eligible: false, price, reason: `Insufficient funds (needs $${price}, has $${buyer.money})` };
   }
@@ -79,11 +81,12 @@ export function canForceBuy(
  * Creates a ForceBuyOffer for the active player landing on opponent's property
  */
 export function createForceBuyOffer(
+  board: BoardDef,
   tileIndex: number,
   buyer: PlayerState,
   property: PropertyState
 ): ForceBuyOffer {
-  const price = calculateForceBuyPrice(tileIndex, property.buildLevel);
+  const price = calculateForceBuyPrice(board, tileIndex, property.buildLevel);
   return {
     tileIndex,
     targetPlayerId: property.ownerId!,
@@ -114,7 +117,7 @@ export function executeForceBuy(
   const buyer = gameState.players.find((p) => p.playerId === offer.buyerPlayerId);
   const seller = gameState.players.find((p) => p.playerId === offer.targetPlayerId);
   const prop = gameState.properties[tileIndex];
-  const tile = BOARD_TILES[tileIndex];
+  const tile = boardOf(gameState).tiles[tileIndex];
 
   if (!buyer || !seller || !prop || !tile) {
     return { success: false, text: 'Invalid participants or property' };

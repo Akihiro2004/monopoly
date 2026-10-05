@@ -4,7 +4,7 @@ import { ChevronLeft, Crown, Medal, ShieldCheck, Trophy } from 'lucide-react';
 import { socket } from '../../net/socket.js';
 import { useGameStore } from '../../store/gameStore.js';
 import { audioManager } from '../../sound/audioManager.js';
-import { Sky } from '../common/Sky.js';
+import { MenuScene } from '../menu/MenuScene.js';
 import { money } from '../theme.js';
 
 const rate = (e: LeaderboardEntry) => (e.gamesPlayed ? Math.round((e.wins / e.gamesPlayed) * 100) : 0);
@@ -52,17 +52,16 @@ export const LeaderboardPage: React.FC = () => {
   const podium = [top[1], top[0], top[2]].map((e, i) => ({ e, place: [2, 1, 3][i] }));
 
   return (
-    <div className="menu-screen lb-page" role="dialog" aria-label="Leaderboard">
-      <Sky />
-      <header className="lobby-appbar">
-        <button className="btn btn-ghost btn-sm btn-leave" onClick={close}>
-          <ChevronLeft size={18} />
-          <span>Back</span>
+    <div className="menu-screen mx lb-page" role="dialog" aria-label="Leaderboard">
+      <MenuScene />
+      <header className="mx-topbar">
+        <button className="mx-pill btn-leave" onClick={close}>
+          <ChevronLeft size={18} strokeWidth={2.8} /> Back
         </button>
         <h1 className="lb-page-title">
           <Trophy size={24} /> Leaderboard
         </h1>
-        <span className="lobby-appbar-spacer" />
+        <span className="mx-topbar-actions" />
       </header>
 
       <div className="lb-page-body">

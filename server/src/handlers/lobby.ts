@@ -144,7 +144,21 @@ export function registerLobbyHandlers(
     broadcast(info.roomId);
   });
 
-  socket.on('room:start', () => {
+  socket.on('room:setBoard', ({ board }) => {
+    const info = roomManager.getPlayerBySocket(socket.id);
+    if (!info) return;
+    if (roomManager.setBoard(info.roomId, info.playerId, board)) broadcast(info.roomId);
+  });
+
+  socket.on('room:addBot', () => {
+    const info = roomManager.getPlayerBySocket(socket.id);
+    if (!info) return;
+    const res = roomManager.addBot(info.roomId, info.playerId);
+    if (!res.ok) return socket.emit('error', { message: res.error || 'Could not add a bot' });
+    broadcast(info.roomId);
+  });
+
+    socket.on('room:start', () => {
     const info = roomManager.getPlayerBySocket(socket.id);
     if (!info) return;
     const res = roomManager.startGame(info.roomId, info.playerId);

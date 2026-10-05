@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { RoundedBox } from '@react-three/drei';
 import { PlayerState, TokenType } from '@monopoly/shared';
 import { getTileCenter } from './boardCoords.js';
+import { currentBoard } from '../board.js';
 import { useGameStore } from '../store/gameStore.js';
 import { audioManager } from '../sound/audioManager.js';
 import { playerHex } from '../ui/theme.js';
@@ -253,9 +254,10 @@ const DICE_WAIT = 0.95; // let the dice tumble before walking
 const LANDING_PAUSE = 1.5; // on Chance / Go To Jail before the follow-up move
 
 function walkSteps(from: number, to: number): PathItem[] {
-  const diff = (to - from + 40) % 40;
+  const size = currentBoard().size;
+  const diff = (to - from + size) % size;
   if (diff >= 1 && diff <= 12) {
-    return Array.from({ length: diff }, (_, i) => ({ kind: 'step' as const, tile: (from + i + 1) % 40 }));
+    return Array.from({ length: diff }, (_, i) => ({ kind: 'step' as const, tile: (from + i + 1) % size }));
   }
   return from === to ? [] : [{ kind: 'glide', tile: to }];
 }
@@ -328,7 +330,7 @@ const AnimatedToken: React.FC<{
     if (!groupRef.current) return;
     // Reuses one vector: no allocations in the frame loop.
     const place = (tile: number) => {
-      const c = getTileCenter(tile);
+      const c = getTileCenter(currentBoard(), tile);
       return scratch.current.set(c[0] + offset[0], c[1] + 0.07 + offset[1], c[2] + offset[2]);
     };
 

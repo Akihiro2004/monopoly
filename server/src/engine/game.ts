@@ -1,11 +1,11 @@
 import {
-  BOARD_TILES,
+  BoardDef,
+  BoardId,
   CHANCE_CARDS,
   CHEST_CARDS,
-  GO_SALARY,
   JAIL_FINE,
-  JAIL_TILE_INDEX,
-  STARTING_MONEY,
+  boardOf,
+  getBoard,
   AUCTION_EXTEND_MS,
   AUCTION_MIN_INCREMENT,
   AUCTION_MS,
@@ -30,7 +30,8 @@ import { executeForceBuy } from './forceBuy.js';
 import { buildProperty, sellBuilding, sellPropertyToBank, toggleMortgage } from './actions.js';
 import { applyBankruptcy } from './rent.js';
 import { resolveLanding } from './resolve.js';
-import { createBank, record } from './bank.js';
+import { createBank, feeToBank, record } from './bank.js';
+import { chargePassingTolls } from './tolls.js';
 import { checkVictory } from './victory.js';
 
 // Fisher-Yates: a fair shuffle (sort(() => random) is biased).
@@ -55,6 +56,8 @@ type RandomEventKind =
 
 export interface GameEngineOptions {
   specialVictory: boolean;
+  // Which board (default: the classic 40-tile World board).
+  boardId?: BoardId;
   // Seconds per decision before the server plays for the current player
   // (0 / undefined = no turn timer).
   turnTimerSec?: number;
@@ -85,6 +88,7 @@ export class MonopolyGameEngine {
 
   constructor(roomId: string, seats: Seat[], options: GameEngineOptions) {
     this.options = options;
+    const board = getBoard(options.boardId);
 
     const players: PlayerState[] = seats.map((seat) => ({
       playerId: seat.playerId,
@@ -92,7 +96,7 @@ export class MonopolyGameEngine {
       name: seat.displayName,
       color: seat.color,
       tokenType: seat.tokenType,
-      money: STARTING_MONEY,
+      money: board.startingMoney,
       position: 0,
       inJail: false,
       jailTurns: 0,
@@ -102,11 +106,12 @@ export class MonopolyGameEngine {
       consecutiveDoubles: 0,
       lapsCompleted: 0,
       mortgagesThisRound: 0,
-      jailCardDecks: []
+      jailCardDecks: [],
+      ...(seat.isBot ? { isBot: true } : {})
     }));
 
     const properties: Record<number, PropertyState> = {};
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < board.size; i++) {
       properties[i] = {
         tileIndex: i,
         ownerId: null,
@@ -134,7 +139,9 @@ export class MonopolyGameEngine {
       debt: null,
       trades: [],
       lastMove: null,
-      bank: createBank(),
+      bank: createBank(board),
+      boardId: board.id,
+      ...(board.jackpot ? { jackpot: 0 } : {}),
       auction: null,
       activeEvent: null,
       winnerId: null,
@@ -152,6 +159,11 @@ export class MonopolyGameEngine {
       to,
       passedGo
     };
+  }
+
+  /** The board this game is played on. */
+  public get board(): BoardDef {
+    return boardOf(this.state);
   }
 
   public getCurrentPlayer(): PlayerState {
@@ -181,7 +193,7 @@ export class MonopolyGameEngine {
         if (player.jailTurns >= 3) {
           const fine = Math.min(player.money, JAIL_FINE);
           player.money -= fine;
-          record(this.state, player.playerId, null, fine, 'Jail fine');
+          feeToBank(this.state, player.playerId, fine, 'Jail fine');
           player.inJail = false;
           player.jailTurns = 0;
           this.emitToast(`${player.name} paid $${JAIL_FINE} after 3 turns in Jail.`, 'info');
@@ -197,8 +209,8 @@ export class MonopolyGameEngine {
     if (doubles) {
       this.state.doublesCount++;
       if (this.state.doublesCount >= 3) {
-        this.recordMove(player, player.position, JAIL_TILE_INDEX, JAIL_TILE_INDEX);
-        player.position = JAIL_TILE_INDEX;
+        this.recordMove(player, player.position, this.board.jail, this.board.jail);
+        player.position = this.board.jail;
         player.inJail = true;
         player.jailTurns = 0;
         this.state.doublesCount = 0;
@@ -213,15 +225,18 @@ export class MonopolyGameEngine {
 
     const total = d1 + d2;
     const oldPos = player.position;
-    const newPos = (oldPos + total) % 40;
+    const salary = this.board.goSalary;
+    const newPos = (oldPos + total) % this.board.size;
 
     if (newPos < oldPos) {
-      player.money += GO_SALARY;
+      player.money += salary;
       player.lapsCompleted++;
       player.mortgagesThisRound = 0;
-      record(this.state, null, player.playerId, GO_SALARY, 'GO salary');
-      this.emitToast(`${player.name} passed GO and collected $${GO_SALARY}.`, 'success');
+      record(this.state, null, player.playerId, salary, 'GO salary');
+      this.emitToast(`${player.name} passed GO and collected $${salary}.`, 'success');
     }
+    // Toll gates driven through on the way (landing on one is like rent).
+    for (const line of chargePassingTolls(this.state, player, oldPos, total)) this.emitToast(line, 'info');
 
     player.position = newPos;
     (this.state as any).phase = 'RESOLVING';
@@ -267,7 +282,7 @@ export class MonopolyGameEngine {
 
     const offer = this.state.buyOffer;
     const player = this.getCurrentPlayer();
-    const tile = BOARD_TILES[offer.tileIndex];
+    const tile = this.board.tiles[offer.tileIndex];
     const prop = this.state.properties[offer.tileIndex];
 
     if (accept) {
@@ -311,7 +326,7 @@ export class MonopolyGameEngine {
       if (!prop.isMortgaged || !prop.ownerId || prop.mortgagedAtLap === undefined) continue;
       const owner = this.state.players.find((p) => p.playerId === prop.ownerId);
       if (!owner || owner.lapsCompleted - prop.mortgagedAtLap < FORECLOSURE_ROUNDS) continue;
-      const tile = BOARD_TILES[prop.tileIndex];
+      const tile = this.board.tiles[prop.tileIndex];
       this.emitToast(
         `${tile.name} was mortgaged for ${FORECLOSURE_ROUNDS} rounds without being paid off. The Bank forecloses on ${owner.name} and auctions it.`,
         'warning'
@@ -333,7 +348,7 @@ export class MonopolyGameEngine {
       tileIndex,
       // Bidding opens at the deed's listed price: the property can never
       // sell for less than the Bank would have charged for it outright.
-      highBid: BOARD_TILES[tileIndex].price,
+      highBid: this.board.tiles[tileIndex].price,
       highBidderId: null,
       endsAt: Date.now() + AUCTION_MS,
       bidders: []
@@ -371,7 +386,7 @@ export class MonopolyGameEngine {
     if (!auction.bidders.includes(playerId)) auction.bidders.push(playerId);
     auction.endsAt = Math.max(auction.endsAt, Date.now() + AUCTION_EXTEND_MS);
     this.scheduleAuctionEnd();
-    this.emitToast(`${bidder.name} bids $${bid} for ${BOARD_TILES[auction.tileIndex].name}.`, 'info');
+    this.emitToast(`${bidder.name} bids $${bid} for ${this.board.tiles[auction.tileIndex].name}.`, 'info');
     this.notify();
   }
 
@@ -380,7 +395,7 @@ export class MonopolyGameEngine {
     const auction = this.state.auction;
     if (this.state.phase !== 'AUCTION' || !auction) return;
     this.clearAuctionTimer();
-    const tile = BOARD_TILES[auction.tileIndex];
+    const tile = this.board.tiles[auction.tileIndex];
     const winner = auction.highBidderId
       ? this.state.players.find((p) => p.playerId === auction.highBidderId)
       : undefined;
@@ -425,7 +440,7 @@ export class MonopolyGameEngine {
     } else {
       this.state.forceBuyOffer = null;
       if (opponent) {
-        this.emitToast(`${player.name} declined the $${offer.price} force-buy on ${BOARD_TILES[offer.tileIndex].name}.`, 'info');
+        this.emitToast(`${player.name} declined the $${offer.price} force-buy on ${this.board.tiles[offer.tileIndex].name}.`, 'info');
       }
     }
 
@@ -442,7 +457,7 @@ export class MonopolyGameEngine {
       throw new Error('Cannot pay jail fine');
     }
     player.money -= JAIL_FINE;
-    record(this.state, player.playerId, null, JAIL_FINE, 'Jail fine');
+    feeToBank(this.state, player.playerId, JAIL_FINE, 'Jail fine');
     player.inJail = false;
     player.jailTurns = 0;
     this.emitToast(`${player.name} paid $${JAIL_FINE} and left Jail.`, 'info');
@@ -781,7 +796,7 @@ export class MonopolyGameEngine {
       creditor.money += debt.amount;
       record(this.state, debtor.playerId, creditor.playerId, debt.amount, `Debt: ${debt.reason}`);
     } else {
-      record(this.state, debtor.playerId, null, debt.amount, `Debt: ${debt.reason}`);
+      feeToBank(this.state, debtor.playerId, debt.amount, `Debt: ${debt.reason}`);
     }
     this.state.debt = null;
     if (!this.tryStartForeclosureAuction()) this.state.phase = 'TURN_ENDED';
@@ -869,7 +884,7 @@ export class MonopolyGameEngine {
     if (Math.random() >= RANDOM_EVENT_CHANCE) return;
 
     const active = this.state.players.filter((p) => !p.isBankrupt);
-    const unownedTiles = BOARD_TILES.filter(
+    const unownedTiles = this.board.tiles.filter(
       (t) => t.price > 0 && this.state.properties[t.index]?.ownerId === null
     ).map((t) => t.index);
 
@@ -903,7 +918,7 @@ export class MonopolyGameEngine {
   // Bank spontaneously auctions off a random unowned property.
   private eventPropertyLottery(unownedTiles: number[]): void {
     const tileIndex = unownedTiles[Math.floor(Math.random() * unownedTiles.length)];
-    this.emitRandomEvent(`Random event! The Bank puts ${BOARD_TILES[tileIndex].name} up for auction.`, 'warning');
+    this.emitRandomEvent(`Random event! The Bank puts ${this.board.tiles[tileIndex].name} up for auction.`, 'warning');
     this.startAuction(tileIndex);
   }
 
@@ -1044,7 +1059,7 @@ export class MonopolyGameEngine {
     }
     if (this.state.auction?.highBidderId === playerId) {
       this.state.auction.highBidderId = null;
-      this.state.auction.highBid = BOARD_TILES[this.state.auction.tileIndex].price;
+      this.state.auction.highBid = this.board.tiles[this.state.auction.tileIndex].price;
     }
 
     while ((player.jailCardDecks?.length ?? 0) > 0) this.returnJailCard(player);
@@ -1102,17 +1117,27 @@ export class MonopolyGameEngine {
   private static readonly TIMED_PHASES = ['ROLLING', 'BUY_OFFER', 'TURN_ENDED', 'DEBT'];
   private static readonly AWAY_SEC = 20;
   private static readonly AWAY_LIMIT = 3;
+  // Bots act within seconds; this only catches a bot that got stuck.
+  private static readonly BOT_WATCHDOG_SEC = 45;
+
+  private humansOnline(): boolean {
+    return this.state.players.some((p) => !p.isBot && p.isConnected);
+  }
 
   private armTurnTimer(): void {
     const base = this.options.turnTimerSec ?? 0;
     const current = this.getCurrentPlayer();
+    // Bots pause while no human is watching; so does their clock.
+    const humans = this.humansOnline();
     const timed =
       this.state.phase !== 'GAME_OVER' &&
       MonopolyGameEngine.TIMED_PHASES.includes(this.state.phase) &&
       !!current &&
       !current.isBankrupt &&
-      (base > 0 || !current.isConnected);
-    const key = timed ? `${this.state.turnNumber}:${this.state.currentPlayerIndex}:${this.state.phase}:${current.isConnected}` : '';
+      (current.isBot ? humans : base > 0 || !current.isConnected);
+    const key = timed
+      ? `${this.state.turnNumber}:${this.state.currentPlayerIndex}:${this.state.phase}:${current.isConnected}:${humans}`
+      : '';
     if (key === this.turnKey) return;
     this.turnKey = key;
     if (this.turnTimer) clearTimeout(this.turnTimer);
@@ -1124,7 +1149,8 @@ export class MonopolyGameEngine {
     // Someone who is offline gets a short clock even with the timer off, so
     // one closed tab never freezes the table. Debts get extra time to plan.
     let sec = base > 0 ? base : MonopolyGameEngine.AWAY_SEC;
-    if (!current.isConnected) sec = Math.min(sec, MonopolyGameEngine.AWAY_SEC);
+    if (current.isBot) sec = Math.max(sec, MonopolyGameEngine.BOT_WATCHDOG_SEC);
+    else if (!current.isConnected) sec = Math.min(sec, MonopolyGameEngine.AWAY_SEC);
     if (this.state.phase === 'DEBT' && current.isConnected) sec *= 2;
     this.state.turnDeadline = Date.now() + sec * 1000;
     this.turnTimer = setTimeout(() => this.onTurnTimeout(), sec * 1000);
@@ -1226,7 +1252,8 @@ export class MonopolyGameEngine {
     engine.chanceDeck = deck(snap.chance, CHANCE_CARDS);
     engine.chestDeck = deck(snap.chest, CHEST_CARDS);
     // Nobody is connected right after a restart; they rejoin one by one.
-    for (const p of engine.state.players) p.isConnected = false;
+    // Bots live on the server, so they are always here.
+    for (const p of engine.state.players) p.isConnected = !!p.isBot;
     engine.state.turnDeadline = null;
     engine.resumeTimers();
     return engine;

@@ -1,14 +1,5 @@
 import React from 'react';
-import {
-  BOARD_TILES,
-  COLOR_GROUPS,
-  PropertyState,
-  TileGroup,
-  buildingRefund,
-  mortgageBlockReason,
-  mortgageValue,
-  unmortgageCost as liftCost
-} from '@monopoly/shared';
+import { PropertyState, TileGroup, buildingRefund, mortgageBlockReason, mortgageValue, unmortgageCost as liftCost } from '@monopoly/shared';
 import { ArrowUpCircle, Banknote, Castle, ChevronRight, Landmark, Lock, MapPin, Undo2 } from 'lucide-react';
 import { useGameStore } from '../../store/gameStore.js';
 import { socket } from '../../net/socket.js';
@@ -16,6 +7,7 @@ import { audioManager } from '../../sound/audioManager.js';
 import { useTurn } from './useTurn.js';
 import { Flag } from '../common/Flag.js';
 import { GROUP_HEX, GROUP_LABEL, GROUP_ORDER, LEVEL_NAMES, completeSets, money, rentLabel, netWorth, ownedBy } from '../theme.js';
+import { currentBoard } from '../../board.js';
 
 const LevelSteps: React.FC<{ level: number }> = ({ level }) => (
   <span className={`level-steps ${level === 4 ? 'landmark' : ''}`} aria-label={`Level ${level} of 4`}>
@@ -54,7 +46,7 @@ export const Portfolio: React.FC<PortfolioProps> = ({ hideSummary, liquidOnly })
 
   const grouped = new Map<TileGroup, PropertyState[]>();
   for (const p of props) {
-    const g = BOARD_TILES[p.tileIndex].group;
+    const g = currentBoard().tiles[p.tileIndex].group;
     if (!grouped.has(g)) grouped.set(g, []);
     grouped.get(g)!.push(p);
   }
@@ -87,12 +79,12 @@ export const Portfolio: React.FC<PortfolioProps> = ({ hideSummary, liquidOnly })
 
       {GROUP_ORDER.filter((g) => grouped.has(g)).map((group) => {
         const list = grouped.get(group)!.sort((a, b) => a.tileIndex - b.tileIndex);
-        const setSize = COLOR_GROUPS[group]?.length;
-        const ownedInGroup = ownedBy(game, me.playerId).filter((p) => BOARD_TILES[p.tileIndex].group === group).length;
+        const setSize = currentBoard().groups[group]?.length;
+        const ownedInGroup = ownedBy(game, me.playerId).filter((p) => currentBoard().tiles[p.tileIndex].group === group).length;
         return (
           <section key={group} className="deed-group" style={{ '--g': GROUP_HEX[group] } as React.CSSProperties}>
             <header className="deed-group-head">
-              {COLOR_GROUPS[group] ? <Flag group={group} size={18} /> : <span className="group-dot" />}
+              {currentBoard().groups[group] ? <Flag group={group} size={18} /> : <span className="group-dot" />}
               <span>{GROUP_LABEL[group]}</span>
               {setSize ? (
                 ownedInGroup === setSize ? (
@@ -106,13 +98,13 @@ export const Portfolio: React.FC<PortfolioProps> = ({ hideSummary, liquidOnly })
             </header>
             <ul>
               {list.map((p) => {
-                const tile = BOARD_TILES[p.tileIndex];
+                const tile = currentBoard().tiles[p.tileIndex];
                 const buildable = tile.buildCost > 0;
                 const standingHere = upgrade?.prop.tileIndex === p.tileIndex;
                 const canSell = canManage && buildable && p.buildLevel > 0 && !p.isMortgaged;
                 const mortgageBlock = mortgageBlockReason(game, me.playerId, p.tileIndex);
                 const canMortgage = canManage && p.buildLevel === 0 && !p.isMortgaged;
-                const unmortgageCost = liftCost(p.tileIndex);
+                const unmortgageCost = liftCost(currentBoard(), p.tileIndex);
                 const canUnmortgage = canManage && p.isMortgaged && !liquidOnly;
                 return (
                   <li key={p.tileIndex} className={`deed-row ${p.isMortgaged ? 'mortgaged' : ''} ${standingHere ? 'here' : ''}`}>
@@ -130,7 +122,7 @@ export const Portfolio: React.FC<PortfolioProps> = ({ hideSummary, liquidOnly })
                             <span>{LEVEL_NAMES[p.buildLevel]}</span>
                           </>
                         ) : (
-                          <span>{tile.type === 'railroad' ? 'Airport' : 'Utility'}</span>
+                          <span>{tile.type === 'railroad' ? 'Airport' : tile.type === 'toll' ? 'Toll gate' : 'Utility'}</span>
                         )}
                         {!p.isMortgaged && <span className="deed-rent tnum">Rent {rentLabel(game, p)}</span>}
                         <ChevronRight size={13} className="deed-more" />
@@ -149,9 +141,9 @@ export const Portfolio: React.FC<PortfolioProps> = ({ hideSummary, liquidOnly })
                         </button>
                       )}
                       {canSell && (
-                        <button className="mini-btn" onClick={() => sell(p.tileIndex)} title={`Sell one level for ${money(buildingRefund(p.tileIndex, 1))}`}>
+                        <button className="mini-btn" onClick={() => sell(p.tileIndex)} title={`Sell one level for ${money(buildingRefund(currentBoard(), p.tileIndex, 1))}`}>
                           <Banknote size={14} />
-                          <span className="tnum">+{money(buildingRefund(p.tileIndex, 1))}</span>
+                          <span className="tnum">+{money(buildingRefund(currentBoard(), p.tileIndex, 1))}</span>
                         </button>
                       )}
                       {canMortgage && (
@@ -159,10 +151,10 @@ export const Portfolio: React.FC<PortfolioProps> = ({ hideSummary, liquidOnly })
                           className="mini-btn"
                           onClick={() => mortgage(p.tileIndex, true)}
                           disabled={!!mortgageBlock}
-                          title={mortgageBlock ?? `Mortgage for ${money(mortgageValue(p.tileIndex))}`}
+                          title={mortgageBlock ?? `Mortgage for ${money(mortgageValue(currentBoard(), p.tileIndex))}`}
                         >
                           <Landmark size={14} />
-                          <span className="tnum">+{money(mortgageValue(p.tileIndex))}</span>
+                          <span className="tnum">+{money(mortgageValue(currentBoard(), p.tileIndex))}</span>
                         </button>
                       )}
                       {canUnmortgage && (

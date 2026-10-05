@@ -1,12 +1,13 @@
 import React from 'react';
 import { socket } from '../net/socket.js';
 import { useGameStore } from '../store/gameStore.js';
-import { BOARD_TILES } from '@monopoly/shared';
+
 import { audioManager } from '../sound/audioManager.js';
 import { AlertTriangle, Check, ShoppingBag, X } from 'lucide-react';
 import { Modal } from './common/Modal.js';
 import { TitleDeed } from './common/TitleDeed.js';
 import { money } from './theme.js';
+import { currentBoard } from '../board.js';
 
 // Only the buyer gets a modal; everyone else sees the decision in the action panel.
 export const BuyPropertyModal: React.FC = () => {
@@ -19,7 +20,7 @@ export const BuyPropertyModal: React.FC = () => {
 
   if (!buyOffer || !gameState || isWalking || cardOpen || buyOffer.buyerPlayerId !== myPlayerId) return null;
 
-  const tile = BOARD_TILES[buyOffer.tileIndex];
+  const tile = currentBoard().tiles[buyOffer.tileIndex];
   const buyer = gameState.players.find((p) => p.playerId === buyOffer.buyerPlayerId);
   if (!tile || !buyer) return null;
   const canAfford = buyer.money >= buyOffer.price;

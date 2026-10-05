@@ -7,6 +7,7 @@ import {
   VictoryType,
   ForceBuyOffer,
   ForceBuyMode,
+  BoardId,
   CardDraw,
   TradeOffer
 } from './types.js';
@@ -56,7 +57,10 @@ export interface ClientToServerEvents {
   'room:setTurnTimer': (payload: { seconds: number }) => void;
   'room:setForceBuyMode': (payload: { mode: ForceBuyMode }) => void;
   'room:setRandomEvents': (payload: { enabled: boolean }) => void;
+  'room:setBoard': (payload: { board: BoardId }) => void;
   'room:kick': (payload: { playerId: string }) => void;
+  // Host fills an open lobby seat with a computer player.
+  'room:addBot': () => void;
   'room:start': () => void;
   'room:reconnect': (
     payload: { roomId: string; playerId: string; token?: string; name?: string },

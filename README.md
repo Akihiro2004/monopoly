@@ -24,6 +24,8 @@ Southeast Asia (Malaysia: Kuala Lumpur, Penang · Indonesia: Jakarta, Bali, Yogy
 9. **3D board in a little town**: hand-painted tiles, animated classic tokens (car, top hat, Scottie dog, battleship, thimble, boot), houses → townhouse → hotel → domed Landmark, rolling dice, and a sunny diorama.
 10. **Desktop & phone**: floating player cards, a collapsible side panel (Assets / Trade / Log / Chat) and a big ROLL button on PC; a portrait-first layout with a tab bar on phones. **Installable** as an app (Add to Home Screen / Install), locked to portrait when installed.
 11. **Runs smoothly anywhere**: the 3D scene only renders while something moves, graphics adapt to the device (Auto / Smooth / Pretty button, automatic step-down when FPS drops), the 3D engine loads in the background while you are in the lobby, and the server gzips and caches everything.
+12. **Bots**: the host can fill open lobby seats with computer players (Add bot). They get realistic usernames (from randomuser.me, or a built-in list offline), play at a human pace, and play to win: they value deeds by sets, rent and special-victory threats, bid in auctions and block rivals, build where it pays, force-buy when it wins or swings the game, negotiate trades (with counter-offers) and dig out of debt by selling what they will miss least. They pause while no human is connected and never appear on the leaderboard. Strategy lives in `server/src/bots/`; `npx tsx server/test/botTune.ts` prints win rates from headless games.
+13. **Grand World board** (lobby setting, made for 5–6 players): 56 tiles, 14 per side, three countries per side (adds Thailand, South Korea, Italy and Canada: 12 countries, 32 cities). New on this board: **toll gates** you can buy that charge everyone who drives past or lands on them ($25, or $60 when one player owns both), **Lucky Draw** tiles (a bonus from the Bank, sometimes a small fee), and a **Free Parking jackpot** where taxes and fines pile up until someone lands exactly on Free Parking. Starts with $2,000 each and a bigger Bank (48 houses, 18 hotels). The classic 40-tile World board is still the default.
 
 ## How to Run Locally
 
@@ -132,6 +134,7 @@ the leaderboard uses the server's local history.
 ## Credits
 
 - Property buildings: [KayKit City Builder Bits](https://github.com/KayKit-Game-Assets/KayKit-City-Builder-Bits-1.0) by Kay Lousberg, CC0 (see `client/public/models/kaykit/LICENSE.txt`).
+- More property buildings (houses, shops, hotels, skyscrapers): [City Kit (Suburban)](https://kenney.nl/assets/city-kit-suburban) and [City Kit (Commercial)](https://kenney.nl/assets/city-kit-commercial) by Kenney, CC0 (see `client/public/models/suburban/` and `client/public/models/commercial/`).
 - Flags: [circle-flags](https://github.com/HatScripts/circle-flags), MIT (see `client/public/icons/LICENSE.txt`).
 - Town models: [Kenney City Builder kit](https://github.com/KenneyNL/Starter-Kit-City-Builder), CC0 (see `client/public/models/city/LICENSE.txt`).
 - Background music: "Blueprints and Tea" (provided by the project owner, `client/public/audio/`).

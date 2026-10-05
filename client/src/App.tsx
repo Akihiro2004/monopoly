@@ -16,7 +16,8 @@ import { ToastContainer } from './ui/ToastContainer.js';
 const MonopolyScene = lazy(() => import('./three/Scene.js'));
 const preloadScene = () => import('./three/Scene.js');
 import { useIsMobile } from './hooks/useIsMobile.js';
-import { Logo, Sky } from './ui/common/Sky.js';
+import { Logo } from './ui/common/Logo.js';
+import { MenuScene } from './ui/menu/MenuScene.js';
 import { IncomingTradeModal } from './ui/trade/IncomingTradeModal.js';
 import { AuctionModal } from './ui/bank/AuctionModal.js';
 import { GoBanner } from './ui/game/GoBanner.js';
@@ -131,8 +132,8 @@ export function App() {
   if (isReconnecting && !roomState) {
     return (
       <div className={rootClass}>
-        <div className="menu-screen">
-          <Sky />
+        <div className="menu-screen mx">
+          <MenuScene />
           <div className="splash">
             <Logo />
             <div className="splash-card paper">

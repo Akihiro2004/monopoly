@@ -1,13 +1,14 @@
 import React from 'react';
-import { BOARD_TILES } from '@monopoly/shared';
-import { Plane, Lightbulb } from 'lucide-react';
+
+import { Lightbulb, Plane, TrafficCone } from 'lucide-react';
 import { COUNTRY_NAMES } from '@monopoly/shared';
 import { Flag } from './Flag.js';
 import { GROUP_HEX, money, rentSchedule } from '../theme.js';
+import { currentBoard } from '../../board.js';
 
 // Paper-style title deed card.
 export const TitleDeed: React.FC<{ tileIndex: number; highlightLevel?: number }> = ({ tileIndex, highlightLevel }) => {
-  const tile = BOARD_TILES[tileIndex];
+  const tile = currentBoard().tiles[tileIndex];
   if (!tile) return null;
   const isProperty = tile.type === 'property';
   const rows = rentSchedule(tileIndex);
@@ -17,6 +18,7 @@ export const TitleDeed: React.FC<{ tileIndex: number; highlightLevel?: number }>
       <div className="title-deed-head">
         {tile.type === 'railroad' && <Plane size={26} />}
         {tile.type === 'utility' && <Lightbulb size={26} />}
+        {tile.type === 'toll' && <TrafficCone size={26} />}
         {tile.country && <Flag country={tile.country} size={34} className="deed-flag" />}
         <small>{tile.country ? COUNTRY_NAMES[tile.country] : 'Title deed'}</small>
         <h3>{tile.name}</h3>

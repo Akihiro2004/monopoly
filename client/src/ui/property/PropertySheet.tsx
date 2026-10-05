@@ -1,34 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import {
-  BOARD_TILES,
-  COLOR_GROUPS,
-  COUNTRY_NAMES,
-  GameState,
-  PlayerState,
-  PropertyState,
-  buildingRefund,
-  mortgageBlockReason,
-  mortgageValue,
-  sellToBankValue,
-  unmortgageCost
-} from '@monopoly/shared';
-import {
-  ArrowDownCircle,
-  ArrowUpCircle,
-  Banknote,
-  Building2,
-  Castle,
-  Crown,
-  Home,
-  Landmark,
-  Lightbulb,
-  Lock,
-  MapPin,
-  Plane,
-  Shield,
-  Undo2,
-  X
-} from 'lucide-react';
+import { COUNTRY_NAMES, GameState, PlayerState, PropertyState, buildingRefund, mortgageBlockReason, mortgageValue, sellToBankValue, unmortgageCost } from '@monopoly/shared';
+import { ArrowDownCircle, ArrowUpCircle, Banknote, Building2, Castle, Crown, Home, Landmark, Lightbulb, Lock, MapPin, Plane, Shield, TrafficCone, Undo2, X } from 'lucide-react';
 import { useGameStore } from '../../store/gameStore.js';
 import { socket } from '../../net/socket.js';
 import { audioManager } from '../../sound/audioManager.js';
@@ -37,14 +9,13 @@ import { Flag } from '../common/Flag.js';
 import { PlayerAvatar } from '../common/PlayerAvatar.js';
 import { GROUP_HEX, GROUP_LABEL, LEVEL_NAMES, money, playerHex, rentLabel } from '../theme.js';
 import { upgradeOptionFor } from '../game/useTurn.js';
+import { currentBoard } from '../../board.js';
 
-const RAILROADS = [5, 15, 25, 35];
-const UTILITIES = [12, 28];
 const LEVEL_ICONS = [MapPin, Home, Building2, Castle, Crown];
 
 // Force-buy price (mirrors server/src/engine/forceBuy.ts).
 const takeoverPrice = (tileIndex: number, level: number) => {
-  const t = BOARD_TILES[tileIndex];
+  const t = currentBoard().tiles[tileIndex];
   return (t.price + t.buildCost * level) * 2;
 };
 
@@ -58,11 +29,11 @@ interface Row {
 }
 
 function rentRows(game: GameState, prop: PropertyState | undefined, tileIndex: number): Row[] {
-  const tile = BOARD_TILES[tileIndex];
+  const tile = currentBoard().tiles[tileIndex];
   const owner = prop?.ownerId ?? null;
   const ownsActive = (i: number) => !!owner && game.properties[i]?.ownerId === owner && !game.properties[i]?.isMortgaged;
   if (tile.type === 'railroad') {
-    const n = owner ? RAILROADS.filter(ownsActive).length : 0;
+    const n = owner ? currentBoard().railroads.filter(ownsActive).length : 0;
     return [1, 2, 3, 4].map((k) => ({
       key: `r${k}`,
       label: k === 1 ? '1 airport owned' : `${k} airports owned`,
@@ -72,13 +43,20 @@ function rentRows(game: GameState, prop: PropertyState | undefined, tileIndex: n
     }));
   }
   if (tile.type === 'utility') {
-    const n = owner ? UTILITIES.filter(ownsActive).length : 0;
+    const n = owner ? currentBoard().utilities.filter(ownsActive).length : 0;
     return [
       { key: 'u1', label: '1 utility owned', value: '4x dice', icon: <Lightbulb size={15} />, current: !!owner && !prop?.isMortgaged && n === 1 },
       { key: 'u2', label: 'Both utilities', value: '10x dice', icon: <Lightbulb size={15} />, current: !!owner && !prop?.isMortgaged && n === 2 }
     ];
   }
-  const group = COLOR_GROUPS[tile.group] ?? [tileIndex];
+  if (tile.type === 'toll') {
+    const n = owner ? currentBoard().tolls.filter(ownsActive).length : 0;
+    return [
+      { key: 't1', label: '1 gate owned', value: money(tile.rentByLevel[0]), icon: <TrafficCone size={15} />, current: !!owner && !prop?.isMortgaged && n === 1 },
+      { key: 't2', label: 'Both gates', value: money(tile.rentByLevel[1]), icon: <TrafficCone size={15} />, current: !!owner && !prop?.isMortgaged && n === 2, note: 'Charged to everyone who passes or lands' }
+    ];
+  }
+  const group = currentBoard().groups[tile.group] ?? [tileIndex];
   const fullSet = !!owner && group.every((i) => game.properties[i]?.ownerId === owner);
   const level = prop?.buildLevel ?? 0;
   const live = !!owner && !prop?.isMortgaged;
@@ -121,7 +99,7 @@ export const PropertySheet: React.FC = () => {
   }, [tileIndex, setInfoTile]);
 
   if (tileIndex === null || !game) return null;
-  const tile = BOARD_TILES[tileIndex];
+  const tile = currentBoard().tiles[tileIndex];
   if (!tile) return null;
   const prop = game.properties[tileIndex];
   const purchasable = tile.price > 0 && !!prop;
@@ -133,7 +111,7 @@ export const PropertySheet: React.FC = () => {
   const head = (
     <header className="ps-head" style={{ '--g': GROUP_HEX[tile.group] } as React.CSSProperties}>
       <div className="ps-band">
-        {tile.country ? <Flag country={tile.country} size={40} className="ps-flag" /> : tile.type === 'railroad' ? <Plane size={30} /> : tile.type === 'utility' ? <Lightbulb size={30} /> : <MapPin size={28} />}
+        {tile.country ? <Flag country={tile.country} size={40} className="ps-flag" /> : tile.type === 'railroad' ? <Plane size={30} /> : tile.type === 'utility' ? <Lightbulb size={30} /> : tile.type === 'toll' ? <TrafficCone size={30} /> : <MapPin size={28} />}
         <div className="ps-title">
           <small>{tile.country ? COUNTRY_NAMES[tile.country] : purchasable ? GROUP_LABEL[tile.group] : 'Board space'}</small>
           <h3>{tile.name}</h3>
@@ -234,11 +212,11 @@ export const PropertySheet: React.FC = () => {
           )}
           <div>
             <dt>Mortgage value</dt>
-            <dd className="tnum">{money(mortgageValue(tileIndex))}</dd>
+            <dd className="tnum">{money(mortgageValue(currentBoard(), tileIndex))}</dd>
           </div>
           <div>
             <dt>Lift mortgage</dt>
-            <dd className="tnum">{money(unmortgageCost(tileIndex))}</dd>
+            <dd className="tnum">{money(unmortgageCost(currentBoard(), tileIndex))}</dd>
           </div>
         </dl>
 
@@ -291,8 +269,11 @@ function describeSpecial(type: string, amount: number): string {
 
 // Who owns each deed in the color set (and at what level).
 const SetStrip: React.FC<{ game: GameState; tileIndex: number }> = ({ game, tileIndex }) => {
-  const tile = BOARD_TILES[tileIndex];
-  const group = COLOR_GROUPS[tile.group] ?? (tile.type === 'railroad' ? RAILROADS : tile.type === 'utility' ? UTILITIES : null);
+  const tile = currentBoard().tiles[tileIndex];
+  const board = currentBoard();
+  const group =
+    board.groups[tile.group] ??
+    (tile.type === 'railroad' ? board.railroads : tile.type === 'utility' ? board.utilities : tile.type === 'toll' ? board.tolls : null);
   const setInfoTile = useGameStore((s) => s.setInfoTile);
   if (!group) return null;
   return (
@@ -309,7 +290,7 @@ const SetStrip: React.FC<{ game: GameState; tileIndex: number }> = ({ game, tile
               style={{ '--c': o ? playerHex(o.color) : 'transparent' } as React.CSSProperties}
               onClick={() => setInfoTile(i)}
             >
-              <span className="truncate">{BOARD_TILES[i].name}</span>
+              <span className="truncate">{currentBoard().tiles[i].name}</span>
               <small>
                 {o ? o.name : 'Bank'}
                 {p && p.buildLevel > 0 ? ` · ${LEVEL_NAMES[p.buildLevel]}` : ''}
@@ -331,7 +312,7 @@ const Manage: React.FC<{
   confirmSell: boolean;
   setConfirmSell: (v: boolean) => void;
 }> = ({ game, me, prop, isWalking, confirmSell, setConfirmSell }) => {
-  const tile = BOARD_TILES[prop.tileIndex];
+  const tile = currentBoard().tiles[prop.tileIndex];
   const emit = (fn: () => void) => {
     audioManager.playClick();
     fn();
@@ -342,8 +323,8 @@ const Manage: React.FC<{
   // property while standing exactly on GO (checked by upgradeOptionFor).
   const upgradeHere = canAct ? upgradeOptionFor(game, me, prop.tileIndex) : null;
   const mortgageBlock = mortgageBlockReason(game, me.playerId, prop.tileIndex);
-  const lift = unmortgageCost(prop.tileIndex);
-  const sellAll = sellToBankValue(prop);
+  const lift = unmortgageCost(currentBoard(), prop.tileIndex);
+  const sellAll = sellToBankValue(currentBoard(), prop);
 
   return (
     <section className="ps-manage">
@@ -377,7 +358,7 @@ const Manage: React.FC<{
                   onClick={() => emit(() => socket.emit('game:sell', { tileIndex: prop.tileIndex, toLevel: lvl }))}
                 >
                   <span>to {LEVEL_NAMES[lvl]}</span>
-                  <b className="tnum">+{money(buildingRefund(prop.tileIndex, prop.buildLevel - lvl))}</b>
+                  <b className="tnum">+{money(buildingRefund(currentBoard(), prop.tileIndex, prop.buildLevel - lvl))}</b>
                 </button>
               ))}
           </div>
@@ -401,7 +382,7 @@ const Manage: React.FC<{
             title={mortgageBlock ?? undefined}
             onClick={() => emit(() => socket.emit('game:mortgage', { tileIndex: prop.tileIndex, mortgage: true }))}
           >
-            <Landmark size={15} /> Mortgage · +{money(mortgageValue(prop.tileIndex))}
+            <Landmark size={15} /> Mortgage · +{money(mortgageValue(currentBoard(), prop.tileIndex))}
           </button>
         )}
         <button

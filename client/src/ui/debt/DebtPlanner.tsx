@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BOARD_TILES, COLOR_GROUPS, LEVEL_LABELS, PropertyState, TileGroup, liquidationValue } from '@monopoly/shared';
+import { LEVEL_LABELS, PropertyState, TileGroup, liquidationValue } from '@monopoly/shared';
 import {
   ChevronDown,
   Eye,
@@ -35,6 +35,7 @@ import {
   refundFor,
   rentAt
 } from './plan.js';
+import { currentBoard } from '../../board.js';
 
 // Sends each step and waits for the server to apply it before the next one.
 async function runSteps(steps: ReturnType<typeof planSteps>) {
@@ -59,7 +60,7 @@ async function runSteps(steps: ReturnType<typeof planSteps>) {
 }
 
 const LevelPicker: React.FC<{ prop: PropertyState; item: PlanItem; onChange: (item: PlanItem) => void }> = ({ prop, item, onChange }) => {
-  const tile = BOARD_TILES[prop.tileIndex];
+  const tile = currentBoard().tiles[prop.tileIndex];
   if (tile.buildCost <= 0) return null;
   return (
     <div className="level-picker" role="radiogroup" aria-label="Sell down to">
@@ -94,7 +95,7 @@ const PropertyCard: React.FC<{
   // Whole color set is (planned to be) free of buildings.
   setClear: boolean;
 }> = ({ prop, item, open, onToggle, onChange, setClear }) => {
-  const tile = BOARD_TILES[prop.tileIndex];
+  const tile = currentBoard().tiles[prop.tileIndex];
   const refund = refundFor(prop, item);
   const perLevel = Math.floor(tile.buildCost / 2);
   const mortgageValue = Math.floor(tile.price / 2);
@@ -111,7 +112,7 @@ const PropertyCard: React.FC<{
         <span className="plan-title">
           <strong className="truncate">{tile.name}</strong>
           <small>
-            {prop.isMortgaged ? 'Mortgaged' : tile.buildCost > 0 ? LEVEL_LABELS[prop.buildLevel] : tile.type === 'railroad' ? 'Airport' : 'Utility'}
+            {prop.isMortgaged ? 'Mortgaged' : tile.buildCost > 0 ? LEVEL_LABELS[prop.buildLevel] : tile.type === 'railroad' ? 'Airport' : tile.type === 'toll' ? 'Toll gate' : 'Utility'}
             {changed && item.level !== prop.buildLevel && <> → {LEVEL_LABELS[item.level]}</>}
             {item.mortgage && ' → Mortgage'}
           </small>
@@ -160,7 +161,7 @@ const PropertyCard: React.FC<{
               </tbody>
             </table>
           ) : (
-            <p className="plan-note">Rent depends on how many {tile.type === 'railroad' ? 'airports' : 'utilities'} you own.</p>
+            <p className="plan-note">Rent depends on how many {tile.type === 'railroad' ? 'airports' : tile.type === 'toll' ? 'toll gates' : 'utilities'} you own.</p>
           )}
           <dl className="plan-facts">
             <div>
@@ -268,7 +269,7 @@ export const DebtPlanner: React.FC = () => {
   );
   const grouped = new Map<TileGroup, PropertyState[]>();
   for (const p of visible) {
-    const g = BOARD_TILES[p.tileIndex].group;
+    const g = currentBoard().tiles[p.tileIndex].group;
     if (!grouped.has(g)) grouped.set(g, []);
     grouped.get(g)!.push(p);
   }
@@ -400,8 +401,8 @@ export const DebtPlanner: React.FC = () => {
         <p className="plan-note">You own no properties. Only a trade or bankruptcy is left.</p>
       ) : (
         GROUP_ORDER.filter((g) => grouped.has(g)).map((g) => {
-          const setSize = COLOR_GROUPS[g]?.length;
-          const owned = props.filter((p) => BOARD_TILES[p.tileIndex].group === g).length;
+          const setSize = currentBoard().groups[g]?.length;
+          const owned = props.filter((p) => currentBoard().tiles[p.tileIndex].group === g).length;
           return (
             <section key={g} className="plan-group">
               <header>

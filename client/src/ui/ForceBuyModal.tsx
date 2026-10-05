@@ -1,13 +1,14 @@
 import React from 'react';
 import { socket } from '../net/socket.js';
 import { useGameStore } from '../store/gameStore.js';
-import { BOARD_TILES, FORCE_BUY_TIMER_MS } from '@monopoly/shared';
+import { FORCE_BUY_TIMER_MS } from '@monopoly/shared';
 import { ArrowRight, Lock, Zap } from 'lucide-react';
 import { audioManager } from '../sound/audioManager.js';
 import { Modal } from './common/Modal.js';
 import { PlayerAvatar } from './common/PlayerAvatar.js';
 import { useCountdown } from './game/useCountdown.js';
 import { GROUP_HEX, LEVEL_NAMES, money, rentLabel } from './theme.js';
+import { currentBoard } from '../board.js';
 
 const RING = 2 * Math.PI * 20;
 
@@ -23,7 +24,7 @@ export const ForceBuyModal: React.FC = () => {
 
   if (!offer || !gameState || isWalking || cardOpen || offer.buyerPlayerId !== myPlayerId) return null;
 
-  const tile = BOARD_TILES[offer.tileIndex];
+  const tile = currentBoard().tiles[offer.tileIndex];
   const prop = gameState.properties[offer.tileIndex];
   const buyer = gameState.players.find((p) => p.playerId === offer.buyerPlayerId);
   const owner = gameState.players.find((p) => p.playerId === offer.targetPlayerId);

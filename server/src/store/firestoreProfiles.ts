@@ -22,12 +22,15 @@ export class FirestoreProfiles implements ProfileStore {
 
   async recordMatch(match: MatchRecord): Promise<void> {
     const { FieldValue } = await import('firebase-admin/firestore');
-    const refs = match.players.map((p) => this.db.collection('players').doc(p.playerId));
+    // Bots don't get player profiles.
+    const players = match.players.filter((p) => !p.bot);
+    if (!players.length) return;
+    const refs = players.map((p) => this.db.collection('players').doc(p.playerId));
     // One transaction: read the (at most 6) profiles to keep the best score,
     // then write each once.
     await this.db.runTransaction(async (tx) => {
       const docs = await tx.getAll(...refs);
-      match.players.forEach((p, i) => {
+      players.forEach((p, i) => {
         const best = Number(docs[i].get('bestScore') ?? 0);
         tx.set(
           refs[i],

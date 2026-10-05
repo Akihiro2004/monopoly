@@ -1,7 +1,7 @@
-import { BANK_HOTELS, BANK_HOUSES, BankState, GameState, LEDGER_SIZE, piecesAt } from '@monopoly/shared';
+import { BankState, BoardDef, GameState, LEDGER_SIZE, boardOf, piecesAt } from '@monopoly/shared';
 
-export function createBank(): BankState {
-  return { houses: BANK_HOUSES, hotels: BANK_HOTELS, ledger: [], nextTxnId: 1 };
+export function createBank(board: BoardDef): BankState {
+  return { houses: board.houses, hotels: board.hotels, ledger: [], nextTxnId: 1 };
 }
 
 /**
@@ -32,4 +32,14 @@ export function movePieces(state: GameState, fromLevel: number, toLevel: number)
 /** Returns every piece standing on a property to the Bank (bankruptcy). */
 export function returnPieces(state: GameState, level: number): void {
   movePieces(state, level, 0);
+}
+
+/**
+ * A tax, fine or card payment to the Bank (the payer's money has already
+ * been taken). On boards with a jackpot it goes into the Free Parking pot.
+ */
+export function feeToBank(state: GameState, fromId: string, amount: number, reason: string): void {
+  if (amount <= 0) return;
+  record(state, fromId, null, amount, reason);
+  if (boardOf(state).jackpot) state.jackpot = (state.jackpot ?? 0) + amount;
 }

@@ -1,6 +1,5 @@
 import {
-  BOARD_TILES,
-  COLOR_GROUPS,
+  boardOf,
   GameState,
   PlayerState,
   PropertyState,
@@ -15,13 +14,15 @@ import { record, returnPieces } from './bank.js';
  * - or rentByLevel[buildLevel]
  * - railroad: 25 * 2^(count-1)
  * - utility: 4x or 10x dice roll
+ * - toll gate: a flat toll by how many gates the owner holds
  */
 export function calculateRent(
   gameState: GameState,
   tileIndex: number,
   diceTotal: number
 ): number {
-  const tile = BOARD_TILES[tileIndex];
+  const board = boardOf(gameState);
+  const tile = board.tiles[tileIndex];
   const prop = gameState.properties[tileIndex];
 
   if (!tile || !prop || !prop.ownerId || prop.isMortgaged) {
@@ -32,15 +33,15 @@ export function calculateRent(
 
   // Railroad
   if (tile.type === 'railroad') {
-    const railroads = [5, 15, 25, 35];
-    const ownedRailroads = railroads.filter(
+    const ownedRailroads = board.railroads.filter(
       (idx) => gameState.properties[idx]?.ownerId === prop.ownerId && !gameState.properties[idx]?.isMortgaged
     ).length;
     rent = 25 * Math.pow(2, Math.max(0, ownedRailroads - 1));
+  } else if (tile.type === 'toll') {
+    rent = tollFee(gameState, tileIndex);
   } else if (tile.type === 'utility') {
     // Utility
-    const utilities = [12, 28];
-    const ownedUtilities = utilities.filter(
+    const ownedUtilities = board.utilities.filter(
       (idx) => gameState.properties[idx]?.ownerId === prop.ownerId && !gameState.properties[idx]?.isMortgaged
     ).length;
     const multiplier = ownedUtilities === 2 ? 10 : 4;
@@ -51,8 +52,8 @@ export function calculateRent(
     rent = tile.rentByLevel[level] ?? tile.rentByLevel[0];
 
     // If level 0 and player owns entire color set, rent is doubled!
-    if (level === 0 && tile.group && COLOR_GROUPS[tile.group]) {
-      const groupIndices = COLOR_GROUPS[tile.group];
+    if (level === 0 && tile.group && board.groups[tile.group]) {
+      const groupIndices = board.groups[tile.group];
       const ownsAll = groupIndices.every((idx) => gameState.properties[idx]?.ownerId === prop.ownerId);
       if (ownsAll) {
         rent *= 2;
@@ -62,6 +63,18 @@ export function calculateRent(
 
   // A Market Crash event temporarily halves rent board-wide.
   return Math.round(rent * rentMultiplier(gameState));
+}
+
+/** Toll a gate charges right now (0 if unowned or mortgaged). */
+export function tollFee(gameState: GameState, tileIndex: number): number {
+  const board = boardOf(gameState);
+  const prop = gameState.properties[tileIndex];
+  if (!prop?.ownerId || prop.isMortgaged) return 0;
+  const owned = board.tolls.filter(
+    (i) => gameState.properties[i]?.ownerId === prop.ownerId && !gameState.properties[i]?.isMortgaged
+  ).length;
+  const fees = board.tiles[tileIndex].rentByLevel;
+  return fees[Math.min(Math.max(owned, 1), fees.length) - 1] || fees[0];
 }
 
 /**

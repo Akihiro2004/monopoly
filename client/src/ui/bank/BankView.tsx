@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { BANK_HOTELS, BANK_HOUSES, BOARD_TILES, BankTxn, GameState } from '@monopoly/shared';
+import { BankTxn, GameState } from '@monopoly/shared';
 import { ArrowDownLeft, ArrowUpRight, Building2, Gavel, Home, Landmark, Receipt } from 'lucide-react';
 import { useGameStore } from '../../store/gameStore.js';
 import { PlayerAvatar } from '../common/PlayerAvatar.js';
 import { useCountdown } from '../game/useCountdown.js';
 import { auctionKey, money } from '../theme.js';
+import { currentBoard } from '../../board.js';
 
 function timeAgo(ts: number): string {
   const s = Math.floor((Date.now() - ts) / 1000);
@@ -39,7 +40,7 @@ const LiveAuction: React.FC<{ game: GameState }> = ({ game }) => {
     <button className="live-auction" onClick={() => setDismissed(null)} title="Open the auction">
       <Gavel size={20} />
       <span className="live-auction-text">
-        <strong>{BOARD_TILES[game.auction.tileIndex].name}</strong>
+        <strong>{currentBoard().tiles[game.auction.tileIndex].name}</strong>
         <small>
           {game.auction.highBid > 0 ? `${money(game.auction.highBid)} by ${leader?.name}` : 'No bids yet'} · {left}s
         </small>
@@ -58,7 +59,7 @@ export const BankView: React.FC = () => {
   if (!game) return null;
 
   const bank = game.bank;
-  const unsold = BOARD_TILES.filter((t) => t.price > 0 && !game.properties[t.index]?.ownerId).length;
+  const unsold = currentBoard().tiles.filter((t) => t.price > 0 && !game.properties[t.index]?.ownerId).length;
   const circulating = game.players.filter((p) => !p.isBankrupt).reduce((s, p) => s + p.money, 0);
   const name = (id: string | null) => (id === null ? 'Bank' : id === myPlayerId ? 'You' : game.players.find((p) => p.playerId === id)?.name ?? '?');
   const txns = [...(bank?.ledger ?? [])]
@@ -110,8 +111,8 @@ export const BankView: React.FC = () => {
           </div>
         </div>
         <div className="vault-grid">
-          <Supply label="Houses" left={bank?.houses ?? BANK_HOUSES} total={BANK_HOUSES} icon={<Home size={16} />} kind="house" />
-          <Supply label="Hotels" left={bank?.hotels ?? BANK_HOTELS} total={BANK_HOTELS} icon={<Building2 size={16} />} kind="hotel" />
+          <Supply label="Houses" left={bank?.houses ?? currentBoard().houses} total={currentBoard().houses} icon={<Home size={16} />} kind="house" />
+          <Supply label="Hotels" left={bank?.hotels ?? currentBoard().hotels} total={currentBoard().hotels} icon={<Building2 size={16} />} kind="hotel" />
         </div>
         <div className="vault-stats">
           <div>
@@ -122,6 +123,12 @@ export const BankView: React.FC = () => {
             <span>Cash in play</span>
             <strong className="tnum">{money(circulating)}</strong>
           </div>
+          {currentBoard().jackpot && (
+            <div title="Taxes and fines pile up here. Land exactly on Free Parking to win it all.">
+              <span>Free Parking jackpot</span>
+              <strong className="tnum">{money(game.jackpot ?? 0)}</strong>
+            </div>
+          )}
         </div>
       </section>
 

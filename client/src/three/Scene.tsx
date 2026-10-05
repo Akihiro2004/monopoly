@@ -11,6 +11,8 @@ import { Tokens3D } from './Tokens3D.js';
 import { Dice3D } from './Dice3D.js';
 import { Environment } from './Environment.js';
 import { GoBurst } from './GoBurst.js';
+import { boardGroupTransform, boardLayout, centerScale } from './boardCoords.js';
+import { currentBoard, useBoard } from '../board.js';
 import { DECK_POS, setDeckProjector } from './deckAnchor.js';
 
 const FOV = 45;
@@ -236,7 +238,9 @@ const DeckAnchor: React.FC = () => {
   useEffect(() => {
     const v = new THREE.Vector3();
     setDeckProjector((deck) => {
-      v.set(...DECK_POS[deck]).project(camera);
+      const [x, y, z] = DECK_POS[deck];
+      const k = centerScale(boardLayout(currentBoard()));
+      v.set(x * k, y, z * k).project(camera);
       if (v.z > 1) return null;
       const rect = gl.domElement.getBoundingClientRect();
       return { x: rect.left + ((v.x + 1) / 2) * rect.width, y: rect.top + ((1 - v.y) / 2) * rect.height };
@@ -256,6 +260,7 @@ function wakeOnInput(el: HTMLElement) {
 
 export const MonopolyScene: React.FC = () => {
   const gameState = useGameStore((s) => s.gameState);
+  const board = useBoard();
   const isMobile = useIsMobile();
   const panelCollapsed = useGameStore((s) => s.panelCollapsed);
   const wideDesktop = useMediaQuery('(min-width: 1281px)');
@@ -346,14 +351,17 @@ export const MonopolyScene: React.FC = () => {
 
           <Board3D />
 
-          {gameState && (
-            <Tokens3D
-              players={gameState.players}
-              currentPlayerIndex={gameState.currentPlayerIndex}
-            />
-          )}
+          {/* Same transform as the tile ring (bigger boards are scaled) */}
+          <group {...boardGroupTransform(boardLayout(board))}>
+            {gameState && (
+              <Tokens3D
+                players={gameState.players}
+                currentPlayerIndex={gameState.currentPlayerIndex}
+              />
+            )}
 
-          <GoBurst />
+            <GoBurst />
+          </group>
 
           <Dice3D />
         </Suspense>

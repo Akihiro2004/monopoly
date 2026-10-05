@@ -1,6 +1,5 @@
 import {
-  BOARD_TILES,
-  COLOR_GROUPS,
+  boardOf,
   BuildLevel,
   GameState,
   PlayerState,
@@ -25,7 +24,7 @@ export function executeAutoBuy(
   buyer: PlayerState,
   tileIndex: number
 ): { bought: boolean; text: string } {
-  const tile = BOARD_TILES[tileIndex];
+  const tile = boardOf(gameState).tiles[tileIndex];
   const prop = gameState.properties[tileIndex];
 
   if (!tile || !prop) {
@@ -72,7 +71,7 @@ export function buildProperty(
   player: PlayerState,
   tileIndex: number
 ): { success: boolean; text: string } {
-  const tile = BOARD_TILES[tileIndex];
+  const tile = boardOf(gameState).tiles[tileIndex];
   const prop = gameState.properties[tileIndex];
   const blocked = buildBlockReason(gameState, player, tileIndex);
   if (blocked || !tile || !prop) {
@@ -104,7 +103,7 @@ export function sellBuilding(
   tileIndex: number,
   toLevel?: number
 ): { success: boolean; text: string; refund?: number } {
-  const tile = BOARD_TILES[tileIndex];
+  const tile = boardOf(gameState).tiles[tileIndex];
   const prop = gameState.properties[tileIndex];
 
   if (!tile || !prop) {
@@ -128,7 +127,7 @@ export function sellBuilding(
   if (prop.buildLevel >= 3 && targetLevel > 0 && targetLevel < 3 && gameState.bank.houses < targetLevel) {
     targetLevel = 0;
   }
-  const refund = buildingRefund(tileIndex, prop.buildLevel - targetLevel);
+  const refund = buildingRefund(boardOf(gameState), tileIndex, prop.buildLevel - targetLevel);
   movePieces(gameState, prop.buildLevel, targetLevel);
   prop.buildLevel = targetLevel as BuildLevel;
   player.money += refund;
@@ -150,12 +149,12 @@ export function sellPropertyToBank(
   player: PlayerState,
   tileIndex: number
 ): { success: boolean; text: string; refund?: number } {
-  const tile = BOARD_TILES[tileIndex];
+  const tile = boardOf(gameState).tiles[tileIndex];
   const prop = gameState.properties[tileIndex];
   if (!tile || !prop || tile.price <= 0) return { success: false, text: 'Invalid property' };
   if (prop.ownerId !== player.playerId) return { success: false, text: 'You do not own this property' };
 
-  const refund = sellToBankValue(prop);
+  const refund = sellToBankValue(boardOf(gameState), prop);
   movePieces(gameState, prop.buildLevel, 0);
   prop.ownerId = null;
   prop.buildLevel = 0;
@@ -179,7 +178,7 @@ export function toggleMortgage(
   tileIndex: number,
   mortgage: boolean
 ): { success: boolean; text: string } {
-  const tile = BOARD_TILES[tileIndex];
+  const tile = boardOf(gameState).tiles[tileIndex];
   const prop = gameState.properties[tileIndex];
 
   if (!tile || !prop || prop.ownerId !== player.playerId) {
@@ -189,7 +188,7 @@ export function toggleMortgage(
   if (mortgage) {
     const blocked = mortgageBlockReason(gameState, player.playerId, tileIndex);
     if (blocked) return { success: false, text: blocked };
-    const value = mortgageValue(tileIndex);
+    const value = mortgageValue(boardOf(gameState), tileIndex);
     prop.isMortgaged = true;
     prop.mortgagedAtLap = player.lapsCompleted;
     player.money += value;
@@ -201,7 +200,7 @@ export function toggleMortgage(
     if (!prop.isMortgaged) {
       return { success: false, text: 'Property is not mortgaged' };
     }
-    const cost = unmortgageCost(tileIndex); // mortgage value + 10% interest
+    const cost = unmortgageCost(boardOf(gameState), tileIndex); // mortgage value + 10% interest
     if (player.money < cost) {
       return { success: false, text: `Need $${cost} to lift the mortgage on ${tile.name}` };
     }

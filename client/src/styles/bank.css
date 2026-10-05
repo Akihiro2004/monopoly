@@ -381,3 +381,8 @@
     display: none;
   }
 }
+
+/* Grand World: the jackpot gets the full row */
+.vault-stats div:nth-child(3) {
+  grid-column: 1 / -1;
+}

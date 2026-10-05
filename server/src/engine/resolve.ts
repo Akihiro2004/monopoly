@@ -1,16 +1,16 @@
 import {
-  BOARD_TILES,
   CardDef,
   CardDraw,
   ForceBuyMode,
-  GO_TO_JAIL_TILE_INDEX,
-  JAIL_TILE_INDEX,
-  GO_SALARY,
   GameState,
+  LUCKY_DRAW_BONUS,
+  LUCKY_DRAW_FEE,
+  LUCKY_DRAW_FEE_CHANCE,
+  boardOf,
   piecesAt,
   PlayerState
 } from '@monopoly/shared';
-import { record } from './bank.js';
+import { feeToBank, record } from './bank.js';
 import { executeAutoBuy } from './actions.js';
 import { canForceBuy, createForceBuyOffer } from './forceBuy.js';
 import { calculateRent, payRent } from './rent.js';
@@ -39,13 +39,14 @@ export function resolveLanding(
   opts: LandingOptions = {},
   forceBuyMode: ForceBuyMode = 'developed'
 ): ResolveResult {
+  const board = boardOf(gameState);
   const tileIndex = player.position;
-  const tile = BOARD_TILES[tileIndex];
+  const tile = board.tiles[tileIndex];
   const prop = gameState.properties[tileIndex];
 
   // 1. Go To Jail tile
-  if (tileIndex === GO_TO_JAIL_TILE_INDEX) {
-    player.position = JAIL_TILE_INDEX;
+  if (tileIndex === board.goToJail) {
+    player.position = board.jail;
     player.inJail = true;
     player.jailTurns = 0;
     const msg = `${player.name} landed on Go To Jail and is arrested.`;
@@ -58,7 +59,7 @@ export function resolveLanding(
     const tax = tile.rentByLevel[0];
     if (player.money >= tax) {
       player.money -= tax;
-      record(gameState, player.playerId, null, tax, tile.name);
+      feeToBank(gameState, player.playerId, tax, tile.name);
       const msg = `${player.name} paid $${tax} in ${tile.name}.`;
       gameState.lastActionText = msg;
       return { needsForceBuyChoice: false, toast: msg };
@@ -67,6 +68,38 @@ export function resolveLanding(
     const debtMsg = `${player.name} cannot afford the $${tax} ${tile.name}. Sell buildings to pay or go bankrupt.`;
     gameState.lastActionText = debtMsg;
     return { needsForceBuyChoice: false, toast: debtMsg };
+  }
+
+  // Free Parking pays out the jackpot (boards that have one).
+  if (tile.type === 'parking' && board.jackpot && (gameState.jackpot ?? 0) > 0) {
+    const pot = gameState.jackpot ?? 0;
+    gameState.jackpot = 0;
+    player.money += pot;
+    record(gameState, null, player.playerId, pot, 'Free Parking jackpot');
+    const msg = `JACKPOT! ${player.name} landed on Free Parking and collected $${pot}.`;
+    gameState.lastActionText = msg;
+    return { needsForceBuyChoice: false, toast: msg };
+  }
+
+  // Lucky Draw: usually a bonus from the Bank, sometimes a fee into the pot.
+  if (tile.type === 'bonus') {
+    const roll = (range: [number, number]) => range[0] + Math.floor(Math.random() * ((range[1] - range[0]) / 10 + 1)) * 10;
+    if (Math.random() < LUCKY_DRAW_FEE_CHANCE) {
+      const fee = Math.min(player.money, roll(LUCKY_DRAW_FEE));
+      player.money -= fee;
+      feeToBank(gameState, player.playerId, fee, tile.name);
+      const msg = board.jackpot
+        ? `Unlucky draw: ${player.name} pays $${fee} into the Free Parking jackpot.`
+        : `Unlucky draw: ${player.name} pays $${fee}.`;
+      gameState.lastActionText = msg;
+      return { needsForceBuyChoice: false, toast: msg };
+    }
+    const prize = roll(LUCKY_DRAW_BONUS);
+    player.money += prize;
+    record(gameState, null, player.playerId, prize, tile.name);
+    const msg = `Lucky Draw! ${player.name} wins $${prize}.`;
+    gameState.lastActionText = msg;
+    return { needsForceBuyChoice: false, toast: msg };
   }
 
   // 3. Chance / Chest
@@ -134,10 +167,10 @@ export function resolveLanding(
 
     // Check force-buy eligibility against what's left after rent -- the
     // takeover price is due on top of it, not instead of it.
-    const fbCheck = canForceBuy(tileIndex, player, prop, forceBuyMode);
+    const fbCheck = canForceBuy(board, tileIndex, player, prop, forceBuyMode);
     if (fbCheck.eligible) {
       gameState.phase = 'FORCE_BUY_OFFER';
-      gameState.forceBuyOffer = createForceBuyOffer(tileIndex, player, prop);
+      gameState.forceBuyOffer = createForceBuyOffer(board, tileIndex, player, prop);
       const msg = `${rentMsg} Force-buy offer: $${fbCheck.price} on top of the rent.`;
       gameState.lastActionText = msg;
       return { needsForceBuyChoice: true, toast: msg };
@@ -152,18 +185,16 @@ export function resolveLanding(
 
 // ---------------------------------------------------------------- cards
 
-const RAILROADS = [5, 15, 25, 35];
-const UTILITIES = [12, 28];
-
 function nextOf(list: number[], from: number): number {
   return list.find((i) => i > from) ?? list[0];
 }
 
 function payGoSalary(gameState: GameState, player: PlayerState): void {
-  player.money += GO_SALARY;
+  const salary = boardOf(gameState).goSalary;
+  player.money += salary;
   player.lapsCompleted++;
   player.mortgagesThisRound = 0;
-  record(gameState, null, player.playerId, GO_SALARY, 'GO salary');
+  record(gameState, null, player.playerId, salary, 'GO salary');
 }
 
 // Buildings a player owns, in house / hotel pieces (Lv1 = 1 house, Lv2 = 2
@@ -184,7 +215,7 @@ function payBank(gameState: GameState, player: PlayerState, amount: number, reas
   if (amount <= 0) return null;
   if (player.money >= amount) {
     player.money -= amount;
-    record(gameState, player.playerId, null, amount, deckName);
+    feeToBank(gameState, player.playerId, amount, deckName);
     return null;
   }
   gameState.debt = { amount, creditorId: null, reason };
@@ -206,6 +237,7 @@ export function drawCard(
   depth = 0,
   forceBuyMode: ForceBuyMode = 'developed'
 ): ResolveResult {
+  const board = boardOf(gameState);
   const deck = deckType === 'chance' ? chanceDeck : chestDeck;
   const deckName = deckType === 'chance' ? 'Chance' : 'Community Chest';
   const card = deck.shift();
@@ -260,14 +292,15 @@ export function drawCard(
     }
     case 'moveTo':
       emit();
-      return moveAndResolve(action.tileIndex, true);
+      // Card targets are classic World indices: the same city on this board.
+      return moveAndResolve(board.cardTargets[action.tileIndex] ?? action.tileIndex, true);
     case 'moveBack': {
       emit();
-      const target = (player.position - action.spaces + 40) % 40;
+      const target = (player.position - action.spaces + board.size) % board.size;
       return moveAndResolve(target, false);
     }
     case 'nearest': {
-      const target = nextOf(action.kind === 'railroad' ? RAILROADS : UTILITIES, player.position);
+      const target = nextOf(action.kind === 'railroad' ? board.railroads : board.utilities, player.position);
       let opts: LandingOptions = { rentMultiplier: 2 };
       if (action.kind === 'utility') {
         const owner = gameState.properties[target]?.ownerId;
@@ -286,7 +319,7 @@ export function drawCard(
     }
     case 'jail':
       emit();
-      player.position = JAIL_TILE_INDEX;
+      player.position = board.jail;
       player.inJail = true;
       player.jailTurns = 0;
       return finish();

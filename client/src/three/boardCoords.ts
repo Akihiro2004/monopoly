@@ -1,4 +1,4 @@
-import { Vector3 } from 'three';
+import { BoardDef } from '@monopoly/shared';
 
 export interface TileCoordinate {
   index: number;
@@ -7,102 +7,93 @@ export interface TileCoordinate {
   size: [number, number, number];
 }
 
-// Board is 20 units x 20 units on the X-Z plane
-// 40 tiles total: 10 per side
-// Corners are at indices 0 (GO), 10 (Jail), 20 (Free Parking), 30 (Go to Jail)
-export function calculateTileCoordinates(): TileCoordinate[] {
-  const coords: TileCoordinate[] = [];
-  const boardSize = 20;
-  const half = boardSize / 2;
-  const cornerSize = 2.4;
-  const standardWidth = (boardSize - 2 * cornerSize) / 9; // ~1.688
-  const tileHeight = 0.14;
-  const surfaceY = 0.1; // top of the blue frame / white ring
-  const tileY = surfaceY + tileHeight / 2;
-  const tileDepth = cornerSize;
-
-  // Bottom side: 0 to 9 (moving right to left: X goes from +half to -half at Z = +half)
-  // 0 is Bottom-Right corner (GO)
-  coords.push({
-    index: 0,
-    position: [half - cornerSize / 2, tileY, half - cornerSize / 2],
-    rotation: [0, 0, 0],
-    size: [cornerSize, tileHeight, cornerSize]
-  });
-
-  for (let i = 1; i <= 9; i++) {
-    const x = half - cornerSize - (i - 0.5) * standardWidth;
-    coords.push({
-      index: i,
-      position: [x, tileY, half - tileDepth / 2],
-      rotation: [0, 0, 0],
-      size: [standardWidth * 0.95, tileHeight, tileDepth]
-    });
-  }
-
-  // Left side: 10 to 19 (moving bottom to top: Z goes from +half to -half at X = -half)
-  // 10 is Bottom-Left corner (Jail)
-  coords.push({
-    index: 10,
-    position: [-half + cornerSize / 2, tileY, half - cornerSize / 2],
-    rotation: [0, -Math.PI / 2, 0],
-    size: [cornerSize, tileHeight, cornerSize]
-  });
-
-  for (let i = 1; i <= 9; i++) {
-    const z = half - cornerSize - (i - 0.5) * standardWidth;
-    coords.push({
-      index: 10 + i,
-      position: [-half + tileDepth / 2, tileY, z],
-      rotation: [0, -Math.PI / 2, 0],
-      size: [standardWidth * 0.95, tileHeight, tileDepth]
-    });
-  }
-
-  // Top side: 20 to 29 (moving left to right: X goes from -half to +half at Z = -half)
-  // 20 is Top-Left corner (Free Parking)
-  coords.push({
-    index: 20,
-    position: [-half + cornerSize / 2, tileY, -half + cornerSize / 2],
-    rotation: [0, Math.PI, 0],
-    size: [cornerSize, tileHeight, cornerSize]
-  });
-
-  for (let i = 1; i <= 9; i++) {
-    const x = -half + cornerSize + (i - 0.5) * standardWidth;
-    coords.push({
-      index: 20 + i,
-      position: [x, tileY, -half + tileDepth / 2],
-      rotation: [0, Math.PI, 0],
-      size: [standardWidth * 0.95, tileHeight, tileDepth]
-    });
-  }
-
-  // Right side: 30 to 39 (moving top to bottom: Z goes from -half to +half at X = +half)
-  // 30 is Top-Right corner (Go to Jail)
-  coords.push({
-    index: 30,
-    position: [half - cornerSize / 2, tileY, -half + cornerSize / 2],
-    rotation: [0, Math.PI / 2, 0],
-    size: [cornerSize, tileHeight, cornerSize]
-  });
-
-  for (let i = 1; i <= 9; i++) {
-    const z = -half + cornerSize + (i - 0.5) * standardWidth;
-    coords.push({
-      index: 30 + i,
-      position: [half - tileDepth / 2, tileY, z],
-      rotation: [0, Math.PI / 2, 0],
-      size: [standardWidth * 0.95, tileHeight, tileDepth]
-    });
-  }
-
-  return coords;
+export interface BoardLayout {
+  coords: TileCoordinate[];
+  // Edge length of the tile ring in board units (20 for the World board).
+  size: number;
+  // Uniform scale that fits the ring into the 20-unit table, so bigger
+  // boards keep their tile proportions (and labels stay readable).
+  scale: number;
 }
 
-export const BOARD_COORDINATES = calculateTileCoordinates();
+const CORNER = 2.4;
+// Width of a regular tile (World board: 9 between corners on 20 units).
+const TILE_W = (20 - 2 * CORNER) / 9;
+const TILE_H = 0.14;
+const SURFACE_Y = 0.1; // top of the blue frame / white ring
+const TILE_Y = SURFACE_Y + TILE_H / 2;
 
-export function getTileCenter(index: number): [number, number, number] {
-  const coord = BOARD_COORDINATES[index % 40];
+const cache = new Map<string, BoardLayout>();
+
+/**
+ * Tile placement for a board with `perSide` tiles per side (corner first).
+ * Side 0 runs right-to-left along the bottom from GO, then up the left, across
+ * the top and down the right, like a real board.
+ */
+export function boardLayout(board: BoardDef): BoardLayout {
+  const hit = cache.get(board.id);
+  if (hit) return hit;
+  const n = board.perSide;
+  const size = 2 * CORNER + (n - 1) * TILE_W;
+  const half = size / 2;
+  const c = CORNER / 2;
+  const corners: [number, number][] = [
+    [half - c, half - c],
+    [-half + c, half - c],
+    [-half + c, -half + c],
+    [half - c, -half + c]
+  ];
+  const rotations = [0, -Math.PI / 2, Math.PI, Math.PI / 2];
+  // Where regular tile k (1-based) of each side sits.
+  const along = (side: number, k: number): [number, number] => {
+    const d = half - CORNER - (k - 0.5) * TILE_W;
+    const depth = half - CORNER / 2;
+    switch (side) {
+      case 0:
+        return [d, depth];
+      case 1:
+        return [-depth, d];
+      case 2:
+        return [-d, -depth];
+      default:
+        return [depth, -d];
+    }
+  };
+  const coords: TileCoordinate[] = [];
+  for (let side = 0; side < 4; side++) {
+    const rot: [number, number, number] = [0, rotations[side], 0];
+    const [cx, cz] = corners[side];
+    coords.push({ index: side * n, position: [cx, TILE_Y, cz], rotation: rot, size: [CORNER, TILE_H, CORNER] });
+    for (let k = 1; k < n; k++) {
+      const [x, z] = along(side, k);
+      coords.push({ index: side * n + k, position: [x, TILE_Y, z], rotation: rot, size: [TILE_W * 0.95, TILE_H, CORNER] });
+    }
+  }
+  const layout = { coords, size, scale: 20 / size };
+  cache.set(board.id, layout);
+  return layout;
+}
+
+/**
+ * Transform for everything that lives on the tile ring (tiles, tokens,
+ * buildings): the fitting scale, lifted so the tile tops stay level with
+ * the centre board, which keeps its own size.
+ */
+export function boardGroupTransform(layout: BoardLayout): { scale: number; position: [number, number, number] } {
+  const top = SURFACE_Y + TILE_H;
+  return { scale: layout.scale, position: [0, top * (1 - layout.scale), 0] };
+}
+
+/**
+ * How much the centre board (art, card decks) grows so it fills the inner
+ * ring of a bigger board (1 on the World board). Applies to x and z only.
+ */
+export function centerScale(layout: BoardLayout): number {
+  return ((layout.size - 2 * CORNER) * layout.scale) / (20 - 2 * CORNER);
+}
+
+/** Centre of a tile in board units (inside the scaled board group). */
+export function getTileCenter(board: BoardDef, index: number): [number, number, number] {
+  const coord = boardLayout(board).coords[((index % board.size) + board.size) % board.size];
   return coord ? coord.position : [0, 0, 0];
 }

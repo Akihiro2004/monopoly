@@ -1,14 +1,17 @@
 import React from 'react';
 import { socket, clearSession } from '../net/socket.js';
 import { useGameStore } from '../store/gameStore.js';
-import { TokenType, PlayerColor, ForceBuyMode, PROTOCOL_VERSION } from '@monopoly/shared';
-import { Check, ChevronLeft, Copy, Play, Share2, Shuffle, Swords, Timer, Trophy, Users, Palette, Shapes } from 'lucide-react';
-import { LeaderboardButton } from './session/Leaderboard.js';
+import { BoardId, TokenType, PlayerColor, ForceBuyMode, PROTOCOL_VERSION } from '@monopoly/shared';
+import { Check, ChevronLeft, Earth, Globe2, Copy, Lock, Play, ScrollText, Share2, Shapes, Shuffle, Swords, Timer, Trophy, Users } from 'lucide-react';
 import { TOKENS, COLORS } from './lobbyConstants.js';
 import { LobbySeats } from './LobbySeats.js';
-import { MobileLobby } from './lobby/MobileLobby.js';
+import { FORCE_BUY_LABEL, MobileLobby } from './lobby/MobileLobby.js';
 import { useIsMobile } from '../hooks/useIsMobile.js';
-import { Logo, Sky } from './common/Sky.js';
+import { Logo } from './common/Logo.js';
+import { MenuScene } from './menu/MenuScene.js';
+import { MuteButton } from './game/TurnHeader.js';
+import { playerHex } from './theme.js';
+import { audioManager } from '../sound/audioManager.js';
 
 export const LobbyScreen: React.FC = () => {
   const roomState = useGameStore((s) => s.roomState);
@@ -24,7 +27,8 @@ export const LobbyScreen: React.FC = () => {
   const settings = {
     ...roomState.settings,
     forceBuyMode: roomState.settings.forceBuyMode ?? ('developed' as ForceBuyMode),
-    randomEvents: roomState.settings.randomEvents ?? true
+    randomEvents: roomState.settings.randomEvents ?? true,
+    board: roomState.settings.board ?? ('world' as BoardId)
   };
   const mySeat = roomState.seats.find((s) => s.playerId === myPlayerId);
   const isHost = mySeat?.isHost ?? false;
@@ -35,7 +39,7 @@ export const LobbyScreen: React.FC = () => {
   const canStart = roomState.seats.length >= 2 && notReady === 0;
   const startHint =
     roomState.seats.length < 2
-      ? 'Invite at least one more player to start.'
+      ? 'Invite a friend or add a bot to start.'
       : notReady > 0
         ? `Waiting for ${notReady} player${notReady > 1 ? 's' : ''} to ready up.`
         : 'Everyone is ready. Start when you like.';
@@ -97,8 +101,18 @@ export const LobbyScreen: React.FC = () => {
     socket.emit('room:setRandomEvents', { enabled: !settings.randomEvents });
   };
 
+  const handleBoard = (board: BoardId) => {
+    if (!isHost) return;
+    socket.emit('room:setBoard', { board });
+  };
+
   const handleKick = (playerId: string) => {
     socket.emit('room:kick', { playerId });
+  };
+
+  const handleAddBot = () => {
+    if (!isHost) return;
+    socket.emit('room:addBot');
   };
 
   const handleLeave = () => {
@@ -128,6 +142,8 @@ export const LobbyScreen: React.FC = () => {
           start: handleStartGame,
           leave: handleLeave,
           kick: handleKick,
+          addBot: handleAddBot,
+          setBoard: handleBoard,
           toggleSpecialVictory: handleToggleSpecialVictory,
           setTurnTimer: handleTurnTimer,
           setForceBuyMode: handleForceBuyMode,
@@ -138,70 +154,99 @@ export const LobbyScreen: React.FC = () => {
     );
   }
 
+  const seatedCount = roomState.seats.length;
+  const readyCount = roomState.seats.filter((s) => s.isHost || s.isReady).length;
+  const maxSeats = roomState.settings.maxPlayers || 6;
+
   return (
-    <div className="menu-screen lobby-screen">
-      <Sky />
+    <div className="menu-screen mx lobby-screen">
+      <MenuScene />
       {outdated}
 
-      <header className="lobby-appbar">
-        <button className="btn btn-ghost btn-sm btn-leave" onClick={handleLeave}>
-          <ChevronLeft size={18} />
-          <span>Leave</span>
+      <header className="mx-topbar">
+        <button className="mx-pill btn-leave" onClick={handleLeave}>
+          <ChevronLeft size={18} strokeWidth={2.8} /> Leave table
         </button>
         <Logo size="sm" />
-        <span className="lobby-appbar-spacer">
-          <LeaderboardButton className="btn-sm" />
-        </span>
+        <div className="mx-topbar-actions">
+          <button
+            type="button"
+            className="mx-pill gold"
+            onClick={() => {
+              audioManager.playClick();
+              useGameStore.getState().setLeaderboardOpen(true);
+            }}
+          >
+            <Trophy size={16} strokeWidth={2.6} /> Leaderboard
+          </button>
+          <MuteButton />
+        </div>
       </header>
 
-      <div className="lobby-layout">
-        <div className="lobby-main">
-          <section className="card paper room-card">
-            <div className="room-code-block">
-              <span className="section-title">Room code</span>
-              <button className="code-display" onClick={handleCopyCode} title="Copy room code">
-                <h2>{roomState.roomId}</h2>
+      <main className="lobby-layout">
+        <section className="mx-panel lobby-ticket">
+          <div className="room-code-block">
+            <span className="mx-label">Table code</span>
+            <button className="code-display" onClick={handleCopyCode} title="Copy table code">
+              <h2>{roomState.roomId}</h2>
+            </button>
+          </div>
+          <div className="ticket-actions">
+            <button className="mx-btn gold" onClick={handleCopyCode}>
+              <Copy size={16} strokeWidth={2.6} /> Copy code
+            </button>
+            {canShare && (
+              <button className="mx-btn violet" onClick={handleShare}>
+                <Share2 size={16} strokeWidth={2.6} /> Share
               </button>
-              <p className="room-hint">Friends join from the home screen with this code.</p>
-            </div>
-            <div className="room-actions">
-              <button className="btn btn-gold" onClick={handleCopyCode}>
-                <Copy size={16} /> Copy
-              </button>
-              {canShare && (
-                <button className="btn btn-blue" onClick={handleShare}>
-                  <Share2 size={16} /> Share
-                </button>
-              )}
-            </div>
-          </section>
+            )}
+          </div>
+          <p className="ticket-hint">Friends enter this code on the home screen to sit down at your table.</p>
+          <div className="ticket-stats">
+            <span>
+              <b className="tnum">
+                {seatedCount}
+                <small>/{maxSeats}</small>
+              </b>
+              Seated
+            </span>
+            <span>
+              <b className="tnum">
+                {readyCount}
+                <small>/{seatedCount}</small>
+              </b>
+              Ready
+            </span>
+          </div>
+        </section>
 
-          <section className="card paper">
-            <div className="card-head">
-              <span className="section-title">
-                <Users size={14} /> Players
-              </span>
-              <span className="seat-count tnum">
-                {roomState.seats.length}
-                <span>/{roomState.settings.maxPlayers || 6}</span>
-              </span>
-            </div>
-            <LobbySeats
-              seats={roomState.seats}
-              myPlayerId={myPlayerId}
-              maxPlayers={roomState.settings.maxPlayers || 6}
-              onKick={isHost ? handleKick : undefined}
-            />
-          </section>
-        </div>
+        <section className="mx-panel lobby-table">
+          <div className="mx-panel-head">
+            <h3>
+              <Users size={18} strokeWidth={2.6} /> The table
+            </h3>
+            <span className="mx-panel-note">
+              {seatedCount} of {maxSeats} seats taken
+            </span>
+          </div>
+          <LobbySeats
+            seats={roomState.seats}
+            myPlayerId={myPlayerId}
+            maxPlayers={maxSeats}
+            onKick={isHost ? handleKick : undefined}
+            onAddBot={isHost ? handleAddBot : undefined}
+            onInvite={handleCopyCode}
+          />
+        </section>
 
-        <div className="lobby-side">
+        <aside className="lobby-side">
           {mySeat && (
-            <section className="card paper">
-              <div className="card-head">
-                <span className="section-title">
-                  <Shapes size={14} /> Your token
-                </span>
+            <section className="mx-panel">
+              <div className="mx-panel-head">
+                <h3>
+                  <Shapes size={18} strokeWidth={2.6} /> Your piece
+                </h3>
+                <span className="mx-panel-note">{TOKENS.find((t) => t.type === mySeat.tokenType)?.label}</span>
               </div>
               <div className="token-grid">
                 {TOKENS.map((t) => {
@@ -211,37 +256,36 @@ export const LobbyScreen: React.FC = () => {
                     <button
                       key={t.type}
                       className={`token-option ${active ? 'active' : ''}`}
+                      style={{ '--c': playerHex(takenBy?.color ?? mySeat.color) } as React.CSSProperties}
                       onClick={() => handleSelectToken(t.type)}
                       disabled={!!takenBy}
                       title={takenBy ? `Taken by ${takenBy.displayName}` : t.label}
                     >
-                      <t.icon size={24} />
-                      <span>{t.label}</span>
-                      {takenBy && <span className="token-taken">{takenBy.displayName}</span>}
+                      <t.icon size={24} strokeWidth={2.2} />
+                      <span>{takenBy ? takenBy.displayName : t.label}</span>
+                      {takenBy && <Lock size={11} strokeWidth={3} className="token-lock" />}
                     </button>
                   );
                 })}
               </div>
-
-              <div className="card-head" style={{ marginTop: 18 }}>
-                <span className="section-title">
-                  <Palette size={14} /> Color
-                </span>
-              </div>
-              <div className="color-row">
+              <div className="color-row" role="radiogroup" aria-label="Color">
                 {COLORS.map((c) => {
                   const takenBy = others.find((s) => s.color === c.color);
                   const active = mySeat.color === c.color;
                   return (
                     <button
                       key={c.color}
-                      className={`color-swatch ${active ? 'active' : ''}`}
+                      role="radio"
+                      aria-checked={active}
+                      className={`color-swatch ${active ? 'active' : ''} ${takenBy ? 'taken' : ''}`}
                       style={{ '--c': c.hex } as React.CSSProperties}
                       onClick={() => handleSelectColor(c.color)}
                       disabled={!!takenBy}
+                      title={takenBy ? `Taken by ${takenBy.displayName}` : c.color}
                       aria-label={takenBy ? `${c.color}, taken by ${takenBy.displayName}` : c.color}
                     >
-                      {active && <Check size={16} strokeWidth={3} />}
+                      {active && <Check size={16} strokeWidth={3.4} />}
+                      {takenBy && <Lock size={12} strokeWidth={3} />}
                     </button>
                   );
                 })}
@@ -249,128 +293,139 @@ export const LobbyScreen: React.FC = () => {
             </section>
           )}
 
-          <section className="card paper">
-            <div className="setting-row">
-              <span className="setting-icon">
-                <Trophy size={18} />
-              </span>
-              <div className="setting-copy">
-                <strong>Special victories</strong>
-                <span>Win instantly with 3 full color sets or every property on one side.</span>
-              </div>
+          <section className="mx-panel lobby-rules">
+            <div className="mx-panel-head">
+              <h3>
+                <ScrollText size={18} strokeWidth={2.6} /> House rules
+              </h3>
+              {!isHost && <span className="mx-panel-note">Set by the host</span>}
+            </div>
+            <div className="board-pick" role="radiogroup" aria-label="Board">
+              {BOARD_CHOICES.map((b) => (
+                <button
+                  key={b.id}
+                  role="radio"
+                  aria-checked={settings.board === b.id}
+                  className={`board-option ${settings.board === b.id ? 'active' : ''}`}
+                  onClick={() => handleBoard(b.id)}
+                  disabled={!isHost}
+                  title={isHost ? undefined : 'Only the host can change this'}
+                >
+                  <span className="board-option-icon">
+                    <b.icon size={20} strokeWidth={2.4} />
+                  </span>
+                  <span className="board-option-copy">
+                    <b>{b.name}</b>
+                    <small>{b.sub}</small>
+                  </span>
+                  <span className="board-option-tag">{b.players}</span>
+                </button>
+              ))}
+            </div>
+            <RuleRow icon={<Trophy size={17} />} title="Special victories" sub="3 full sets or a whole side wins instantly">
               <button
                 className={`switch ${roomState.settings.specialVictory ? 'on' : ''}`}
                 onClick={handleToggleSpecialVictory}
                 disabled={!isHost}
                 role="switch"
                 aria-checked={roomState.settings.specialVictory}
-                title={isHost ? 'Toggle special victories' : 'Only the host can change this'}
+                aria-label="Special victories"
               />
-            </div>
-            <div className="setting-row">
-              <span className="setting-icon">
-                <Timer size={18} />
-              </span>
-              <div className="setting-copy">
-                <strong>Turn timer</strong>
-                <span>Time per decision before the game plays it for you.</span>
-              </div>
-            </div>
-            <div className="segmented small timer-choice" role="radiogroup" aria-label="Turn timer">
-              {[0, 60, 90, 120].map((sec) => (
-                <button
-                  key={sec}
-                  role="radio"
-                  aria-checked={roomState.settings.turnTimeoutSec === sec}
-                  className={roomState.settings.turnTimeoutSec === sec ? 'active' : ''}
-                  onClick={() => handleTurnTimer(sec)}
-                  disabled={!isHost}
-                  title={isHost ? undefined : 'Only the host can change this'}
-                >
-                  {sec === 0 ? 'Off' : `${sec}s`}
-                </button>
-              ))}
-            </div>
-
-            <div className="setting-row">
-              <span className="setting-icon">
-                <Swords size={18} />
-              </span>
-              <div className="setting-copy">
-                <strong>Force-buy</strong>
-                <span>Land on a rival's deed and buy it from them at double price.</span>
-              </div>
-            </div>
-            <div className="segmented small" role="radiogroup" aria-label="Force-buy mode">
-              {(
-                [
-                  ['off', 'Off'],
-                  ['developed', 'Built only'],
-                  ['any', 'Any deed']
-                ] as [ForceBuyMode, string][]
-              ).map(([mode, label]) => (
-                <button
-                  key={mode}
-                  role="radio"
-                  aria-checked={settings.forceBuyMode === mode}
-                  className={settings.forceBuyMode === mode ? 'active' : ''}
-                  onClick={() => handleForceBuyMode(mode)}
-                  disabled={!isHost}
-                  title={isHost ? undefined : 'Only the host can change this'}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            <div className="setting-row">
-              <span className="setting-icon">
-                <Shuffle size={18} />
-              </span>
-              <div className="setting-copy">
-                <strong>Random events</strong>
-                <span>Occasional board-wide surprises: bank bonuses, market crashes, surprise auctions.</span>
-              </div>
+            </RuleRow>
+            <RuleRow icon={<Shuffle size={17} />} title="Random events" sub="Bank bonuses, crashes, surprise auctions">
               <button
                 className={`switch ${settings.randomEvents ? 'on' : ''}`}
                 onClick={handleToggleRandomEvents}
                 disabled={!isHost}
                 role="switch"
                 aria-checked={settings.randomEvents}
-                title={isHost ? 'Toggle random events' : 'Only the host can change this'}
+                aria-label="Random events"
               />
-            </div>
+            </RuleRow>
+            <RuleRow icon={<Timer size={17} />} title="Turn timer" sub="Then the game plays the turn for you" stacked>
+              <div className="segmented small" role="radiogroup" aria-label="Turn timer">
+                {[0, 60, 90, 120].map((sec) => (
+                  <button
+                    key={sec}
+                    role="radio"
+                    aria-checked={roomState.settings.turnTimeoutSec === sec}
+                    className={roomState.settings.turnTimeoutSec === sec ? 'active' : ''}
+                    onClick={() => handleTurnTimer(sec)}
+                    disabled={!isHost}
+                  >
+                    {sec === 0 ? 'Off' : `${sec}s`}
+                  </button>
+                ))}
+              </div>
+            </RuleRow>
+            <RuleRow icon={<Swords size={17} />} title="Force-buy" sub="Buy a rival's city at double price" stacked>
+              <div className="segmented small" role="radiogroup" aria-label="Force-buy mode">
+                {(['off', 'developed', 'any'] as ForceBuyMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    role="radio"
+                    aria-checked={settings.forceBuyMode === mode}
+                    className={settings.forceBuyMode === mode ? 'active' : ''}
+                    onClick={() => handleForceBuyMode(mode)}
+                    disabled={!isHost}
+                  >
+                    {FORCE_BUY_LABEL[mode]}
+                  </button>
+                ))}
+              </div>
+            </RuleRow>
           </section>
+        </aside>
 
-
-          <div className="lobby-actions">
-            {isHost ? (
-              <button className="btn btn-primary btn-xl btn-block btn-start" onClick={handleStartGame} disabled={!canStart}>
-                <Play size={20} fill="currentColor" />
-                <span>Start game</span>
-              </button>
-            ) : (
-              <button
-                className={`btn btn-xl btn-block btn-ready ${mySeat?.isReady ? 'btn-secondary is-ready' : 'btn-success'}`}
-                onClick={handleToggleReady}
-              >
-                <Check size={20} strokeWidth={3} />
-                <span>{mySeat?.isReady ? "I'm ready (tap to undo)" : 'Ready up'}</span>
-              </button>
-            )}
-            <p className="lobby-hint">{isHost ? startHint : mySeat?.isReady ? 'Waiting for the host to start.' : 'Pick your token, then ready up.'}</p>
-          </div>
-        </div>
-      </div>
+        <footer className="mx-panel lobby-actions">
+          <p className="lobby-hint">
+            <span className={`hint-dot ${canStart ? 'go' : ''}`} />
+            {isHost ? startHint : mySeat?.isReady ? 'You are ready. Waiting for the host to start.' : 'Pick your piece, then ready up.'}
+          </p>
+          {isHost ? (
+            <button className="mx-cta gold btn-start" onClick={handleStartGame} disabled={!canStart}>
+              <Play size={22} fill="currentColor" />
+              <span>Start game</span>
+            </button>
+          ) : (
+            <button className={`mx-cta btn-ready ${mySeat?.isReady ? 'ghost is-ready' : 'green'}`} onClick={handleToggleReady}>
+              <Check size={22} strokeWidth={3.2} />
+              <span>{mySeat?.isReady ? 'Ready (undo)' : 'Ready up'}</span>
+            </button>
+          )}
+        </footer>
+      </main>
     </div>
   );
 };
+
+export const BOARD_CHOICES: { id: BoardId; name: string; sub: string; players: string; icon: typeof Globe2 }[] = [
+  { id: 'world', name: 'World', sub: '40 tiles · 8 countries', players: '2–4', icon: Globe2 },
+  { id: 'grand', name: 'Grand World', sub: '56 tiles · 12 countries · tolls & jackpot', players: '4–6', icon: Earth }
+];
+
+const RuleRow: React.FC<{ icon: React.ReactNode; title: string; sub: string; stacked?: boolean; children: React.ReactNode }> = ({
+  icon,
+  title,
+  sub,
+  stacked,
+  children
+}) => (
+  <div className={`rule-row ${stacked ? 'stacked' : ''}`}>
+    <span className="rule-icon">{icon}</span>
+    <span className="rule-copy">
+      <b>{title}</b>
+      <small>{sub}</small>
+    </span>
+    {children}
+  </div>
+);
 
 // The server runs older code than this page: new lobby settings would be
 // ignored, so say so plainly (the fix is rebuilding + restarting it).
 const ServerOutdated: React.FC = () => (
   <div className="server-outdated" role="alert">
-    <b>The game server needs an update.</b> Some settings (force-buy, random events) will not work until the host
+    <b>The game server needs an update.</b> Some features (bots, force-buy, random events) will not work until the host
     rebuilds and restarts it (<code>npm run build</code>, then restart).
   </div>
 );

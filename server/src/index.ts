@@ -17,6 +17,7 @@ import { broadcastRoom, wireEngine } from './wire.js';
 import { verifyIdToken } from './firebase.js';
 import { registerLobbyHandlers } from './handlers/lobby.js';
 import { registerGameHandlers } from './handlers/gameplay.js';
+import { refillBotNames } from './bots/names.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -101,6 +102,8 @@ async function createProfiles(): Promise<ProfileStore | undefined> {
 }
 
 const roomManager = new RoomManager(fileStore, await createProfiles());
+// Fetch a batch of bot names in the background (built-in names if offline).
+void refillBotNames();
 
 // Firebase sign-in (optional): a valid ID token makes the account uid the
 // player's identity. Invalid / missing tokens just play as guests.

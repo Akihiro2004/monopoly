@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, PiggyBank, Siren } from 'lucide-react';
-import { BOARD_TILES, GameState } from '@monopoly/shared';
+import { GameState } from '@monopoly/shared';
 import { useGameStore } from '../../store/gameStore.js';
 import { audioManager } from '../../sound/audioManager.js';
 import { money } from '../theme.js';
+import { currentBoard } from '../../board.js';
 
 // Cash warning tiers: 1 = under $300, 2 = under $200, 3 = under $100.
 export const LOW_CASH = [300, 200, 100];
@@ -19,7 +20,7 @@ function worstRent(game: GameState, myId: string): number {
   let worst = 0;
   for (const p of Object.values(game.properties)) {
     if (!p.ownerId || p.ownerId === myId || p.isMortgaged) continue;
-    const t = BOARD_TILES[p.tileIndex];
+    const t = currentBoard().tiles[p.tileIndex];
     if (t.type !== 'property') continue;
     worst = Math.max(worst, t.rentByLevel[p.buildLevel] ?? 0);
   }

@@ -1,16 +1,8 @@
 import { create } from 'zustand';
-import {
-  GameState,
-  RoomState,
-  ChatMessage,
-  BuyOffer,
-  ForceBuyOffer,
-  VictoryType,
-  CardDraw,
-  GO_SALARY
-} from '@monopoly/shared';
+import { GameState, RoomState, ChatMessage, BuyOffer, ForceBuyOffer, VictoryType, CardDraw } from '@monopoly/shared';
 import { socket, currentPlayerId, clearSession } from '../net/socket.js';
 import { audioManager } from '../sound/audioManager.js';
+import { currentBoard } from '../board.js';
 
 export interface ToastMessage {
   id: string;
@@ -212,7 +204,7 @@ export const useGameStore = create<GameStore>((set) => ({
       const held = s.moneyHold?.[playerId];
       if (!s.moneyHold || !held || !s.rawGame) return { goCelebration };
       // The salary is paid the moment the token passes GO.
-      const moneyHold = { ...s.moneyHold, [playerId]: { ...held, money: held.money + GO_SALARY } };
+      const moneyHold = { ...s.moneyHold, [playerId]: { ...held, money: held.money + currentBoard().goSalary } };
       return { goCelebration, moneyHold, gameState: present(s.rawGame, moneyHold) };
     });
   },

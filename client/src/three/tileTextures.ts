@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { BOARD_TILES, COLOR_GROUPS, COUNTRY_NAMES, GROUP_COUNTRY, SIDE_NAMES, TileDef } from '@monopoly/shared';
-import { BOARD_COORDINATES } from './boardCoords.js';
+import { BoardDef, COUNTRY_NAMES, GROUP_COUNTRY, SIDE_NAMES, TileDef, sideOf } from '@monopoly/shared';
+import { boardLayout, centerScale } from './boardCoords.js';
 
 // Half the size of the painted centre square (CenterBoard box is 14.7 wide).
 const CENTER_HALF = 7.35;
@@ -23,7 +23,12 @@ export const BAND_HEX: Record<string, string> = {
   red: '#e2261f',
   yellow: '#f7d117',
   green: '#1ea44b',
-  darkblue: '#1f4fbf'
+  darkblue: '#1f4fbf',
+  // Grand World
+  teal: '#14b8a6',
+  purple: '#7c3aed',
+  lime: '#9bd12c',
+  crimson: '#9f1239'
 };
 
 function canvas(w: number, h: number) {
@@ -250,7 +255,71 @@ function paintEdge(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.strokeRect(3, 3, w - 6, h - 6);
 }
 
-function standardTile(tile: TileDef, flags: Record<string, HTMLImageElement>): HTMLCanvasElement {
+// Toll gate: a little booth and a striped barrier arm.
+function tollGate(ctx: CanvasRenderingContext2D, x: number, y: number, s: number) {
+  const k = s / 150;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(k, k);
+  ctx.lineWidth = 8;
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = INK;
+  ctx.fillStyle = '#2f7de1';
+  roundRect(ctx, -78, -40, 52, 92, 8);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#9ee7ff';
+  ctx.fillRect(-70, -28, 36, 28);
+  ctx.strokeRect(-70, -28, 36, 28);
+  ctx.fillStyle = '#e7352c';
+  roundRect(ctx, -88, -58, 72, 20, 6);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = INK;
+  ctx.fillRect(-18, 2, 16, 50);
+  ctx.save();
+  ctx.translate(-10, 10);
+  ctx.rotate(-0.14);
+  ctx.fillStyle = '#fff';
+  roundRect(ctx, 0, -10, 100, 20, 6);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#e7352c';
+  for (let i = 0; i < 4; i++) ctx.fillRect(12 + i * 22, -6, 11, 12);
+  ctx.restore();
+  ctx.restore();
+}
+
+// Lucky Draw: a wrapped present.
+function giftBox(ctx: CanvasRenderingContext2D, x: number, y: number, s: number) {
+  const k = s / 150;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(k, k);
+  ctx.lineWidth = 8;
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = INK;
+  ctx.fillStyle = '#a78bfa';
+  roundRect(ctx, -54, -6, 108, 72, 8);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#8b5cf6';
+  roundRect(ctx, -64, -34, 128, 30, 8);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#ffc629';
+  ctx.fillRect(-12, -34, 24, 100);
+  ctx.strokeRect(-12, -34, 24, 100);
+  for (const dir of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(dir * 24, -48, 24, 14, dir * 0.45, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function standardTile(tile: TileDef, flags: Record<string, HTMLImageElement>, board: BoardDef): HTMLCanvasElement {
   const W = 256;
   const H = 384;
   const [c, ctx] = canvas(W, H);
@@ -290,6 +359,8 @@ function standardTile(tile: TileDef, flags: Record<string, HTMLImageElement>): H
 
   const name =
     tile.type === 'chest' ? 'COMMUNITY CHEST' : tile.type === 'chance' ? 'CHANCE' : tile.name.toUpperCase();
+  // Chance tiles take turns between three colours around the board.
+  const chanceNo = board.tiles.filter((t) => t.type === 'chance' && t.index < tile.index).length;
   ctx.fillStyle = INK;
   ctx.font = `900 ${tile.type === 'property' ? 32 : 30}px ${BODY}`;
   const lines = wrap(ctx, name, W - 40);
@@ -298,7 +369,7 @@ function standardTile(tile: TileDef, flags: Record<string, HTMLImageElement>): H
   const iconY = tile.type === 'property' ? 0 : 230;
   switch (tile.type) {
     case 'chance':
-      questionMark(ctx, W / 2, iconY, 170, tile.index === 7 ? '#e7352c' : tile.index === 22 ? '#2f7de1' : '#f58a1f');
+      questionMark(ctx, W / 2, iconY, 170, ['#e7352c', '#2f7de1', '#f58a1f'][chanceNo % 3]);
       break;
     case 'chest':
       chest(ctx, W / 2, iconY, 130);
@@ -307,12 +378,18 @@ function standardTile(tile: TileDef, flags: Record<string, HTMLImageElement>): H
       airplane(ctx, W / 2, iconY, 170);
       break;
     case 'utility':
-      if (tile.index === 12) bulb(ctx, W / 2, iconY - 10, 150);
+      if (tile.name.startsWith('Electric')) bulb(ctx, W / 2, iconY - 10, 150);
       else faucet(ctx, W / 2, iconY, 150);
       break;
     case 'tax':
-      if (tile.index === 4) moneyBag(ctx, W / 2, iconY, 120);
+      if (tile.name.startsWith('Income')) moneyBag(ctx, W / 2, iconY, 120);
       else diamond(ctx, W / 2, iconY, 130);
+      break;
+    case 'toll':
+      tollGate(ctx, W / 2, iconY, 150);
+      break;
+    case 'bonus':
+      giftBox(ctx, W / 2, iconY, 140);
       break;
   }
 
@@ -329,11 +406,14 @@ function standardTile(tile: TileDef, flags: Record<string, HTMLImageElement>): H
     ctx.fillText(`$${tile.price}`, W / 2, H - 40);
   } else if (tile.type === 'tax') {
     ctx.fillText(`PAY $${tile.rentByLevel[0]}`, W / 2, H - 40);
+  } else if (tile.type === 'bonus') {
+    ctx.font = `800 26px ${BODY}`;
+    ctx.fillText('TRY YOUR LUCK', W / 2, H - 40);
   }
   return c;
 }
 
-function cornerTile(tile: TileDef): HTMLCanvasElement {
+function cornerTile(tile: TileDef, board: BoardDef): HTMLCanvasElement {
   const S = 384;
   const [c, ctx] = canvas(S, S);
   paintEdge(ctx, S, S);
@@ -404,9 +484,19 @@ function cornerTile(tile: TileDef): HTMLCanvasElement {
     ctx.save();
     ctx.translate(S / 2, S / 2);
     ctx.rotate(-Math.PI / 4);
-    ctx.font = `48px ${DISPLAY}`;
-    ctx.fillText('FREE', 0, -110);
-    ctx.fillText('PARKING', 0, 118);
+    if (board.jackpot) {
+      // Grand World: Free Parking pays out the jackpot.
+      ctx.font = `40px ${DISPLAY}`;
+      ctx.fillText('FREE PARKING', 0, -110);
+      ctx.font = `52px ${DISPLAY}`;
+      ctx.fillStyle = '#c98f00';
+      ctx.fillText('JACKPOT', 0, 122);
+      ctx.fillStyle = INK;
+    } else {
+      ctx.font = `48px ${DISPLAY}`;
+      ctx.fillText('FREE', 0, -110);
+      ctx.fillText('PARKING', 0, 118);
+    }
     // car
     ctx.lineWidth = 8;
     ctx.strokeStyle = INK;
@@ -463,7 +553,7 @@ function cornerTile(tile: TileDef): HTMLCanvasElement {
   return c;
 }
 
-function centerArt(): HTMLCanvasElement {
+function centerArt(board: BoardDef): HTMLCanvasElement {
   const S = 1024;
   const [c, ctx] = canvas(S, S);
   ctx.fillStyle = FACE;
@@ -529,11 +619,15 @@ function centerArt(): HTMLCanvasElement {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
-  for (const [group, idxs] of Object.entries(COLOR_GROUPS)) {
+  const layout = boardLayout(board);
+  for (const [group, idxs] of Object.entries(board.groups)) {
     const country = GROUP_COUNTRY[group];
     if (!country || !idxs.length) continue;
-    const side = Math.floor(idxs[0] / 10);
-    const pos = idxs.map((i) => BOARD_COORDINATES[i].position);
+    const side = sideOf(board, idxs[0]);
+    // Tile positions in centre-board units (the ring is scaled to fit the
+    // table and the centre board is stretched to fill the ring).
+    const k = layout.scale / centerScale(layout);
+    const pos = idxs.map((i) => layout.coords[i].position.map((v) => v * k));
     const avgX = pos.reduce((a, p) => a + p[0], 0) / pos.length;
     const avgZ = pos.reduce((a, p) => a + p[2], 0) / pos.length;
     const [x, y, r] =
@@ -600,7 +694,7 @@ export interface BoardTextures {
   center: THREE.CanvasTexture;
 }
 
-let cache: Promise<BoardTextures> | null = null;
+const cache = new Map<string, Promise<BoardTextures>>();
 
 function loadFlags(): Promise<Record<string, HTMLImageElement>> {
   const codes = Object.keys(COUNTRY_NAMES);
@@ -618,9 +712,10 @@ function loadFlags(): Promise<Record<string, HTMLImageElement>> {
 }
 
 // Waits for the web fonts so the canvas text uses Lilita One / Nunito.
-export function loadBoardTextures(): Promise<BoardTextures> {
-  if (!cache) {
-    cache = Promise.all([
+export function loadBoardTextures(board: BoardDef): Promise<BoardTextures> {
+  let textures = cache.get(board.id);
+  if (!textures) {
+    textures = Promise.all([
       document.fonts.load(`64px ${DISPLAY}`),
       document.fonts.load(`900 32px ${BODY}`),
       document.fonts.load(`800 30px ${BODY}`)
@@ -628,9 +723,12 @@ export function loadBoardTextures(): Promise<BoardTextures> {
       .catch(() => undefined)
       .then(loadFlags)
       .then((flags) => ({
-        tiles: BOARD_TILES.map((t) => toTexture(t.index % 10 === 0 ? cornerTile(t) : standardTile(t, flags))),
-        center: toTexture(centerArt())
+        tiles: board.tiles.map((t) =>
+          toTexture(t.index % board.perSide === 0 ? cornerTile(t, board) : standardTile(t, flags, board))
+        ),
+        center: toTexture(centerArt(board))
       }));
+    cache.set(board.id, textures);
   }
-  return cache;
+  return textures;
 }

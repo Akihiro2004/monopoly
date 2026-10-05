@@ -1,5 +1,6 @@
-import { BOARD_TILES, GO_TILE_INDEX, GameState, PlayerState, PropertyState, TileDef, buildBlockReason } from '@monopoly/shared';
+import { GO_TILE_INDEX, GameState, PlayerState, PropertyState, TileDef, buildBlockReason } from '@monopoly/shared';
 import { useGameStore } from '../../store/gameStore.js';
+import { currentBoard } from '../../board.js';
 
 export interface UpgradeOption {
   prop: PropertyState;
@@ -35,7 +36,7 @@ export interface TurnInfo {
 export function upgradeOptionFor(game: GameState, me: PlayerState | undefined, tileIndex: number): UpgradeOption | null {
   if (!me) return null;
   const prop = game.properties[tileIndex];
-  const tile = BOARD_TILES[tileIndex];
+  const tile = currentBoard().tiles[tileIndex];
   if (!prop || !tile || prop.ownerId !== me.playerId) return null;
   if (prop.isMortgaged || tile.buildCost <= 0 || prop.buildLevel >= 4) return null;
   if (prop.buildLevel === 3 && prop.forceBought) return null;
@@ -60,7 +61,7 @@ export function upgradeOptionFor(game: GameState, me: PlayerState | undefined, t
 function goBuildOptionsFor(game: GameState, me: PlayerState | undefined): UpgradeOption[] {
   if (!me || me.position !== GO_TILE_INDEX) return [];
   const options: UpgradeOption[] = [];
-  for (const tile of BOARD_TILES) {
+  for (const tile of currentBoard().tiles) {
     if (game.properties[tile.index]?.ownerId !== me.playerId) continue;
     const option = upgradeOptionFor(game, me, tile.index);
     if (option) options.push(option);
